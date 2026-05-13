@@ -1,0 +1,21 @@
+# PyTorch: install CUDA version separately from https://pytorch.org/
+# e.g. pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+torch>=2.1.0
+
+# Stable Baselines3
+stable-baselines3>=2.2.0
+
+# sb3-contrib: MaskablePPO
+sb3-contrib>=2.2.0
+
+# Gymnasium
+gymnasium>=0.29.0
+
+# Numpy
+numpy>=1.24.0
+
+# TensorBoard (optional)
+tensorboard>=2.15.0
+
+# Weights & Biases (optional, for --wandb flag)
+wandb>=0.16.0

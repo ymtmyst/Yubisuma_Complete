@@ -1,0 +1,312 @@
+_current_progress_remaining:
+    value: 0.9737856
+_custom_logger:
+    value: "False"
+_episode_num:
+    value: 0
+_last_episode_starts:
+    value: '[ True  True  True  True]'
+_last_obs:
+    value: |-
+        [[1. 1. 1. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0.
+          0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 1. 1. 1. 0. 0. 0. 0. 0. 0. 0. 0. 0.
+          0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 1. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0.
+          0. 0. 0. 0. 0. 0. 0. 1. 0. 0. 0. 0. 0.]
+         [1. 1. 1. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0.
+          0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 1. 1. 1. 0. 0. 0. 0. 0. 0. 0. 0. 0.
+          0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 1. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0.
+          0. 0. 0. 0. 0. 0. 0. 1. 0. 0. 0. 0. 0.]
+         [1. 1. 1. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0.
+          0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 1. 1. 1. 0. 0. 0. 0. 0. 0. 0. 0. 0.
+          0. 0. 0. 0. 0. 0. 0. 0. 0. 1. 1. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0.
+          0. 0. 0. 0. 0. 0. 0. 1. 0. 0. 0. 0. 0.]
+         [1. 1. 1. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0.
+          0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 1. 1. 1. 0. 0. 0. 0. 0. 0. 0. 0. 0.
+          0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 1. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0.
+          0. 0. 0. 0. 0. 0. 0. 1. 0. 0. 0. 0. 0.]]
+_last_original_obs:
+    value: None
+_logger:
+    value: <stable_baselines3.common.logger.Logger object at 0x00000196F0271300>
+_n_updates:
+    value: 160
+_num_timesteps_at_start:
+    value: 133776
+_stats_window_size:
+    value: 100
+_total_timesteps:
+    value: 5133776
+_vec_normalize_env:
+    value: None
+_wandb:
+    value:
+        cli_version: 0.24.1
+        e:
+            gyzome85a7wnj3fmob3upel8ic7o4r11:
+                args:
+                    - --resume
+                    - rl_models/yubisuma_ppo_final
+                    - --wandb
+                    - --steps
+                    - "5000000"
+                cpu_count: 16
+                cpu_count_logical: 24
+                cudaVersion: "13.1"
+                disk:
+                    /:
+                        total: "1999226531840"
+                        used: "553275895808"
+                email: tkt.hotrine.yomis.m4@gmail.com
+                executable: C:\Users\tktho\AppData\Local\Programs\Python\Python310\python.exe
+                gpu: NVIDIA GeForce RTX 4070 Ti
+                gpu_count: 1
+                gpu_nvidia:
+                    - architecture: Ada
+                      cudaCores: 7680
+                      memoryTotal: "12878610432"
+                      name: NVIDIA GeForce RTX 4070 Ti
+                      uuid: GPU-794035eb-c490-01f2-6785-b53e00077f4c
+                host: DESKTOP-VBDUSDT
+                memory:
+                    total: "34200444928"
+                os: Windows-10-10.0.26200-SP0
+                program: -m rl.train
+                python: CPython 3.10.11
+                root: C:\Users\tktho\OneDrive\yubisuma\Complete
+                startedAt: "2026-05-13T09:09:37.697579Z"
+                writerId: gyzome85a7wnj3fmob3upel8ic7o4r11
+        m: []
+        python_version: 3.10.11
+        t:
+            "1":
+                - 1
+                - 105
+            "2":
+                - 1
+                - 105
+            "3":
+                - 2
+                - 16
+                - 22
+                - 35
+            "4": 3.10.11
+            "5": 0.24.1
+            "8":
+                - 3
+            "12": 0.24.1
+            "13": windows-amd64
+action_noise:
+    value: None
+action_space:
+    value: Discrete(87)
+algo:
+    value: MaskablePPO
+batch_size:
+    value: 256
+clip_range:
+    value: 0.2
+clip_range_vf:
+    value: None
+device:
+    value: cuda
+ent_coef:
+    value: 0.01
+env:
+    value: <stable_baselines3.common.vec_env.dummy_vec_env.DummyVecEnv object at 0x00000196DA5433A0>
+ep_info_buffer:
+    value: deque([], maxlen=100)
+ep_success_buffer:
+    value: deque([], maxlen=100)
+gae_lambda:
+    value: 0.95
+gamma:
+    value: 0.99
+league:
+    value:
+        initial_weight: 0.1
+        max_opponents: 30
+        random_weight: 0.2
+        recent_weight: 0.7
+        win_rate_threshold: 0.6
+learning_rate:
+    value: 0.0003
+lr_schedule:
+    value: FloatSchedule(ConstantSchedule(val=0.0003))
+max_grad_norm:
+    value: 0.5
+n_envs:
+    value: 4
+n_epochs:
+    value: 10
+n_steps:
+    value: 2048
+network:
+    value:
+        aux_layers:
+            - 128
+            - 64
+        feature_dim: 256
+        policy_layers:
+            - 256
+            - 128
+        value_layers:
+            - 256
+            - 128
+normalize_advantage:
+    value: true
+num_timesteps:
+    value: 133776
+observation_space:
+    value: Box(0.0, 1.0, (85,), float32)
+policy:
+    value: |-
+        MaskableActorCriticPolicy(
+          (features_extractor): YubisumaFeaturesExtractor(
+            (shared_net): Sequential(
+              (0): Linear(in_features=85, out_features=512, bias=True)
+              (1): ReLU()
+              (2): LayerNorm((512,), eps=1e-05, elementwise_affine=True)
+              (3): Linear(in_features=512, out_features=384, bias=True)
+              (4): ReLU()
+              (5): LayerNorm((384,), eps=1e-05, elementwise_affine=True)
+              (6): Linear(in_features=384, out_features=256, bias=True)
+              (7): ReLU()
+              (8): LayerNorm((256,), eps=1e-05, elementwise_affine=True)
+            )
+            (aux_reaction_head): Sequential(
+              (0): Linear(in_features=256, out_features=128, bias=True)
+              (1): ReLU()
+              (2): Linear(in_features=128, out_features=64, bias=True)
+              (3): ReLU()
+              (4): Linear(in_features=64, out_features=3, bias=True)
+            )
+            (aux_thumbs_head): Sequential(
+              (0): Linear(in_features=256, out_features=128, bias=True)
+              (1): ReLU()
+              (2): Linear(in_features=128, out_features=64, bias=True)
+              (3): ReLU()
+              (4): Linear(in_features=64, out_features=3, bias=True)
+            )
+            (aux_skill_head): Sequential(
+              (0): Linear(in_features=256, out_features=128, bias=True)
+              (1): ReLU()
+              (2): Linear(in_features=128, out_features=64, bias=True)
+              (3): ReLU()
+              (4): Linear(in_features=64, out_features=26, bias=True)
+            )
+          )
+          (pi_features_extractor): YubisumaFeaturesExtractor(
+            (shared_net): Sequential(
+              (0): Linear(in_features=85, out_features=512, bias=True)
+              (1): ReLU()
+              (2): LayerNorm((512,), eps=1e-05, elementwise_affine=True)
+              (3): Linear(in_features=512, out_features=384, bias=True)
+              (4): ReLU()
+              (5): LayerNorm((384,), eps=1e-05, elementwise_affine=True)
+              (6): Linear(in_features=384, out_features=256, bias=True)
+              (7): ReLU()
+              (8): LayerNorm((256,), eps=1e-05, elementwise_affine=True)
+            )
+            (aux_reaction_head): Sequential(
+              (0): Linear(in_features=256, out_features=128, bias=True)
+              (1): ReLU()
+              (2): Linear(in_features=128, out_features=64, bias=True)
+              (3): ReLU()
+              (4): Linear(in_features=64, out_features=3, bias=True)
+            )
+            (aux_thumbs_head): Sequential(
+              (0): Linear(in_features=256, out_features=128, bias=True)
+              (1): ReLU()
+              (2): Linear(in_features=128, out_features=64, bias=True)
+              (3): ReLU()
+              (4): Linear(in_features=64, out_features=3, bias=True)
+            )
+            (aux_skill_head): Sequential(
+              (0): Linear(in_features=256, out_features=128, bias=True)
+              (1): ReLU()
+              (2): Linear(in_features=128, out_features=64, bias=True)
+              (3): ReLU()
+              (4): Linear(in_features=64, out_features=26, bias=True)
+            )
+          )
+          (vf_features_extractor): YubisumaFeaturesExtractor(
+            (shared_net): Sequential(
+              (0): Linear(in_features=85, out_features=512, bias=True)
+              (1): ReLU()
+              (2): LayerNorm((512,), eps=1e-05, elementwise_affine=True)
+              (3): Linear(in_features=512, out_features=384, bias=True)
+              (4): ReLU()
+              (5): LayerNorm((384,), eps=1e-05, elementwise_affine=True)
+              (6): Linear(in_features=384, out_features=256, bias=True)
+              (7): ReLU()
+              (8): LayerNorm((256,), eps=1e-05, elementwise_affine=True)
+            )
+            (aux_reaction_head): Sequential(
+              (0): Linear(in_features=256, out_features=128, bias=True)
+              (1): ReLU()
+              (2): Linear(in_features=128, out_features=64, bias=True)
+              (3): ReLU()
+              (4): Linear(in_features=64, out_features=3, bias=True)
+            )
+            (aux_thumbs_head): Sequential(
+              (0): Linear(in_features=256, out_features=128, bias=True)
+              (1): ReLU()
+              (2): Linear(in_features=128, out_features=64, bias=True)
+              (3): ReLU()
+              (4): Linear(in_features=64, out_features=3, bias=True)
+            )
+            (aux_skill_head): Sequential(
+              (0): Linear(in_features=256, out_features=128, bias=True)
+              (1): ReLU()
+              (2): Linear(in_features=128, out_features=64, bias=True)
+              (3): ReLU()
+              (4): Linear(in_features=64, out_features=26, bias=True)
+            )
+          )
+          (mlp_extractor): MlpExtractor(
+            (policy_net): Sequential(
+              (0): Linear(in_features=256, out_features=256, bias=True)
+              (1): ReLU()
+              (2): Linear(in_features=256, out_features=128, bias=True)
+              (3): ReLU()
+            )
+            (value_net): Sequential(
+              (0): Linear(in_features=256, out_features=256, bias=True)
+              (1): ReLU()
+              (2): Linear(in_features=256, out_features=128, bias=True)
+              (3): ReLU()
+            )
+          )
+          (action_net): Linear(in_features=128, out_features=87, bias=True)
+          (value_net): Linear(in_features=128, out_features=1, bias=True)
+        )
+policy_class:
+    value: <class 'sb3_contrib.common.maskable.policies.MaskableActorCriticPolicy'>
+policy_kwargs:
+    value: '{''features_extractor_class'': <class ''rl.network.YubisumaFeaturesExtractor''>, ''features_extractor_kwargs'': {''features_dim'': 256}, ''net_arch'': {''pi'': [256, 128], ''vf'': [256, 128]}, ''activation_fn'': <class ''torch.nn.modules.activation.ReLU''>}'
+resume:
+    value: rl_models/yubisuma_ppo_final
+rollout_buffer:
+    value: <sb3_contrib.common.maskable.buffers.MaskableRolloutBuffer object at 0x00000196DAC89E40>
+rollout_buffer_class:
+    value: <class 'sb3_contrib.common.maskable.buffers.MaskableRolloutBuffer'>
+rollout_buffer_kwargs:
+    value: '{}'
+sde_sample_freq:
+    value: -1
+seed:
+    value: None
+start_time:
+    value: 1778663382584966200
+target_kl:
+    value: None
+tensorboard_log:
+    value: C:\Users\tktho\OneDrive\yubisuma\Complete\rl_logs
+total_steps:
+    value: 5000000
+use_sde:
+    value: "False"
+verbose:
+    value: 1
+vf_coef:
+    value: 0.5
