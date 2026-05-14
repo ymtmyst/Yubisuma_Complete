@@ -5,11 +5,14 @@ SB3用カスタムコールバック:
 - AuxLossCallback: 補助タスク損失の計算・適用
 - AnalysisCallback: 分析DBへの記録
 - CheckpointCallback: チェックポイント保存
+- SkillSnapshotCallback: スキル分布をJSONに上書き出力（ゲームロジック確認用）
 """
 
+import json
 import os
 import numpy as np
 from collections import deque
+from datetime import datetime
 
 from stable_baselines3.common.callbacks import BaseCallback
 
@@ -298,3 +301,76 @@ class EntCoefScheduleCallback(BaseCallback):
         # progress: 0.0(開始) → 1.0(終了) で initial → final に線形減衰
         self.model.ent_coef = self.final + (1.0 - progress) * (self.initial - self.final)
         return True
+
+
+class SkillSnapshotCallback(BaseCallback):
+    """
+    直近 last_n エピソードのスキル使用分布を JSON に上書き出力。
+    ゲームロジックが正しく機能しているかの確認用。
+    snapshot_freq ステップごとに更新し、訓練終了時にも最終出力する。
+    """
+
+    def __init__(self, analysis_db, output_path, snapshot_freq=50_000,
+                 last_n=100, verbose=0):
+        super().__init__(verbose)
+        self.analysis_db = analysis_db
+        self.output_path = output_path
+        self.snapshot_freq = snapshot_freq
+        self.last_n = last_n
+        self._last_snapshot = 0
+
+    def _on_step(self) -> bool:
+        if self.num_timesteps - self._last_snapshot >= self.snapshot_freq:
+            self._write_snapshot()
+            self._last_snapshot = self.num_timesteps
+        return True
+
+    def _on_training_end(self) -> None:
+        self._write_snapshot()
+
+    def _write_snapshot(self):
+        try:
+            skills    = self.analysis_db.get_skill_usage_stats(last_n_episodes=self.last_n)
+            reactions = self.analysis_db.get_reaction_stats(last_n_episodes=self.last_n)
+            summary   = self.analysis_db.get_summary()
+            ep_stats  = self.analysis_db.get_episode_length_stats(last_n_episodes=self.last_n)
+
+            # スキル使用分布（TP行動）
+            total_skill = sum(s['usage_count'] for s in skills)
+            skill_dist = {}
+            for s in skills:
+                pct = s['usage_count'] / total_skill * 100 if total_skill else 0
+                skill_dist[s['skill']] = {
+                    "count": s['usage_count'],
+                    "pct":   round(pct, 1),
+                    "win%":  round(s['win_rate'] * 100, 1),
+                }
+
+            # リアクション分布（NTP行動）
+            total_react = sum(r['count'] for r in reactions)
+            react_dist = {}
+            for r in reactions:
+                pct = r['count'] / total_react * 100 if total_react else 0
+                react_dist[r['reaction']] = {
+                    "count": r['count'],
+                    "pct":   round(pct, 1),
+                }
+
+            snapshot = {
+                "step":             self.num_timesteps,
+                "updated_at":       datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "episodes_sampled": self.last_n,
+                "win_rate_%":       round(summary['recent_100_win_rate'] * 100, 1),
+                "avg_turns":        round(ep_stats.get('mean', 0), 1),
+                "skills_as_tp":     skill_dist,
+                "reactions_as_ntp": react_dist,
+            }
+
+            with open(self.output_path, 'w', encoding='utf-8') as f:
+                json.dump(snapshot, f, ensure_ascii=False, indent=2)
+
+            if self.verbose > 0:
+                print(f"[Snapshot] {self.output_path} 更新 (step={self.num_timesteps:,})")
+        except Exception as e:
+            if self.verbose > 0:
+                print(f"[Snapshot] 書き込みエラー: {e}")

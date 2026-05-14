@@ -209,14 +209,16 @@ class YubisumaEnv(gym.Env):
                     # フォールバック
                     available = [s for s in tp_inner.stock if s not in tp_inner.choice_used_this_phase]
                     chosen = available[0] if available else None
-                
+
                 if reaction_inner == "ブロック":
                     ntp.used_ultimate = True
-                    return
-                
+                    # スキップはブロック無効: スキップ以外のみ早期return
+                    if chosen != "スキップ":
+                        return
+
                 if chosen is None:
                     return
-                
+
                 tp_inner.choice_used_this_phase.add(chosen)
                 
                 from yubisuma_constants import ANTI_COUNTER_SKILLS
@@ -270,50 +272,54 @@ class YubisumaEnv(gym.Env):
         """ターン後のゲーム進行を処理"""
         gs = self.game_state
         effects = gs.effects
-        
+
+        # タイム復帰チェック（最優先: 強制ターン中の追加ターンを無効化してTime使用者に戻る）
+        if hasattr(gs, '_time_return_to') and gs._time_return_to:
+            if gs._time_return_to != last_tp_key:
+                # 強制ターン終了: 追加ターンを破棄してTime使用者に戻る
+                # ※ _time_return_toはクリアしない → _auto_advanceがスキップ中かどうか検知に使用
+                next_key = gs._time_return_to
+                if effects.has_extra_turn(last_tp_key):
+                    effects.additional_turns[last_tp_key] = 0
+                gs.on_phase_end(last_tp_key)
+                gs.current_player_key = next_key
+                self._on_phase_start(next_key)
+                return
+            else:
+                # Time使用者が通常ターンを完了した（スキップなし）: クリアして通常進行
+                gs._time_return_to = None
+
         # 追加ターンチェック
         if effects.has_extra_turn(last_tp_key):
             effects.use_extra_turn(last_tp_key)
             # 同じTPが続けてターンを行う（次のstep()で処理）
             return
-        
+
         # フェーズ終了
         gs.on_phase_end(last_tp_key)
-        
+
         # タイム効果チェック
         opp_key = gs.get_opponent_key(last_tp_key)
         current_player = gs.get_player(last_tp_key)
         opponent = gs.get_opponent(last_tp_key)
-        
+
         next_key = opp_key
-        
+
         if current_player.time_active:
             current_player.time_active = False
             # タイム効果: 相手に1ターンだけ渡して戻る
-            # → この処理は複雑なので簡略化: 相手のフェーズを開始
             gs.current_player_key = opp_key
             self._on_phase_start(opp_key)
-            # 相手のターンは次のstep()で処理される
-            # タイム効果のフラグをセット
+            # タイム効果のフラグをセット（次のstep()後に復帰）
             gs._time_return_to = last_tp_key
             return
-        
+
         if opponent.time_active:
             opponent.time_active = False
             if effects.has_extra_turn(last_tp_key):
                 effects.additional_turns[last_tp_key] = 0
             next_key = opp_key
-        
-        # タイム復帰チェック
-        if hasattr(gs, '_time_return_to') and gs._time_return_to:
-            # タイム効果で相手のターンが終了 → 元のプレイヤーに戻る
-            next_key = gs._time_return_to
-            gs._time_return_to = None
-            # 相手の追加ターンを破棄
-            if effects.has_extra_turn(opp_key):
-                effects.additional_turns[opp_key] = 0
-            gs.on_phase_end(opp_key)
-        
+
         # フェーズ遷移
         gs.current_player_key = next_key
         self._on_phase_start(next_key)
@@ -327,15 +333,30 @@ class YubisumaEnv(gym.Env):
         gs = self.game_state
         current_key = gs.current_player_key
         player = gs.get_player(current_key)
-        
+
         # スキップ中のターンを自動処理
         while player.skip_phases > 0 and not gs.game_over:
             # クイックレベル減少（スキップされた場合もターン経過として扱う）
             if player.quick_level > 0:
                 player.quick_level = max(0, player.quick_level - 1)
             gs.on_phase_end(current_key)
-            
-            # 相手にターンを渡す
+
+            # タイム復帰中にTime使用者がスキップされた場合:
+            # タイムは全処理に優先するため相手もスキップし、Time使用者に戻る
+            if hasattr(gs, '_time_return_to') and gs._time_return_to == current_key:
+                gs._time_return_to = None
+                opp_key = gs.get_opponent_key(current_key)
+                opp = gs.get_player(opp_key)
+                if opp.quick_level > 0:
+                    opp.quick_level = max(0, opp.quick_level - 1)
+                gs.effects.mark_first_phase_done(opp_key)
+                # Time使用者に戻る
+                gs.current_player_key = current_key
+                self._on_phase_start(current_key)
+                player = gs.get_player(current_key)
+                continue  # skip_phases = 0 になったのでループ終了へ
+
+            # 相手にターンを渡す（通常スキップ）
             current_key = gs.get_opponent_key(current_key)
             gs.current_player_key = current_key
             self._on_phase_start(current_key)

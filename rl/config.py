@@ -13,6 +13,7 @@ MODEL_DIR = os.path.join(BASE_DIR, "rl_models")
 LOG_DIR = os.path.join(BASE_DIR, "rl_logs")
 LEAGUE_DIR = os.path.join(MODEL_DIR, "league")
 DB_PATH = os.path.join(BASE_DIR, "rl_analysis.db")
+SNAPSHOT_PATH = os.path.join(BASE_DIR, "skill_snapshot.json")  # スキル分布スナップショット
 
 # === 行動空間 ===
 # TP (ターンプレイヤー) の行動

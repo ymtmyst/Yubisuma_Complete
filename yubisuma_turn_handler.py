@@ -71,7 +71,13 @@ class TurnHandler:
         # 2. ブロック使用
         elif reaction == "ブロック":
             ntp.used_ultimate = True
-            if skill_name == "スキップ":
+            # スキップはブロック無効。コピーがスキップをコピーする場合も同様
+            is_skip_effect = skill_name == "スキップ"
+            if not is_skip_effect and skill_name == "コピー" and len(effects.turn_history) >= 2:
+                copied_skill = effects.turn_history[-2][1]
+                if copied_skill == "スキップ":
+                    is_skip_effect = True
+            if is_skip_effect:
                 print(f"  ブロックはスキップに対しては無効！")
                 TurnHandler._resolve_skill_effect(gs, tp_key, skill, thumbs, total, was_skip_before, charge_was_active)
             else:
@@ -308,11 +314,9 @@ class TurnHandler:
         ntp = gs.get_opponent(tp_key)
         effects = gs.effects
 
-        # ブロックされた場合: 効果無効（選択自体スキップ）
+        # ブロック宣言: 先に必殺使用済みマーク（スキップ選択時はブロック無効のため選択後に判定）
         if reaction == "ブロック":
             ntp.used_ultimate = True
-            print(f"  {ntp.name}のブロックによりチョイスの効果が無効化！")
-            return
 
         # プレイヤーがカウンター有無を見てからストックを選択
         if tp.key == KEY_PLAYER:
@@ -336,6 +340,11 @@ class TurnHandler:
 
         tp.choice_used_this_phase.add(chosen)
         print(f"  チョイス！「{chosen}」の効果を発動します")
+
+        # ブロック有効判定: スキップはブロック無効、それ以外はブロックで無効化
+        if reaction == "ブロック" and chosen != "スキップ":
+            print(f"  {ntp.name}のブロックにより{tp.name}のスキル効果が無効化！")
+            return
 
         # スキップ連鎖判定（チョイスでスキップを選んだ場合も連鎖対象）
         was_skip_before = effects.last_turn_was_skip[tp_key]
@@ -364,7 +373,7 @@ class TurnHandler:
             else:
                 print(f"    カウンターにより{chosen}の効果は発動せず、何も起こりません")
         else:
-            # リアクションなし → 通常効果発動
+            # リアクションなし（またはブロック+スキップ選択）→ 通常効果発動
             TurnHandler._execute_copied_skill(gs, tp_key, chosen, thumbs, total,
                                                upgrade_hand_to_win=False,
                                                was_skip_before=was_skip_before)

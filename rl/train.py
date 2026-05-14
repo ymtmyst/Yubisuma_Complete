@@ -22,7 +22,7 @@ import numpy as np
 from rl.config import (
     PPO_CONFIG, NETWORK_CONFIG, TOTAL_TIMESTEPS,
     MODEL_DIR, LOG_DIR, LEAGUE_CONFIG,
-    CHECKPOINT_FREQ, OPPONENT_UPDATE_FREQ,
+    CHECKPOINT_FREQ, OPPONENT_UPDATE_FREQ, SNAPSHOT_PATH,
 )
 from rl.env import YubisumaEnv
 from rl.network import YubisumaFeaturesExtractor
@@ -30,7 +30,7 @@ from rl.opponents import LeagueManager
 from rl.analysis import AnalysisDB
 from rl.callbacks import (
     SelfPlayCallback, AnalysisCallback, CheckpointCallback, AuxLossCallback,
-    EntCoefScheduleCallback,
+    EntCoefScheduleCallback, SkillSnapshotCallback,
 )
 
 
@@ -145,8 +145,13 @@ def train(args):
         final=0.005,
         total_steps=args.steps,
     )
+    snapshot_cb = SkillSnapshotCallback(
+        analysis_db, SNAPSHOT_PATH,
+        snapshot_freq=CHECKPOINT_FREQ, last_n=100, verbose=1,
+    )
 
-    callbacks = [selfplay_cb, analysis_cb, checkpoint_cb, aux_loss_cb, ent_coef_cb]
+    callbacks = [selfplay_cb, analysis_cb, checkpoint_cb, aux_loss_cb, ent_coef_cb,
+                 snapshot_cb]
 
     # W&B コールバック追加
     if wandb_run is not None:
