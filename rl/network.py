@@ -1,15 +1,17 @@
 # rl/network.py - カスタムネットワーク（補助予測ヘッド付き）
 """
-PPOのActor-Criticネットワークに相手行動予測の補助ヘッドを追加。
+PPOのActor-Criticネットワークに補助ヘッドを追加。
 - メイン: 方策(Actor) + 価値(Critic)
-- 補助: 相手リアクション予測 + 相手指本数予測 + 相手スキル予測
+- 補助1: 相手リアクション予測 + 相手指本数予測 + 相手スキル予測
+- 補助2: 終盤勝敗予測 (終盤局面の価値表現を補強)
 
 補助タスクは共有特徴量からの勾配を通じて、
-不完全情報下での相手モデリング能力を向上させる。
+不完全情報下での相手モデリング能力と長期戦略認識を向上させる。
 """
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import numpy as np
 from gymnasium import spaces
 
@@ -20,6 +22,7 @@ from rl.config import (
     NUM_TP_ACTIONS, NUM_NTP_ACTIONS,
     NUM_NTP_REACTIONS, NUM_THUMB_OPTIONS, NUM_TP_SKILLS,
     AUX_REACTION_WEIGHT, AUX_THUMBS_WEIGHT, AUX_SKILL_WEIGHT, AUX_LOSS_WEIGHT,
+    AUX_LOOKAHEAD_WEIGHT,
 )
 
 
@@ -78,7 +81,17 @@ class YubisumaFeaturesExtractor(BaseFeaturesExtractor):
             nn.ReLU(),
             nn.Linear(aux_hidden[1], NUM_TP_SKILLS),
         )
-        
+
+        # 終盤勝敗予測 (エピソード末尾LOOKAHEAD_N手前の観測→勝敗をBCEで学習)
+        # PPOの価値学習を壊さない範囲で、終盤局面の特徴表現を補助する。
+        self.aux_lookahead_head = nn.Sequential(
+            nn.Linear(features_dim, aux_hidden[0]),
+            nn.ReLU(),
+            nn.Linear(aux_hidden[0], aux_hidden[1]),
+            nn.ReLU(),
+            nn.Linear(aux_hidden[1], 1),
+        )
+
     def forward(self, observations: torch.Tensor) -> torch.Tensor:
         return self.shared_net(observations)
     
@@ -88,6 +101,7 @@ class YubisumaFeaturesExtractor(BaseFeaturesExtractor):
             'reaction': self.aux_reaction_head(features),
             'thumbs': self.aux_thumbs_head(features),
             'skill': self.aux_skill_head(features),
+            'lookahead': self.aux_lookahead_head(features),
         }
 
 
@@ -101,14 +115,23 @@ class AuxiliaryLossComputer:
         self.feature_extractor = feature_extractor
         self.device = device
         self.ce_loss = nn.CrossEntropyLoss()
-        
+
         # バッファ: エピソード内で相手の行動を記録
         self.obs_buffer = []
         self.reaction_targets = []
         self.thumbs_targets = []
         self.skill_targets = []
         self.is_agent_tp_buffer = []  # エージェントがTP時のデータかどうか
+
+        # 終盤勝敗予測バッファ: エピソード末尾付近の観測→勝敗ペア
+        self.lookahead_obs = []
+        self.lookahead_targets = []  # 1.0=勝利, 0.0=敗北・引き分け
     
+    def add_lookahead(self, obs: np.ndarray, outcome: float) -> None:
+        """エピソード末尾付近の観測と最終勝敗を記録 (callbackから呼ばれる)"""
+        self.lookahead_obs.append(obs.copy())
+        self.lookahead_targets.append(outcome)
+
     def record_opponent_action(self, obs, opponent_action, is_agent_tp):
         """相手の行動を記録"""
         self.obs_buffer.append(obs.copy())
@@ -141,18 +164,26 @@ class AuxiliaryLossComputer:
     
     def compute_loss(self):
         """蓄積されたデータから補助損失を計算"""
-        if len(self.obs_buffer) < 8:
-            return torch.tensor(0.0, device=self.device)
-        
-        obs_tensor = torch.FloatTensor(np.array(self.obs_buffer)).to(self.device)
+        total_loss = torch.tensor(0.0, device=self.device)
 
-        # 勾配ありで特徴抽出・補助予測
+        # --- 終盤勝敗予測損失 (BCE): obs_bufferとは独立して計算 ---
+        if len(self.lookahead_obs) >= 4:
+            la_obs = torch.FloatTensor(np.array(self.lookahead_obs)).to(self.device)
+            la_tgt = torch.FloatTensor(self.lookahead_targets).to(self.device)
+            la_features = self.feature_extractor.shared_net(la_obs)
+            la_logits = self.feature_extractor.aux_lookahead_head(la_features).squeeze(-1)
+            total_loss = total_loss + F.binary_cross_entropy_with_logits(la_logits, la_tgt) * AUX_LOOKAHEAD_WEIGHT
+
+        # --- 相手行動予測損失 ---
+        if len(self.obs_buffer) < 8:
+            return total_loss
+
+        obs_tensor = torch.FloatTensor(np.array(self.obs_buffer)).to(self.device)
         features = self.feature_extractor.shared_net(obs_tensor)
         preds = self.feature_extractor.get_aux_predictions(features)
-        
-        total_loss = torch.tensor(0.0, device=self.device)
-        count = 0
-        
+
+        pred_loss = torch.tensor(0.0, device=self.device)
+
         # リアクション予測損失 (エージェントがTPの場合のみ)
         tp_indices = [i for i, is_tp in enumerate(self.is_agent_tp_buffer) if is_tp]
         if tp_indices:
@@ -161,8 +192,7 @@ class AuxiliaryLossComputer:
                 [self.reaction_targets[i] for i in tp_indices]
             ).to(self.device)
             reaction_logits = preds['reaction'][tp_idx]
-            total_loss = total_loss + self.ce_loss(reaction_logits, reaction_tgt) * AUX_REACTION_WEIGHT
-            count += 1
+            pred_loss = pred_loss + self.ce_loss(reaction_logits, reaction_tgt) * AUX_REACTION_WEIGHT
 
         # 指本数予測損失 (全データ)
         valid_thumbs = [i for i, t in enumerate(self.thumbs_targets) if t >= 0]
@@ -172,8 +202,7 @@ class AuxiliaryLossComputer:
                 [self.thumbs_targets[i] for i in valid_thumbs]
             ).to(self.device)
             thumbs_logits = preds['thumbs'][t_idx]
-            total_loss = total_loss + self.ce_loss(thumbs_logits, thumbs_tgt) * AUX_THUMBS_WEIGHT
-            count += 1
+            pred_loss = pred_loss + self.ce_loss(thumbs_logits, thumbs_tgt) * AUX_THUMBS_WEIGHT
 
         # スキル予測損失 (エージェントがNTPの場合のみ)
         ntp_indices = [i for i, is_tp in enumerate(self.is_agent_tp_buffer)
@@ -184,11 +213,12 @@ class AuxiliaryLossComputer:
                 [self.skill_targets[i] for i in ntp_indices]
             ).to(self.device)
             skill_logits = preds['skill'][ntp_idx]
-            total_loss = total_loss + self.ce_loss(skill_logits, skill_tgt) * AUX_SKILL_WEIGHT
-            count += 1
-        
+            pred_loss = pred_loss + self.ce_loss(skill_logits, skill_tgt) * AUX_SKILL_WEIGHT
+
         # 個別重みの合計(0.4+0.3+0.3=1.0)に全体スケールAUX_LOSS_WEIGHT(0.3)を適用
-        return total_loss * AUX_LOSS_WEIGHT
+        total_loss = total_loss + pred_loss * AUX_LOSS_WEIGHT
+
+        return total_loss
 
     def clear_buffer(self):
         """バッファをクリア"""
@@ -197,3 +227,5 @@ class AuxiliaryLossComputer:
         self.thumbs_targets.clear()
         self.skill_targets.clear()
         self.is_agent_tp_buffer.clear()
+        self.lookahead_obs.clear()
+        self.lookahead_targets.clear()

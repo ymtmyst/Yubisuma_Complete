@@ -1,5 +1,9 @@
 rl_models/
 rl_logs/
+rl_analysis/
 rl_analysis.db
+rl_analysis.db-*
+wandb/
+Trash/
 __pycache__/
 *.pyc

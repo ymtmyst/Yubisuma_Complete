@@ -304,10 +304,22 @@ test("T1: スキップ->連鎖フラグON", gs.effects.last_turn_was_skip[KEY_PL
 # Turn 2: コピー(スキップ)がカウンターで止められる
 TurnHandler.resolve_turn(gs, KEY_PLAYER, "コピー", {KEY_PLAYER: 0, KEY_COMPUTER: 0}, "カウンター")
 test("T2: コピー被カウンター->連鎖フラグOFF", gs.effects.last_turn_was_skip[KEY_PLAYER] == False)
-# Turn 3: スキップ宣言 → 連鎖しない（1フェーズのみ）
+# Turn 3: スキップ宣言 → 連鎖しない（コピーは宣言されたスキルではないのでフラグ不在）
 prev_skip = gs.computer.skip_phases
 TurnHandler.resolve_turn(gs, KEY_PLAYER, "スキップ", {KEY_PLAYER: 0, KEY_COMPUTER: 0}, None)
 test("T3: コピー被カウンター後スキップ->連鎖なし", gs.computer.skip_phases == prev_skip + 1)
+
+# ===== スキップ連鎖(スキップが被カウンター後にコピー) =====
+print("\n=== スキップ連鎖(スキップ被カウンター→コピー) ===")
+gs = make_gs()
+gs.effects.record_turn(KEY_COMPUTER, "スキップ")  # 1ターン前の履歴を設定
+# Turn 1: スキップ被カウンター → 宣言したので連鎖フラグON（条件A）
+TurnHandler.resolve_turn(gs, KEY_PLAYER, "スキップ", {KEY_PLAYER: 0, KEY_COMPUTER: 0}, "カウンター")
+test("T1: スキップ被カウンター->連鎖フラグON", gs.effects.last_turn_was_skip[KEY_PLAYER] == True)
+# Turn 2: コピー(スキップ) → 直前にスキップ宣言済みなので連鎖して2フェーズ封印
+prev_skip = gs.computer.skip_phases
+TurnHandler.resolve_turn(gs, KEY_PLAYER, "コピー", {KEY_PLAYER: 0, KEY_COMPUTER: 0}, None)
+test("T2: スキップ被カウンター後コピー(スキップ)->連鎖2フェーズ", gs.computer.skip_phases == prev_skip + 2)
 
 # ===== サマリ =====
 print(f"\n{'='*40}")

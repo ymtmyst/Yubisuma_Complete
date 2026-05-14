@@ -11,6 +11,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 RL_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_DIR = os.path.join(BASE_DIR, "rl_models")
 LOG_DIR = os.path.join(BASE_DIR, "rl_logs")
+ANALYSIS_DIR = os.path.join(BASE_DIR, "rl_analysis")
 LEAGUE_DIR = os.path.join(MODEL_DIR, "league")
 DB_PATH = os.path.join(BASE_DIR, "rl_analysis.db")
 SNAPSHOT_PATH = os.path.join(BASE_DIR, "skill_snapshot.json")  # スキル分布スナップショット
@@ -55,16 +56,18 @@ NUM_STOCKABLE = len(STOCKABLE_SKILLS)  # 8
 
 # === 観測空間 ===
 # 自分の状態
-OBS_SELF_BASE = 12        # hands(3) + buffs/debuffs(9)
+OBS_SELF_BASE = 11        # hands(3) + buffs/debuffs(8)  ※cement_flagは冗長なので除外
 OBS_SELF_STOCK = 8        # ストック内容 (one-hot)
 OBS_SELF_CHOICE_USED = 8  # フェーズ内チョイス使用済み
 OBS_SELF_DROP_BLOCKED = 8 # ドロップ封印
-OBS_SELF_TOTAL = OBS_SELF_BASE + OBS_SELF_STOCK + OBS_SELF_CHOICE_USED + OBS_SELF_DROP_BLOCKED  # 36
+OBS_SELF_TOTAL = OBS_SELF_BASE + OBS_SELF_STOCK + OBS_SELF_CHOICE_USED + OBS_SELF_DROP_BLOCKED  # 35
 
-# 相手の可視状態
-OBS_OPP_BASE = 13         # hands(3) + buffs/debuffs(9) + stock_count(1)
-OBS_OPP_DROP_BLOCKED = 8  # ドロップ封印
-OBS_OPP_TOTAL = OBS_OPP_BASE + OBS_OPP_DROP_BLOCKED  # 21
+# 相手の可視状態 (ストックは公開情報のため内容を完全開示)
+OBS_OPP_BASE = 12          # hands(3) + buffs/debuffs(8) + stock_count(1)  ※cement_flagは冗長なので除外
+OBS_OPP_DROP_BLOCKED = 8   # ドロップ封印
+OBS_OPP_STOCK = 8          # ストック内容 (one-hot、公開情報)
+OBS_OPP_CHOICE_USED = 8    # フェーズ内チョイス使用済み (公開情報)
+OBS_OPP_TOTAL = OBS_OPP_BASE + OBS_OPP_DROP_BLOCKED + OBS_OPP_STOCK + OBS_OPP_CHOICE_USED  # 36
 
 # グローバル状態
 OBS_IS_TP = 1
@@ -72,13 +75,17 @@ OBS_FIRST_RESTRICTED = 2  # me + opp
 OBS_PREV_SKILL = 20       # one-hot: 5数字 + 14スキル + None
 OBS_EXTRA_TURNS = 2       # me + opp (各1)
 OBS_SKIP_CHAIN = 2        # me + opp
-OBS_PHASE_TURN = 1        # フェーズ内ターン数
+OBS_PHASE_TURN = 1        # フェーズ内ターン数 (実務上8以下)
 OBS_TURN_COUNT = 1        # 試合全体のターン進行度
+
+# エンコーディング上限値
+SKIP_PHASES_MAX = 20      # スキップ連鎖は理論上無制限なので十分大きく設定
+PHASE_TURNS_MAX = 8       # 実務上8以下
 OBS_GLOBAL_TOTAL = (OBS_IS_TP + OBS_FIRST_RESTRICTED + OBS_PREV_SKILL +
                     OBS_EXTRA_TURNS + OBS_SKIP_CHAIN + OBS_PHASE_TURN + OBS_TURN_COUNT)  # 29
 
 # 合計観測次元
-OBS_TOTAL = OBS_SELF_TOTAL + OBS_OPP_TOTAL + OBS_GLOBAL_TOTAL  # 86
+OBS_TOTAL = OBS_SELF_TOTAL + OBS_OPP_TOTAL + OBS_GLOBAL_TOTAL  # 100
 
 # === PPOハイパーパラメータ (RTX 4070 Ti 向け) ===
 PPO_CONFIG = {
@@ -108,6 +115,8 @@ AUX_LOSS_WEIGHT = 0.3         # 補助損失の重み
 AUX_REACTION_WEIGHT = 0.4     # リアクション予測の重み
 AUX_THUMBS_WEIGHT = 0.3       # 指の本数予測の重み
 AUX_SKILL_WEIGHT = 0.3        # スキル予測の重み
+AUX_LOOKAHEAD_WEIGHT = 0.2    # 終盤勝敗予測ヘッドの重み (終盤局面の価値表現を補強)
+LOOKAHEAD_N = 3               # エピソード末尾から何ステップ分を勝敗予測に使うか
 
 # === 訓練設定 ===
 TOTAL_TIMESTEPS = 5_000_000

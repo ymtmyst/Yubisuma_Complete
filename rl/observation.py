@@ -1,12 +1,14 @@
 # rl/observation.py - 観測空間エンコーディング
 """
 ゲーム状態を固定長の観測ベクトルに変換する。
-不完全情報を考慮: 相手のストック内容は非公開（件数のみ）。
+完全公開情報: 相手のストック内容を含む全状態を観測に含める (マルコフゲーム理論的に正しい設計)。
+観測次元: 自分 35 + 相手 36 + グローバル 29 = 100次元
 """
 
 import numpy as np
 from rl.config import (
     OBS_TOTAL, STOCKABLE_SKILLS, TP_SKILL_OPTIONS, MAX_TURNS,
+    SKIP_PHASES_MAX, PHASE_TURNS_MAX,
 )
 import sys
 import os
@@ -14,6 +16,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from yubisuma_constants import (
     KEY_PLAYER, KEY_COMPUTER, NORMAL_SKILLS, ANTI_COUNTER_SKILLS,
 )
+
+
+LEGACY_OBS_TOTAL_V86 = 86
 
 
 # 前ターンスキルのone-hotインデックス
@@ -68,21 +73,56 @@ def encode_observation(game_state, agent_key, turn_count=0):
     return result
 
 
-def _encode_self_state(player, effects, player_key):
-    """自分の完全な状態をエンコード (36次元)"""
+def encode_observation_for_dim(game_state, agent_key, turn_count=0, obs_dim=OBS_TOTAL):
+    """Encode observation for the expected model input width."""
+    if obs_dim == OBS_TOTAL:
+        return encode_observation(game_state, agent_key, turn_count)
+    if obs_dim == LEGACY_OBS_TOTAL_V86:
+        return _encode_observation_legacy_v86(game_state, agent_key, turn_count)
+    raise ValueError(f"Unsupported observation dim: {obs_dim}")
+
+
+def _encode_observation_legacy_v86(game_state, agent_key, turn_count=0):
+    """
+    Legacy 86-dim observation used by older checkpoints.
+
+    Layout:
+      self 36 = base12 + stock8 + choice8 + drop8
+      opp  21 = base13 + drop8
+      global 29 = unchanged
+    """
+    me = game_state.get_player(agent_key)
+    opp_key = game_state.get_opponent_key(agent_key)
+    opp = game_state.get_opponent(agent_key)
+    effects = game_state.effects
+
     obs = []
-    
-    # 基本状態 (12次元)
-    obs.append(player.get_active_hands() / 2.0)        # 正規化された手の数
+    obs.extend(_encode_self_state_legacy_v86(me))
+    obs.extend(_encode_opponent_state_legacy_v86(opp))
+    obs.extend(_encode_global_state(game_state, effects, agent_key, opp_key, turn_count))
+
+    result = np.array(obs, dtype=np.float32)
+    assert result.shape == (LEGACY_OBS_TOTAL_V86,), (
+        f"Legacy observation dim mismatch: {result.shape} != ({LEGACY_OBS_TOTAL_V86},)"
+    )
+    return result
+
+
+def _encode_self_state(player, effects, player_key):
+    """自分の完全な状態をエンコード (35次元)"""
+    obs = []
+
+    # 基本状態 (11次元)
+    # cement: None=0.0, 1=0.5, 2=1.0 (通常プレイ中にcement=0は発生しない)
+    obs.append(player.get_active_hands() / 2.0)
     obs.append(float(player.left_hand))
     obs.append(float(player.right_hand))
     obs.append(float(player.guard_active))
     obs.append(float(player.charge_active))
     obs.append(player.quick_level / 2.0)
-    obs.append(float(player.cement is not None))
     obs.append((player.cement or 0) / 2.0)
     obs.append(min(player.lock_debuff, 2) / 2.0)
-    obs.append(min(player.skip_phases, 2) / 2.0)
+    obs.append(min(player.skip_phases, SKIP_PHASES_MAX) / SKIP_PHASES_MAX)
     obs.append(float(player.used_ultimate))
     obs.append(float(player.time_active))
     
@@ -107,14 +147,12 @@ def _encode_self_state(player, effects, player_key):
             drop_blocked[STOCKABLE_SKILL_IDX[s]] = 1.0
     obs.extend(drop_blocked)
     
-    return obs  # 12 + 8 + 8 + 8 = 36
+    return obs  # 11 + 8 + 8 + 8 = 35
 
 
-def _encode_opponent_state(player, effects, player_key):
-    """相手の可視状態をエンコード (21次元) - ストック内容は非公開"""
+def _encode_self_state_legacy_v86(player):
+    """Legacy self-state encoder for old 86-dim checkpoints."""
     obs = []
-    
-    # 基本状態 (13次元)
     obs.append(player.get_active_hands() / 2.0)
     obs.append(float(player.left_hand))
     obs.append(float(player.right_hand))
@@ -127,16 +165,93 @@ def _encode_opponent_state(player, effects, player_key):
     obs.append(min(player.skip_phases, 2) / 2.0)
     obs.append(float(player.used_ultimate))
     obs.append(float(player.time_active))
-    obs.append(min(len(player.stock), 8) / 8.0)  # ストック件数のみ
-    
+
+    stock_vec = [0.0] * len(STOCKABLE_SKILLS)
+    for s in player.stock:
+        if s in STOCKABLE_SKILL_IDX:
+            stock_vec[STOCKABLE_SKILL_IDX[s]] += 1.0
+    obs.extend([min(v, 8.0) / 8.0 for v in stock_vec])
+
+    choice_used = [0.0] * len(STOCKABLE_SKILLS)
+    for s in player.choice_used_this_phase:
+        if s in STOCKABLE_SKILL_IDX:
+            choice_used[STOCKABLE_SKILL_IDX[s]] = 1.0
+    obs.extend(choice_used)
+
+    drop_blocked = [0.0] * len(STOCKABLE_SKILLS)
+    for s in player.drop_blocked_skills:
+        if s in STOCKABLE_SKILL_IDX:
+            drop_blocked[STOCKABLE_SKILL_IDX[s]] = 1.0
+    obs.extend(drop_blocked)
+    return obs
+
+
+def _encode_opponent_state(player, effects, player_key):
+    """相手の可視状態をエンコード (36次元) - ストックは公開情報のため内容を完全開示"""
+    obs = []
+
+    # 基本状態 (12次元)
+    # cement: None=0.0, 1=0.5, 2=1.0 (通常プレイ中にcement=0は発生しない)
+    obs.append(player.get_active_hands() / 2.0)
+    obs.append(float(player.left_hand))
+    obs.append(float(player.right_hand))
+    obs.append(float(player.guard_active))
+    obs.append(float(player.charge_active))
+    obs.append(player.quick_level / 2.0)
+    obs.append((player.cement or 0) / 2.0)
+    obs.append(min(player.lock_debuff, 2) / 2.0)
+    obs.append(min(player.skip_phases, SKIP_PHASES_MAX) / SKIP_PHASES_MAX)
+    obs.append(float(player.used_ultimate))
+    obs.append(float(player.time_active))
+    obs.append(min(len(player.stock), 8) / 8.0)  # ストック件数
+
     # ドロップ封印 (8次元) - 公開情報
     drop_blocked = [0.0] * len(STOCKABLE_SKILLS)
     for s in player.drop_blocked_skills:
         if s in STOCKABLE_SKILL_IDX:
             drop_blocked[STOCKABLE_SKILL_IDX[s]] = 1.0
     obs.extend(drop_blocked)
-    
-    return obs  # 13 + 8 = 21
+
+    # ストック内容 (8次元) - 公開情報（完全ルール準拠）
+    stock_vec = [0.0] * len(STOCKABLE_SKILLS)
+    for s in player.stock:
+        if s in STOCKABLE_SKILL_IDX:
+            stock_vec[STOCKABLE_SKILL_IDX[s]] += 1.0
+    obs.extend([min(v, 8.0) / 8.0 for v in stock_vec])
+
+    # チョイス使用済み (8次元) - 公開情報
+    choice_used = [0.0] * len(STOCKABLE_SKILLS)
+    for s in player.choice_used_this_phase:
+        if s in STOCKABLE_SKILL_IDX:
+            choice_used[STOCKABLE_SKILL_IDX[s]] = 1.0
+    obs.extend(choice_used)
+
+    return obs  # 12 + 8 + 8 + 8 = 36
+
+
+def _encode_opponent_state_legacy_v86(player):
+    """Legacy opponent-state encoder for old 86-dim checkpoints."""
+    obs = []
+    obs.append(player.get_active_hands() / 2.0)
+    obs.append(float(player.left_hand))
+    obs.append(float(player.right_hand))
+    obs.append(float(player.guard_active))
+    obs.append(float(player.charge_active))
+    obs.append(player.quick_level / 2.0)
+    obs.append(float(player.cement is not None))
+    obs.append((player.cement or 0) / 2.0)
+    obs.append(min(player.lock_debuff, 2) / 2.0)
+    obs.append(min(player.skip_phases, 2) / 2.0)
+    obs.append(float(player.used_ultimate))
+    obs.append(float(player.time_active))
+    obs.append(min(len(player.stock), 8) / 8.0)
+
+    drop_blocked = [0.0] * len(STOCKABLE_SKILLS)
+    for s in player.drop_blocked_skills:
+        if s in STOCKABLE_SKILL_IDX:
+            drop_blocked[STOCKABLE_SKILL_IDX[s]] = 1.0
+    obs.extend(drop_blocked)
+    return obs
 
 
 def _encode_global_state(game_state, effects, agent_key, opp_key, turn_count=0):
@@ -171,8 +286,8 @@ def _encode_global_state(game_state, effects, agent_key, opp_key, turn_count=0):
     obs.append(float(effects.last_turn_was_skip.get(agent_key, False)))
     obs.append(float(effects.last_turn_was_skip.get(opp_key, False)))
 
-    # フェーズ内ターン数 (1次元)
-    obs.append(min(effects.turns_in_current_phase, 8) / 8.0)
+    # フェーズ内ターン数 (1次元) - 実務上8以下
+    obs.append(min(effects.turns_in_current_phase, PHASE_TURNS_MAX) / PHASE_TURNS_MAX)
 
     # 試合全体のターン進行度 (1次元) - セメント等のタイミング依存スキルの文脈を与える
     obs.append(min(turn_count, MAX_TURNS) / MAX_TURNS)

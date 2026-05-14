@@ -22,7 +22,8 @@ from rl.config import (
     TOTAL_ACTIONS, OBS_TOTAL, REWARD_WIN, REWARD_LOSE,
     REWARD_DRAW, MAX_TURNS,
 )
-from rl.observation import encode_observation
+from rl.observation import encode_observation, encode_observation_for_dim
+from rl.model_utils import load_maskable_ppo
 from rl.actions import (
     decode_action, get_action_mask, encode_tp_action, encode_ntp_action,
     action_to_readable, NUM_TP_ACTIONS,
@@ -369,6 +370,8 @@ class YubisumaEnv(gym.Env):
         
         # 対戦相手の観測を作成（相手視点）
         opp_obs = encode_observation(self.game_state, self.opponent_key, self.turn_count)
+        obs_dim = getattr(self.opponent_policy, "observation_dim", OBS_TOTAL)
+        opp_obs = encode_observation_for_dim(self.game_state, self.opponent_key, self.turn_count, obs_dim=obs_dim)
         opp_mask = get_action_mask(self.game_state, self.opponent_key)
 
         action, _ = self.opponent_policy.predict(
@@ -383,6 +386,8 @@ class YubisumaEnv(gym.Env):
 
         # 対戦相手の観測を作成（相手視点でNTP）
         opp_obs = encode_observation(self.game_state, self.opponent_key, self.turn_count)
+        obs_dim = getattr(self.opponent_policy, "observation_dim", OBS_TOTAL)
+        opp_obs = encode_observation_for_dim(self.game_state, self.opponent_key, self.turn_count, obs_dim=obs_dim)
         opp_mask = get_action_mask(self.game_state, self.opponent_key)
         
         action, _ = self.opponent_policy.predict(
@@ -448,9 +453,8 @@ class YubisumaEnv(gym.Env):
         SubprocVecEnvからenv_method経由で呼ばれるためサブプロセス内で実行される。
         device='cpu'を強制: 16プロセス×GPUロードによるVRAM枯渇を防ぐ。"""
         try:
-            from sb3_contrib import MaskablePPO
             from rl.opponents import _FrozenPolicy
-            model = MaskablePPO.load(path, device='cpu')
+            model = load_maskable_ppo(path, device='cpu')
             self.opponent_policy = _FrozenPolicy(model)
         except Exception as e:
             print(f"[Env] 対戦相手読み込みエラー ({path}): {e}")

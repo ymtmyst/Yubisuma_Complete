@@ -13,6 +13,7 @@
 import argparse
 import os
 import sys
+from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -21,16 +22,18 @@ import numpy as np
 
 from rl.config import (
     PPO_CONFIG, NETWORK_CONFIG, TOTAL_TIMESTEPS,
-    MODEL_DIR, LOG_DIR, LEAGUE_CONFIG,
-    CHECKPOINT_FREQ, OPPONENT_UPDATE_FREQ, SNAPSHOT_PATH,
+    MODEL_DIR, LOG_DIR, ANALYSIS_DIR, LEAGUE_CONFIG,
+    CHECKPOINT_FREQ, OPPONENT_UPDATE_FREQ, EVAL_FREQ, EVAL_EPISODES,
+    SNAPSHOT_PATH,
 )
 from rl.env import YubisumaEnv
 from rl.network import YubisumaFeaturesExtractor
+from rl.model_utils import import_maskable_ppo, load_maskable_ppo
 from rl.opponents import LeagueManager
 from rl.analysis import AnalysisDB
 from rl.callbacks import (
     SelfPlayCallback, AnalysisCallback, CheckpointCallback, AuxLossCallback,
-    EntCoefScheduleCallback, SkillSnapshotCallback,
+    EntCoefScheduleCallback, RandomEvalCallback, SkillSnapshotCallback,
 )
 
 
@@ -41,11 +44,19 @@ def make_env(rank=0):
     return _init
 
 
+def _make_run_id(args):
+    raw = args.run_id or args.run_name or datetime.now().strftime("%Y%m%d_%H%M%S")
+    safe = "".join(c if c.isalnum() or c in ("-", "_") else "_" for c in raw)
+    return safe.strip("_") or datetime.now().strftime("%Y%m%d_%H%M%S")
+
 
 
 def train(args):
     os.makedirs(MODEL_DIR, exist_ok=True)
     os.makedirs(LOG_DIR, exist_ok=True)
+    os.makedirs(ANALYSIS_DIR, exist_ok=True)
+    run_id = _make_run_id(args)
+    analysis_db_path = args.db_path or os.path.join(ANALYSIS_DIR, f"{run_id}.db")
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"[Train] Device: {device}")
@@ -67,6 +78,8 @@ def train(args):
                     "n_envs": args.n_envs,
                     "total_steps": args.steps,
                     "resume": args.resume,
+                    "run_id": run_id,
+                    "analysis_db": analysis_db_path,
                 },
                 sync_tensorboard=True,  # SB3 の TensorBoard ログを自動同期
                 save_code=False,
@@ -78,7 +91,7 @@ def train(args):
             wandb_run = None
 
     # === 分析DB ===
-    analysis_db = AnalysisDB()
+    analysis_db = AnalysisDB(db_path=analysis_db_path, run_id=run_id)
     analysis_cb = AnalysisCallback(analysis_db, verbose=1)
 
     # === 環境作成 (SubprocVecEnv: CPUコアを並列活用) ===
@@ -90,7 +103,7 @@ def train(args):
                         start_method="spawn")
 
     # === MaskablePPO ===
-    from sb3_contrib import MaskablePPO
+    MaskablePPO = import_maskable_ppo()
 
     policy_kwargs = {
         "features_extractor_class": YubisumaFeaturesExtractor,
@@ -106,7 +119,7 @@ def train(args):
 
     if args.resume:
         print(f"[Train] Resume from: {args.resume}")
-        model = MaskablePPO.load(args.resume, env=env, device=device)
+        model = load_maskable_ppo(args.resume, env=env, device=device)
         # --steps が指定されていない場合は残りステップを継続
         # (model.num_timesteps が保存済みステップ数を保持している)
         remaining = args.steps - model.num_timesteps
@@ -145,13 +158,19 @@ def train(args):
         final=0.005,
         total_steps=args.steps,
     )
+    eval_cb = RandomEvalCallback(
+        eval_freq=EVAL_FREQ,
+        n_eval_episodes=EVAL_EPISODES,
+        deterministic=False,
+        verbose=1,
+    )
     snapshot_cb = SkillSnapshotCallback(
         analysis_db, SNAPSHOT_PATH,
         snapshot_freq=CHECKPOINT_FREQ, last_n=100, verbose=1,
     )
 
     callbacks = [selfplay_cb, analysis_cb, checkpoint_cb, aux_loss_cb, ent_coef_cb,
-                 snapshot_cb]
+                 eval_cb, snapshot_cb]
 
     # W&B コールバック追加
     if wandb_run is not None:
@@ -168,6 +187,7 @@ def train(args):
     # === 訓練情報表示 ===
     total_params = sum(p.numel() for p in model.policy.parameters())
     print(f"[Train] Parameters: {total_params:,}")
+    print(f"[Train] Run ID: {run_id}")
     print(f"[Train] Target steps: {args.steps:,}")
     print(f"[Train] Analysis DB: {analysis_db.db_path}")
     print()
@@ -227,6 +247,14 @@ def main():
     parser.add_argument(
         "--run-name", type=str, default=None,
         help="W&B run name (optional)",
+    )
+    parser.add_argument(
+        "--run-id", type=str, default=None,
+        help="Stable run identifier for analysis DB naming/filtering",
+    )
+    parser.add_argument(
+        "--db-path", type=str, default=None,
+        help="Analysis DB path (default: rl_analysis/<run-id>.db)",
     )
 
     args = parser.parse_args()

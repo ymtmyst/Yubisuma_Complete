@@ -18,7 +18,7 @@ from stable_baselines3.common.callbacks import BaseCallback
 
 from rl.config import (
     CHECKPOINT_FREQ, OPPONENT_UPDATE_FREQ,
-    MODEL_DIR,
+    MODEL_DIR, LOOKAHEAD_N,
 )
 
 
@@ -179,6 +179,8 @@ class AuxLossCallback(BaseCallback):
         self.aux_lr = aux_lr
         self._aux_computer = None
         self._aux_optimizer = None
+        # 終盤勝敗予測用: env_idx -> 直近LOOKAHEAD_N観測の deque
+        self._recent_obs_by_env: dict = {}
 
     def _on_training_start(self) -> None:
         import torch
@@ -197,7 +199,8 @@ class AuxLossCallback(BaseCallback):
         self._aux_optimizer = torch.optim.Adam([
             {'params': (list(fe.aux_reaction_head.parameters()) +
                         list(fe.aux_thumbs_head.parameters()) +
-                        list(fe.aux_skill_head.parameters())),
+                        list(fe.aux_skill_head.parameters()) +
+                        list(fe.aux_lookahead_head.parameters())),
              'lr': self.aux_lr},
             {'params': list(fe.shared_net.parameters()),
              'lr': self.aux_lr * 0.1},
@@ -222,13 +225,28 @@ class AuxLossCallback(BaseCallback):
             return True
 
         for i, info in enumerate(infos):
-            if 'opponent_action' not in info or i >= len(obs_array):
+            if i >= len(obs_array):
                 continue
-
-            opp_action = info['opponent_action']
             obs_i = np.asarray(obs_array[i], dtype=np.float32)
-            is_agent_tp = (opp_action.get('role') == 'ntp')
-            self._aux_computer.record_opponent_action(obs_i, opp_action, is_agent_tp)
+
+            # 相手行動の記録 (既存)
+            if 'opponent_action' in info:
+                opp_action = info['opponent_action']
+                is_agent_tp = (opp_action.get('role') == 'ntp')
+                self._aux_computer.record_opponent_action(obs_i, opp_action, is_agent_tp)
+
+            # 終盤勝敗予測: per-env deque にこのステップの観測を蓄積
+            if i not in self._recent_obs_by_env:
+                self._recent_obs_by_env[i] = deque(maxlen=LOOKAHEAD_N)
+            self._recent_obs_by_env[i].append(obs_i)
+
+            # エピソード終了時: deque 内の全観測（末尾LOOKAHEAD_N手）をラベル付け
+            ep_data = info.get('episode_summary')
+            if ep_data is not None and i in self._recent_obs_by_env:
+                outcome = 1.0 if ep_data.get('agent_won') else 0.0
+                for past_obs in self._recent_obs_by_env[i]:
+                    self._aux_computer.add_lookahead(past_obs, outcome)
+                self._recent_obs_by_env[i].clear()
 
         return True
 
@@ -301,6 +319,77 @@ class EntCoefScheduleCallback(BaseCallback):
         # progress: 0.0(開始) → 1.0(終了) で initial → final に線形減衰
         self.model.ent_coef = self.final + (1.0 - progress) * (self.initial - self.final)
         return True
+
+
+class RandomEvalCallback(BaseCallback):
+    """
+    固定ランダム相手に対する定期評価。
+
+    self-play中の勝率は相手リーグの強さや分布に依存するため、
+    学習進捗の外部指標としてランダム相手への勝率・平均ターン数を記録する。
+    混合戦略を評価するため、デフォルトでは確率的に行動をサンプルする。
+    """
+
+    def __init__(self, eval_freq: int, n_eval_episodes: int,
+                 deterministic: bool = False, verbose: int = 0):
+        super().__init__(verbose)
+        self.eval_freq = eval_freq
+        self.n_eval_episodes = n_eval_episodes
+        self.deterministic = deterministic
+        self._last_eval = 0
+
+    def _on_step(self) -> bool:
+        if self.eval_freq <= 0:
+            return True
+        if self.num_timesteps - self._last_eval < self.eval_freq:
+            return True
+
+        self._last_eval = self.num_timesteps
+        win_rate, avg_turns = self._evaluate_random_opponent()
+
+        if self.logger is not None:
+            self.logger.record("eval/random_win_rate", win_rate)
+            self.logger.record("eval/random_avg_turns", avg_turns)
+
+        if self.verbose > 0:
+            print(f"[Eval] Step {self.num_timesteps}: "
+                  f"random_win_rate={win_rate:.1%}, avg_turns={avg_turns:.1f}")
+
+        return True
+
+    def _evaluate_random_opponent(self):
+        import numpy as np
+        from rl.env import YubisumaEnv
+
+        env = YubisumaEnv(opponent_policy=None)
+        wins = 0
+        total_turns = []
+
+        try:
+            for _ in range(self.n_eval_episodes):
+                obs, _ = env.reset()
+                done = False
+                reward = 0.0
+
+                while not done:
+                    mask = env.action_masks()
+                    action, _ = self.model.predict(
+                        obs,
+                        action_masks=mask,
+                        deterministic=self.deterministic,
+                    )
+                    obs, reward, terminated, truncated, _ = env.step(int(action))
+                    done = terminated or truncated
+
+                if reward > 0:
+                    wins += 1
+                total_turns.append(env.turn_count)
+        finally:
+            env.close()
+
+        win_rate = wins / self.n_eval_episodes if self.n_eval_episodes > 0 else 0.0
+        avg_turns = float(np.mean(total_turns)) if total_turns else 0.0
+        return win_rate, avg_turns
 
 
 class SkillSnapshotCallback(BaseCallback):

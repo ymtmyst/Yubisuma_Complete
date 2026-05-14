@@ -89,6 +89,10 @@ class TurnHandler:
         else:
             TurnHandler._resolve_skill_effect(gs, tp_key, skill, thumbs, total, was_skip_before, charge_was_active)
 
+        # 条件A: スキップを宣言したターンは効果不発（被カウンター等）でも連鎖フラグを立てる
+        if skill_name == "スキップ":
+            effects.last_turn_was_skip[tp_key] = True
+
         # === クイックレベル減少（ターン終了時）===
         if quick_before > 0:
             tp.quick_level = max(0, quick_before - 1)

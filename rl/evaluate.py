@@ -20,20 +20,37 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import numpy as np
 from collections import Counter
 
-from rl.config import MODEL_DIR, TOTAL_ACTIONS
+from rl.config import MODEL_DIR, ANALYSIS_DIR, TOTAL_ACTIONS
 from rl.env import YubisumaEnv
 from rl.actions import decode_action, action_to_readable
 from rl.analysis import AnalysisDB
+from rl.model_utils import import_maskable_ppo, load_maskable_ppo
+from rl.observation import encode_observation_for_dim
+
+
+def _get_model_obs(model, env):
+    """Build an observation vector matching the loaded model's expected width."""
+    obs_dim = int(model.observation_space.shape[0])
+    return encode_observation_for_dim(
+        env.game_state, env.agent_key, env.turn_count, obs_dim=obs_dim
+    )
 
 
 def find_latest_model():
     """最新のチェックポイントを更新時刻で自動検索"""
-    files = []
-    for pattern in [
-        os.path.join(MODEL_DIR, "*.zip"),
-        os.path.join(MODEL_DIR, "**", "*.zip"),
-    ]:
-        files.extend(glob_module.glob(pattern, recursive=True))
+    top_level = glob_module.glob(os.path.join(MODEL_DIR, "*.zip"))
+    if top_level:
+        return max(top_level, key=os.path.getmtime)
+
+    files = glob_module.glob(os.path.join(MODEL_DIR, "**", "*.zip"), recursive=True)
+    if not files:
+        return None
+    return max(files, key=os.path.getmtime)
+
+
+def find_latest_analysis_db():
+    """rl_analysis 配下の最新DBを更新時刻で自動検索"""
+    files = glob_module.glob(os.path.join(ANALYSIS_DIR, "*.db"))
     if not files:
         return None
     return max(files, key=os.path.getmtime)
@@ -42,6 +59,7 @@ def find_latest_model():
 def _bar(value, width=32, max_val=1.0):
     """テキストプログレスバーを生成"""
     filled = int(value / max_val * width) if max_val > 0 else 0
+    return "#" * filled + "." * (width - filled)
     return "█" * filled + "░" * (width - filled)
 
 
@@ -109,7 +127,7 @@ def analyze_policy(model_path, n_episodes=150, n_show_episodes=5):
     """
     import torch
     from collections import deque
-    from sb3_contrib import MaskablePPO
+    MaskablePPO = import_maskable_ppo()
     from rl.config import (
         TP_SKILL_OPTIONS, NTP_REACTION_OPTIONS,
         NUM_TP_SKILLS, NUM_THUMB_OPTIONS, NUM_TP_ACTIONS,
@@ -118,7 +136,7 @@ def analyze_policy(model_path, n_episodes=150, n_show_episodes=5):
     from yubisuma_constants import KEY_PLAYER, KEY_COMPUTER
 
     print(f"[Policy] モデル読み込み: {os.path.basename(model_path)}")
-    model = MaskablePPO.load(model_path)
+    model = load_maskable_ppo(model_path)
     policy = model.policy
     policy.eval()
     device = model.device
@@ -157,7 +175,8 @@ def analyze_policy(model_path, n_episodes=150, n_show_episodes=5):
             is_tp = bool(mask[:NUM_TP_ACTIONS].any())
             current_tp_key = env.game_state.current_player_key  # stepの前に取得
 
-            obs_tensor = torch.FloatTensor(obs).unsqueeze(0).to(device)
+            model_obs = _get_model_obs(model, env)
+            obs_tensor = torch.FloatTensor(model_obs).unsqueeze(0).to(device)
 
             with torch.no_grad():
                 dist = policy.get_distribution(
@@ -187,7 +206,7 @@ def analyze_policy(model_path, n_episodes=150, n_show_episodes=5):
                 ntp_values.append(value)
                 ntp_steps += 1
 
-            action, _ = model.predict(obs, action_masks=mask, deterministic=False)
+            action, _ = model.predict(model_obs, action_masks=mask, deterministic=False)
             decoded = decode_action(int(action))
 
             obs, reward, terminated, truncated, info = env.step(int(action))
@@ -347,10 +366,10 @@ def analyze_policy(model_path, n_episodes=150, n_show_episodes=5):
 
 def evaluate_model(model_path, n_episodes=200, verbose=0):
     """モデルを評価"""
-    from sb3_contrib import MaskablePPO
+    MaskablePPO = import_maskable_ppo()
     
     print(f"[Eval] モデル読み込み: {model_path}")
-    model = MaskablePPO.load(model_path)
+    model = load_maskable_ppo(model_path)
     
     # ランダム相手との対戦
     env = YubisumaEnv(opponent_policy=None)
@@ -366,7 +385,8 @@ def evaluate_model(model_path, n_episodes=200, verbose=0):
         
         while not done:
             mask = env.action_masks()
-            action, _ = model.predict(obs, action_masks=mask, deterministic=False)
+            model_obs = _get_model_obs(model, env)
+            action, _ = model.predict(model_obs, action_masks=mask, deterministic=False)
             
             decoded = decode_action(int(action))
             if decoded['role'] == 'tp':
@@ -406,10 +426,10 @@ def evaluate_model(model_path, n_episodes=200, verbose=0):
 
 def watch_game(model_path):
     """1ゲームを詳細表示"""
-    from sb3_contrib import MaskablePPO
+    MaskablePPO = import_maskable_ppo()
     
     print(f"[Watch] モデル読み込み: {model_path}")
-    model = MaskablePPO.load(model_path)
+    model = load_maskable_ppo(model_path)
     
     env = YubisumaEnv(opponent_policy=None)
     obs, info = env.reset()
@@ -423,7 +443,8 @@ def watch_game(model_path):
     
     while not done:
         mask = env.action_masks()
-        action, _ = model.predict(obs, action_masks=mask, deterministic=False)
+        model_obs = _get_model_obs(model, env)
+        action, _ = model.predict(model_obs, action_masks=mask, deterministic=False)
         
         decoded = decode_action(int(action))
         is_tp = info.get('agent_is_tp', False)
@@ -462,9 +483,9 @@ def watch_game(model_path):
     env.close()
 
 
-def show_stats():
+def show_stats(db_path=None, run_id=None):
     """分析統計を表示"""
-    db = AnalysisDB()
+    db = AnalysisDB(db_path=db_path, run_id=run_id)
     
     # 全体サマリー
     summary = db.get_summary()
@@ -531,6 +552,12 @@ def main():
                         help="1ゲームを詳細表示")
     parser.add_argument("--stats", action="store_true",
                         help="訓練統計を表示")
+    parser.add_argument("--db-path", type=str, default=None,
+                        help="分析DBパス (--stats 用)")
+    parser.add_argument("--latest-db", action="store_true",
+                        help="rl_analysis 配下の最新DBを使用 (--stats 用)")
+    parser.add_argument("--run-id", type=str, default=None,
+                        help="分析DB内のrun_idで絞り込み (--stats 用)")
     parser.add_argument("--policy", action="store_true",
                         help="方策のsoftmax確率分布を分析 (--latest と組み合わせ推奨)")
     parser.add_argument("--verbose", type=int, default=1)
@@ -548,7 +575,14 @@ def main():
             return
 
     if args.stats:
-        show_stats()
+        db_path = args.db_path
+        if args.latest_db and not db_path:
+            db_path = find_latest_analysis_db()
+            if db_path:
+                print(f"[Auto] 最新DB: {os.path.basename(db_path)}")
+            else:
+                print(f"[Info] rl_analysis 配下にDBが見つかりません。既定DBを使用します。")
+        show_stats(db_path=db_path, run_id=args.run_id)
     elif args.policy:
         model_path = args.model or find_latest_model()
         if not model_path:

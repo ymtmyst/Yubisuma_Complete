@@ -12,6 +12,7 @@ import random
 import glob
 
 from rl.config import LEAGUE_DIR, LEAGUE_CONFIG
+from rl.model_utils import load_maskable_ppo
 
 
 class _FrozenPolicy:
@@ -19,6 +20,7 @@ class _FrozenPolicy:
 
     def __init__(self, model):
         self.model = model
+        self.observation_dim = int(model.observation_space.shape[0])
 
     def predict(self, obs, action_masks=None, deterministic=False):
         import torch
@@ -125,7 +127,7 @@ class LeagueManager:
         if path is None or self.model_class is None:
             return None, None
         try:
-            model = self.model_class.load(path)
+            model = load_maskable_ppo(path)
             return _create_frozen_policy(model), step
         except Exception as e:
             print(f"[League] 対戦相手読み込みエラー: {e}")
