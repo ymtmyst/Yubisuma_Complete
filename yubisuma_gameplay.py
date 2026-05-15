@@ -108,6 +108,9 @@ def play_game():
         # フェーズ開始
         gs.on_phase_start(current_key)
 
+        # タイム+スキップ判定用: フェーズ開始時点でのスキップ状態を記録
+        phase_was_skip = gs.get_player(current_key).skip_phases > 0
+
         # フェーズ内ループ（追加ターン含む）
         while True:
             gs.display_state()
@@ -116,6 +119,16 @@ def play_game():
             # ターン実行
             if execute_turn(gs, current_key):
                 break  # 勝利
+
+            # タイム効果チェック: current_keyが追加ターンを得た && 相手がtime_active
+            opp = gs.get_opponent(current_key)
+            if opp.time_active and gs.effects.has_extra_turn(current_key):
+                opp.time_active = False
+                lost = gs.effects.additional_turns[current_key]
+                gs.effects.additional_turns[current_key] = 0
+                cp_name = gs.get_player(current_key).name
+                print(f"  タイム効果！{cp_name}の追加{lost}ターンを無効化 → {opp.name}のターンへ！")
+                break
 
             # 追加ターンチェック
             if gs.effects.has_extra_turn(current_key):
@@ -132,51 +145,13 @@ def play_game():
         # フェーズ終了
         gs.on_phase_end(current_key)
 
-        # === タイム効果チェック ===
-        opponent_key = gs.get_opponent_key(current_key)
-        opponent = gs.get_opponent(current_key)
-        current_player = gs.get_player(current_key)
-
-        next_key = opponent_key  # デフォルト: 相手のターン
-
-        if current_player.time_active:
-            # current_playerがタイムを使っている
-            # 次は相手のターン → 1ターンのみ実行（追加ターン無視）→ 自分に戻る
-            current_player.time_active = False
-
-            gs.current_player_key = opponent_key
-            gs.on_phase_start(opponent_key)
-            gs.display_state()
-            gs.effects.turns_in_current_phase += 1
-
-            if execute_turn(gs, opponent_key):
-                break
-
-            # タイム効果: 相手の追加ターン（ガード等）を全て無視して自分に戻る
-            if gs.effects.has_extra_turn(opponent_key):
-                lost_turns = gs.effects.additional_turns[opponent_key]
-                gs.effects.additional_turns[opponent_key] = 0
-                print(f"  タイム効果により{opponent.name}の追加{lost_turns}ターンは無効化！")
-
-            gs.on_phase_end(opponent_key)
-
-            if gs.game_over:
-                break
-
+        # タイム+スキップ: スキップされた側がtime_activeなら、フェーズを戻す
+        # （スキップされても相手に連続行動を許さない）
+        cp = gs.get_player(current_key)
+        if phase_was_skip and cp.time_active:
             next_key = current_key
-            print(f"\n  タイム効果により{current_player.name}のターンに戻ります！")
-
-        elif opponent.time_active:
-            # opponent側がタイムを使っていた場合
-            opponent.time_active = False
-
-            if gs.effects.has_extra_turn(current_key):
-                lost_turns = gs.effects.additional_turns[current_key]
-                gs.effects.additional_turns[current_key] = 0
-                print(f"  タイム効果により{current_player.name}の追加{lost_turns}ターンは無効化！")
-
-            next_key = opponent_key
-            print(f"\n  タイム効果により{opponent.name}のターンに戻ります！")
+        else:
+            next_key = gs.get_opponent_key(current_key)
 
         current_key = next_key
         gs.current_player_key = current_key

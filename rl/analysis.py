@@ -19,7 +19,9 @@ class AnalysisDB:
     def __init__(self, db_path=None, run_id=None):
         self.db_path = db_path or DB_PATH
         self.run_id = run_id
-        os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
+        db_dir = os.path.dirname(self.db_path)
+        if db_dir:
+            os.makedirs(db_dir, exist_ok=True)
         self._init_db()
 
     def _connect(self):
@@ -85,13 +87,13 @@ class AnalysisDB:
                 );
 
                 CREATE INDEX IF NOT EXISTS idx_episodes_step ON episodes(training_step);
-                CREATE INDEX IF NOT EXISTS idx_episodes_run ON episodes(run_id);
                 CREATE INDEX IF NOT EXISTS idx_turns_episode ON turns(episode_id);
                 CREATE INDEX IF NOT EXISTS idx_training_step ON training_stats(step);
-                CREATE INDEX IF NOT EXISTS idx_training_run ON training_stats(run_id);
             """)
             self._ensure_column(conn, "episodes", "run_id", "TEXT")
             self._ensure_column(conn, "training_stats", "run_id", "TEXT")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_episodes_run ON episodes(run_id)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_training_run ON training_stats(run_id)")
 
     def _ensure_column(self, conn, table, column, column_type):
         columns = [row[1] for row in conn.execute(f"PRAGMA table_info({table})")]
@@ -245,6 +247,169 @@ class AnalysisDB:
             "episode_count": episodes,
             "win_rate": win_episodes / episodes if episodes > 0 else 0,
         } for skill, count, win_episodes, episodes in rows]
+
+    def get_skill_opportunity_stats(self, last_n_episodes=500):
+        """Return agent TP skill usage relative to legal opportunities.
+
+        This replays recent episodes and counts each skill once per agent TP
+        decision where at least one action for that skill was legal. Choice
+        target-selection actions are collapsed to the Choice skill.
+        """
+        episodes = self._get_recent_episodes(last_n_episodes)
+        if not episodes:
+            return []
+
+        episode_ids = [ep["id"] for ep in episodes]
+        placeholders = ",".join("?" for _ in episode_ids)
+        with self._connect() as conn:
+            rows = conn.execute(f"""
+                SELECT episode_id, turn_number, tp_key, skill, choice_target,
+                       player_thumbs, computer_thumbs, reaction, agent_is_tp
+                FROM turns
+                WHERE episode_id IN ({placeholders})
+                ORDER BY episode_id, turn_number
+            """, episode_ids).fetchall()
+
+        turns_by_episode = {ep_id: [] for ep_id in episode_ids}
+        for row in rows:
+            turns_by_episode[row[0]].append(row)
+
+        from collections import defaultdict
+        from rl.actions import decode_action, get_action_mask, NUM_TP_ACTIONS
+        from rl.env import YubisumaEnv, _create_game_state
+        from yubisuma_constants import KEY_PLAYER, KEY_COMPUTER
+
+        opportunity = defaultdict(int)
+        usage = defaultdict(int)
+        win_episodes = defaultdict(set)
+        used_episodes = defaultdict(set)
+
+        def normalize_skill(skill):
+            if skill is None:
+                return None
+            if isinstance(skill, int):
+                return str(skill)
+            text = str(skill)
+            if text.startswith("チョイス:"):
+                return "チョイス"
+            return text
+
+        def parse_skill(skill):
+            if skill is None:
+                return None
+            text = str(skill)
+            if text.isdigit():
+                return int(text)
+            return text
+
+        def to_int(value):
+            if isinstance(value, bytes):
+                return int.from_bytes(value, byteorder="little", signed=True)
+            return int(value or 0)
+
+        for ep in episodes:
+            turns = turns_by_episode.get(ep["id"], [])
+            if not turns:
+                continue
+
+            env = YubisumaEnv(opponent_policy=None)
+            env.game_state = _create_game_state()
+            env.game_state.current_player_key = turns[0][2]
+            env.game_state.effects.first_player_key = turns[0][2]
+            env.agent_key = ep["agent_key"]
+            env.opponent_key = (
+                KEY_COMPUTER if ep["agent_key"] == KEY_PLAYER else KEY_PLAYER
+            )
+            env._on_phase_start(env.game_state.current_player_key)
+
+            try:
+                for turn in turns:
+                    (_, _, tp_key, skill, choice_target,
+                     player_thumbs, computer_thumbs, reaction, agent_is_tp) = turn
+
+                    if int(agent_is_tp):
+                        mask = get_action_mask(env.game_state, ep["agent_key"])
+                        legal_skills = set()
+                        for action_idx, ok in enumerate(mask[:NUM_TP_ACTIONS]):
+                            if not ok:
+                                continue
+                            decoded = decode_action(int(action_idx))
+                            legal_skills.add(normalize_skill(decoded.get("skill")))
+                        for legal in legal_skills:
+                            if legal is not None:
+                                opportunity[legal] += 1
+
+                        used = normalize_skill(skill)
+                        if used is not None:
+                            usage[used] += 1
+                            used_episodes[used].add(ep["id"])
+                            if ep["agent_won"]:
+                                win_episodes[used].add(ep["id"])
+
+                    thumbs = {
+                        KEY_PLAYER: to_int(player_thumbs),
+                        KEY_COMPUTER: to_int(computer_thumbs),
+                    }
+                    env._resolve_turn_silent(
+                        tp_key,
+                        parse_skill(skill),
+                        thumbs,
+                        reaction,
+                        choice_target,
+                    )
+                    env._finish_resolved_turn(tp_key, {
+                        "turn": int(turn[1]),
+                        "tp_key": tp_key,
+                        "skill": parse_skill(skill),
+                        "choice_target": choice_target,
+                        "thumbs": thumbs,
+                        "reaction": reaction,
+                        "agent_is_tp": bool(agent_is_tp),
+                    })
+                    if env.game_state.game_over:
+                        break
+            finally:
+                env.close()
+
+        all_skills = sorted(set(opportunity) | set(usage), key=lambda s: (-usage[s], s))
+        return [{
+            "skill": skill,
+            "usage_count": usage[skill],
+            "opportunity_count": opportunity[skill],
+            "opportunity_usage_rate": (
+                usage[skill] / opportunity[skill] if opportunity[skill] > 0 else 0.0
+            ),
+            "win_episode_count": len(win_episodes[skill]),
+            "episode_count": len(used_episodes[skill]),
+            "win_rate": (
+                len(win_episodes[skill]) / len(used_episodes[skill])
+                if used_episodes[skill] else 0.0
+            ),
+        } for skill in all_skills]
+
+    def _get_recent_episodes(self, last_n_episodes=500):
+        with self._connect() as conn:
+            if self.run_id:
+                rows = conn.execute("""
+                    SELECT id, agent_key, agent_won
+                    FROM episodes
+                    WHERE run_id = ?
+                    ORDER BY id DESC
+                    LIMIT ?
+                """, (self.run_id, last_n_episodes)).fetchall()
+            else:
+                rows = conn.execute("""
+                    SELECT id, agent_key, agent_won
+                    FROM episodes
+                    ORDER BY id DESC
+                    LIMIT ?
+                """, (last_n_episodes,)).fetchall()
+
+        rows.reverse()
+        return [
+            {"id": row[0], "agent_key": row[1], "agent_won": bool(row[2])}
+            for row in rows
+        ]
 
     def get_reaction_stats(self, last_n_episodes=500):
         """Return NTP reaction usage in recent episodes."""

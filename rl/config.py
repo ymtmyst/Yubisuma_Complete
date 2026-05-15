@@ -81,11 +81,21 @@ OBS_TURN_COUNT = 1        # 試合全体のターン進行度
 # エンコーディング上限値
 SKIP_PHASES_MAX = 20      # スキップ連鎖は理論上無制限なので十分大きく設定
 PHASE_TURNS_MAX = 8       # 実務上8以下
+OBS_PENDING_CHOICE = 4       # pending flag + revealed NTP reaction (none/counter/block)
 OBS_GLOBAL_TOTAL = (OBS_IS_TP + OBS_FIRST_RESTRICTED + OBS_PREV_SKILL +
-                    OBS_EXTRA_TURNS + OBS_SKIP_CHAIN + OBS_PHASE_TURN + OBS_TURN_COUNT)  # 29
+                    OBS_EXTRA_TURNS + OBS_SKIP_CHAIN + OBS_PHASE_TURN +
+                    OBS_TURN_COUNT + OBS_PENDING_CHOICE)  # 33
+
+# === Persona (DIAYN-style diversity conditioning) ===
+# UVFA (Schaul 2015) 風の goal/persona one-hot 観測拡張。
+# 戦術タイプ別エージェントを単一ネットワークで学習させ、評価時は P_TP0 で柔軟運用。
+NUM_PERSONA_TP = 7   # 0:Balanced, 1:Guard-mid, 2:Cement-Lock-Flash, 3:Stock-Choice,
+                     # 4:Skip-Tempo, 5:Quick-Time, 6:Copy-Punish
+NUM_PERSONA_NTP = 3  # 0:Neutral, 1:Aggressive-Counter, 2:Block-Preserve
+OBS_PERSONA = NUM_PERSONA_TP + NUM_PERSONA_NTP  # 10
 
 # 合計観測次元
-OBS_TOTAL = OBS_SELF_TOTAL + OBS_OPP_TOTAL + OBS_GLOBAL_TOTAL  # 100
+OBS_TOTAL = OBS_SELF_TOTAL + OBS_OPP_TOTAL + OBS_GLOBAL_TOTAL + OBS_PERSONA  # 114
 
 # === PPOハイパーパラメータ (RTX 4070 Ti 向け) ===
 PPO_CONFIG = {
@@ -117,6 +127,14 @@ AUX_THUMBS_WEIGHT = 0.3       # 指の本数予測の重み
 AUX_SKILL_WEIGHT = 0.3        # スキル予測の重み
 AUX_LOOKAHEAD_WEIGHT = 0.2    # 終盤勝敗予測ヘッドの重み (終盤局面の価値表現を補強)
 LOOKAHEAD_N = 3               # エピソード末尾から何ステップ分を勝敗予測に使うか
+
+# === DIAYN: Diversity via Mutual Information (Eysenbach et al. ICLR 2019) ===
+# Persona-conditioned policy が persona z 毎に区別可能な行動を取るよう、
+# discriminator q(z|s) の対数尤度を補助損失として最大化する。
+# Reward には介入せず、shared_net 経由で policy に分化を促す。
+LAMBDA_DIVERSITY_TP = 0.1     # TP軸 discriminator loss の重み
+LAMBDA_DIVERSITY_NTP = 0.03   # NTP軸 (判断機会少のため軽め)
+DIAYN_SHARED_LR_RATIO = 0.1   # shared_net への back-prop は 1/10 速度 (AuxLoss と同じ思想)
 
 # === 訓練設定 ===
 TOTAL_TIMESTEPS = 5_000_000

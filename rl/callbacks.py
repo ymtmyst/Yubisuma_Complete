@@ -19,6 +19,9 @@ from stable_baselines3.common.callbacks import BaseCallback
 from rl.config import (
     CHECKPOINT_FREQ, OPPONENT_UPDATE_FREQ,
     MODEL_DIR, LOOKAHEAD_N,
+    OBS_PERSONA, NUM_PERSONA_TP, NUM_PERSONA_NTP,
+    LAMBDA_DIVERSITY_TP, LAMBDA_DIVERSITY_NTP,
+    DIAYN_SHARED_LR_RATIO,
 )
 
 
@@ -419,7 +422,7 @@ class SkillSnapshotCallback(BaseCallback):
 
     def _write_snapshot(self):
         try:
-            skills    = self.analysis_db.get_skill_usage_stats(last_n_episodes=self.last_n)
+            skills    = self.analysis_db.get_skill_opportunity_stats(last_n_episodes=self.last_n)
             reactions = self.analysis_db.get_reaction_stats(last_n_episodes=self.last_n)
             summary   = self.analysis_db.get_summary()
             ep_stats  = self.analysis_db.get_episode_length_stats(last_n_episodes=self.last_n)
@@ -431,7 +434,9 @@ class SkillSnapshotCallback(BaseCallback):
                 pct = s['usage_count'] / total_skill * 100 if total_skill else 0
                 skill_dist[s['skill']] = {
                     "count": s['usage_count'],
-                    "pct":   round(pct, 1),
+                    "turn_pct": round(pct, 1),
+                    "legal_count": s.get('opportunity_count', 0),
+                    "legal_use%": round(s.get('opportunity_usage_rate', 0.0) * 100, 1),
                     "win%":  round(s['win_rate'] * 100, 1),
                 }
 
@@ -463,3 +468,140 @@ class SkillSnapshotCallback(BaseCallback):
         except Exception as e:
             if self.verbose > 0:
                 print(f"[Snapshot] 書き込みエラー: {e}")
+
+
+class DiversityLossCallback(BaseCallback):
+    """
+    DIAYN-style diversity loss (Eysenbach et al. "Diversity is All You Need", ICLR 2019).
+
+    Persona-conditioned policy が persona z 毎に区別可能な行動を取るよう、
+    discriminator q(z|s) の対数尤度を補助損失として最大化する。
+
+    実装上の注意:
+    - 観測末尾 OBS_PERSONA 次元 (persona one-hot) を zero-mask して shared_net に通す
+      → discriminator が観測の persona one-hot を trivial に passthrough できないようにする
+    - shared_net への back-prop は DIAYN_SHARED_LR_RATIO (1/10) 倍速
+      → PPO の policy/value 更新への干渉を最小化
+    - PPO の reward には介入しない (純勝敗報酬を保持)
+    """
+
+    def __init__(self, lambda_tp: float = LAMBDA_DIVERSITY_TP,
+                 lambda_ntp: float = LAMBDA_DIVERSITY_NTP,
+                 lr: float = 3e-4,
+                 shared_lr_ratio: float = DIAYN_SHARED_LR_RATIO,
+                 buffer_max: int = 8192,
+                 verbose: int = 0):
+        super().__init__(verbose)
+        self.lambda_tp = lambda_tp
+        self.lambda_ntp = lambda_ntp
+        self.lr = lr
+        self.shared_lr_ratio = shared_lr_ratio
+        self.buffer_max = buffer_max
+        self._optimizer = None
+        self._device = "cpu"
+        self._obs_buf: list = []
+        self._tp_labels: list = []
+        self._ntp_labels: list = []
+
+    def _on_training_start(self) -> None:
+        import torch
+        fe = self.model.policy.features_extractor
+        device = next(fe.parameters()).device
+        self._device = str(device)
+
+        # 2 lr group: discriminator heads (full lr), shared_net (低速)
+        self._optimizer = torch.optim.Adam([
+            {'params': (list(fe.persona_disc_shared.parameters()) +
+                        list(fe.persona_tp_head.parameters()) +
+                        list(fe.persona_ntp_head.parameters())),
+             'lr': self.lr},
+            {'params': list(fe.shared_net.parameters()),
+             'lr': self.lr * self.shared_lr_ratio},
+        ])
+
+    def _on_step(self) -> bool:
+        if self._optimizer is None:
+            return True
+
+        infos = self.locals.get('infos', [])
+        if not infos:
+            return True
+
+        obs_tensor = self.locals.get('obs_tensor', None)
+        if obs_tensor is not None and hasattr(obs_tensor, 'detach'):
+            obs_array = obs_tensor.detach().cpu().numpy()
+        else:
+            obs_array = self.locals.get('new_obs', None)
+        if obs_array is None:
+            return True
+
+        for i, info in enumerate(infos):
+            if i >= len(obs_array):
+                continue
+            if 'agent_persona_tp' not in info:
+                continue
+            obs_i = np.asarray(obs_array[i], dtype=np.float32).copy()
+            # persona one-hot を zero-mask (trivial 解防止)
+            obs_i[-OBS_PERSONA:] = 0.0
+            self._obs_buf.append(obs_i)
+            self._tp_labels.append(int(info['agent_persona_tp']))
+            self._ntp_labels.append(int(info['agent_persona_ntp']))
+
+        # バッファ上限
+        if len(self._obs_buf) > self.buffer_max:
+            drop = len(self._obs_buf) - self.buffer_max
+            self._obs_buf = self._obs_buf[drop:]
+            self._tp_labels = self._tp_labels[drop:]
+            self._ntp_labels = self._ntp_labels[drop:]
+
+        return True
+
+    def _on_rollout_end(self) -> None:
+        if self._optimizer is None or len(self._obs_buf) < 64:
+            return
+
+        import torch
+        import torch.nn.functional as F
+
+        fe = self.model.policy.features_extractor
+        obs = torch.FloatTensor(np.array(self._obs_buf)).to(self._device)
+        tp_lbl = torch.LongTensor(self._tp_labels).to(self._device)
+        ntp_lbl = torch.LongTensor(self._ntp_labels).to(self._device)
+
+        features = fe.shared_net(obs)
+        tp_logits, ntp_logits = fe.persona_predictions(features)
+
+        loss_tp = F.cross_entropy(tp_logits, tp_lbl)
+        loss_ntp = F.cross_entropy(ntp_logits, ntp_lbl)
+        loss = self.lambda_tp * loss_tp + self.lambda_ntp * loss_ntp
+
+        self._optimizer.zero_grad()
+        loss.backward()
+        all_params: list = []
+        for pg in self._optimizer.param_groups:
+            all_params.extend(pg['params'])
+        torch.nn.utils.clip_grad_norm_(all_params, 0.5)
+        self._optimizer.step()
+
+        with torch.no_grad():
+            tp_acc = (tp_logits.argmax(dim=-1) == tp_lbl).float().mean().item()
+            ntp_acc = (ntp_logits.argmax(dim=-1) == ntp_lbl).float().mean().item()
+
+        if self.logger is not None:
+            self.logger.record("train/diversity_loss", float(loss.item()))
+            self.logger.record("train/diversity_loss_tp", float(loss_tp.item()))
+            self.logger.record("train/diversity_loss_ntp", float(loss_ntp.item()))
+            self.logger.record("diversity/disc_tp_acc", tp_acc)
+            self.logger.record("diversity/disc_ntp_acc", ntp_acc)
+            self.logger.record("diversity/disc_tp_baseline", 1.0 / NUM_PERSONA_TP)
+            self.logger.record("diversity/disc_ntp_baseline", 1.0 / NUM_PERSONA_NTP)
+
+        if self.verbose > 0:
+            print(f"[Diversity] Step {self.num_timesteps}: "
+                  f"loss={loss.item():.4f}, "
+                  f"tp_acc={tp_acc:.3f} (baseline {1.0/NUM_PERSONA_TP:.3f}), "
+                  f"ntp_acc={ntp_acc:.3f} (baseline {1.0/NUM_PERSONA_NTP:.3f})")
+
+        self._obs_buf.clear()
+        self._tp_labels.clear()
+        self._ntp_labels.clear()

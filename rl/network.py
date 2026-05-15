@@ -23,6 +23,7 @@ from rl.config import (
     NUM_NTP_REACTIONS, NUM_THUMB_OPTIONS, NUM_TP_SKILLS,
     AUX_REACTION_WEIGHT, AUX_THUMBS_WEIGHT, AUX_SKILL_WEIGHT, AUX_LOSS_WEIGHT,
     AUX_LOOKAHEAD_WEIGHT,
+    NUM_PERSONA_TP, NUM_PERSONA_NTP,
 )
 
 
@@ -92,9 +93,23 @@ class YubisumaFeaturesExtractor(BaseFeaturesExtractor):
             nn.Linear(aux_hidden[1], 1),
         )
 
+        # DIAYN persona discriminator (Eysenbach et al. ICLR 2019)
+        # 観測 (persona one-hot を zero-mask したもの) を shared_net に通した features から
+        # persona ID を予測。学習が進めば policy が persona毎に区別可能な行動を取るよう分化する。
+        # NOTE: callback 側で観測の末尾 OBS_PERSONA 次元 (persona one-hot) を 0 にして
+        # shared_net に渡すことで、discriminator が trivial 解に陥らない設計。
+        self.persona_disc_shared = nn.Sequential(
+            nn.Linear(features_dim, aux_hidden[0]),
+            nn.ReLU(),
+            nn.Linear(aux_hidden[0], aux_hidden[1]),
+            nn.ReLU(),
+        )
+        self.persona_tp_head = nn.Linear(aux_hidden[1], NUM_PERSONA_TP)
+        self.persona_ntp_head = nn.Linear(aux_hidden[1], NUM_PERSONA_NTP)
+
     def forward(self, observations: torch.Tensor) -> torch.Tensor:
         return self.shared_net(observations)
-    
+
     def get_aux_predictions(self, features: torch.Tensor):
         """補助予測を取得（明示的呼び出し用）"""
         return {
@@ -103,6 +118,11 @@ class YubisumaFeaturesExtractor(BaseFeaturesExtractor):
             'skill': self.aux_skill_head(features),
             'lookahead': self.aux_lookahead_head(features),
         }
+
+    def persona_predictions(self, features: torch.Tensor):
+        """DIAYN discriminator: features -> (TP persona logits, NTP persona logits)."""
+        h = self.persona_disc_shared(features)
+        return self.persona_tp_head(h), self.persona_ntp_head(h)
 
 
 class AuxiliaryLossComputer:

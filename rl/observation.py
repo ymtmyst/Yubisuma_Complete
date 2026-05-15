@@ -2,12 +2,13 @@
 """
 ゲーム状態を固定長の観測ベクトルに変換する。
 完全公開情報: 相手のストック内容を含む全状態を観測に含める (マルコフゲーム理論的に正しい設計)。
-観測次元: 自分 35 + 相手 36 + グローバル 29 = 100次元
+現観測次元: 自分 35 + 相手 36 + グローバル 33 + persona 10 = 114次元
 """
 
 import numpy as np
 from rl.config import (
-    OBS_TOTAL, STOCKABLE_SKILLS, TP_SKILL_OPTIONS, MAX_TURNS,
+    OBS_TOTAL, OBS_PERSONA, NUM_PERSONA_TP, NUM_PERSONA_NTP,
+    STOCKABLE_SKILLS, TP_SKILL_OPTIONS, MAX_TURNS,
     SKIP_PHASES_MAX, PHASE_TURNS_MAX,
 )
 import sys
@@ -18,6 +19,8 @@ from yubisuma_constants import (
 )
 
 
+LEGACY_OBS_TOTAL_V104 = 104  # persona one-hot 導入前のlegacy
+LEGACY_OBS_TOTAL_V100 = 100
 LEGACY_OBS_TOTAL_V86 = 86
 
 
@@ -40,14 +43,17 @@ STOCKABLE_SKILL_IDX = {s: i for i, s in enumerate(STOCKABLE_SKILLS)}
 DROP_BLOCKABLE_SKILLS = STOCKABLE_SKILLS  # 同じ8種
 
 
-def encode_observation(game_state, agent_key, turn_count=0):
+def encode_observation(game_state, agent_key, turn_count=0,
+                       persona_tp=0, persona_ntp=0):
     """
-    ゲーム状態を観測ベクトルに変換。
+    ゲーム状態を観測ベクトルに変換 (persona one-hot 付き、114次元)。
 
     Args:
         game_state: GameStateオブジェクト
         agent_key: エージェントのプレイヤーキー
         turn_count: 現在のターン数 (試合全体の進行度として使用)
+        persona_tp: TP軸 persona ID (0..NUM_PERSONA_TP-1)
+        persona_ntp: NTP軸 persona ID (0..NUM_PERSONA_NTP-1)
 
     Returns:
         np.ndarray: 観測ベクトル (shape: (OBS_TOTAL,), dtype: float32)
@@ -59,27 +65,86 @@ def encode_observation(game_state, agent_key, turn_count=0):
 
     obs = []
 
-    # === 自分の状態 (36次元) ===
+    # === 自分の状態 (35次元) ===
     obs.extend(_encode_self_state(me, effects, agent_key))
 
-    # === 相手の可視状態 (21次元) ===
+    # === 相手の可視状態 (36次元) ===
     obs.extend(_encode_opponent_state(opp, effects, opp_key))
 
-    # === グローバル状態 ===
+    # === グローバル状態 (33次元) ===
     obs.extend(_encode_global_state(game_state, effects, agent_key, opp_key, turn_count))
-    
+
+    # === Persona one-hot (10次元) ===
+    obs.extend(_encode_persona(persona_tp, persona_ntp))
+
     result = np.array(obs, dtype=np.float32)
     assert result.shape == (OBS_TOTAL,), f"Observation dim mismatch: {result.shape} != ({OBS_TOTAL},)"
     return result
 
 
-def encode_observation_for_dim(game_state, agent_key, turn_count=0, obs_dim=OBS_TOTAL):
-    """Encode observation for the expected model input width."""
+def _encode_persona(persona_tp, persona_ntp):
+    """Persona one-hot (TP軸 + NTP軸, 計 NUM_PERSONA_TP + NUM_PERSONA_NTP 次元)。"""
+    vec = [0.0] * OBS_PERSONA
+    if 0 <= int(persona_tp) < NUM_PERSONA_TP:
+        vec[int(persona_tp)] = 1.0
+    if 0 <= int(persona_ntp) < NUM_PERSONA_NTP:
+        vec[NUM_PERSONA_TP + int(persona_ntp)] = 1.0
+    return vec
+
+
+def encode_observation_for_dim(game_state, agent_key, turn_count=0, obs_dim=OBS_TOTAL,
+                                persona_tp=0, persona_ntp=0):
+    """Encode observation for the expected model input width.
+
+    persona 引数は OBS_TOTAL (現行114次元) でのみ意味を持ち、legacy では無視される。
+    """
     if obs_dim == OBS_TOTAL:
-        return encode_observation(game_state, agent_key, turn_count)
+        return encode_observation(game_state, agent_key, turn_count, persona_tp, persona_ntp)
+    if obs_dim == LEGACY_OBS_TOTAL_V104:
+        return _encode_observation_legacy_v104(game_state, agent_key, turn_count)
+    if obs_dim == LEGACY_OBS_TOTAL_V100:
+        return _encode_observation_legacy_v100(game_state, agent_key, turn_count)
     if obs_dim == LEGACY_OBS_TOTAL_V86:
         return _encode_observation_legacy_v86(game_state, agent_key, turn_count)
     raise ValueError(f"Unsupported observation dim: {obs_dim}")
+
+
+def _encode_observation_legacy_v104(game_state, agent_key, turn_count=0):
+    """Persona 拡張前の 104次元 observation (legacy ckp 用)。"""
+    me = game_state.get_player(agent_key)
+    opp_key = game_state.get_opponent_key(agent_key)
+    opp = game_state.get_opponent(agent_key)
+    effects = game_state.effects
+
+    obs = []
+    obs.extend(_encode_self_state(me, effects, agent_key))
+    obs.extend(_encode_opponent_state(opp, effects, opp_key))
+    obs.extend(_encode_global_state(game_state, effects, agent_key, opp_key, turn_count))
+
+    result = np.array(obs, dtype=np.float32)
+    assert result.shape == (LEGACY_OBS_TOTAL_V104,), (
+        f"Legacy v104 observation dim mismatch: {result.shape} != ({LEGACY_OBS_TOTAL_V104},)"
+    )
+    return result
+
+
+def _encode_observation_legacy_v100(game_state, agent_key, turn_count=0):
+    """Legacy 100-dim observation before pending Choice features."""
+    me = game_state.get_player(agent_key)
+    opp_key = game_state.get_opponent_key(agent_key)
+    opp = game_state.get_opponent(agent_key)
+    effects = game_state.effects
+
+    obs = []
+    obs.extend(_encode_self_state(me, effects, agent_key))
+    obs.extend(_encode_opponent_state(opp, effects, opp_key))
+    obs.extend(_encode_global_state_base(game_state, effects, agent_key, opp_key, turn_count))
+
+    result = np.array(obs, dtype=np.float32)
+    assert result.shape == (LEGACY_OBS_TOTAL_V100,), (
+        f"Legacy observation dim mismatch: {result.shape} != ({LEGACY_OBS_TOTAL_V100},)"
+    )
+    return result
 
 
 def _encode_observation_legacy_v86(game_state, agent_key, turn_count=0):
@@ -99,7 +164,7 @@ def _encode_observation_legacy_v86(game_state, agent_key, turn_count=0):
     obs = []
     obs.extend(_encode_self_state_legacy_v86(me))
     obs.extend(_encode_opponent_state_legacy_v86(opp))
-    obs.extend(_encode_global_state(game_state, effects, agent_key, opp_key, turn_count))
+    obs.extend(_encode_global_state_base(game_state, effects, agent_key, opp_key, turn_count))
 
     result = np.array(obs, dtype=np.float32)
     assert result.shape == (LEGACY_OBS_TOTAL_V86,), (
@@ -254,7 +319,7 @@ def _encode_opponent_state_legacy_v86(player):
     return obs
 
 
-def _encode_global_state(game_state, effects, agent_key, opp_key, turn_count=0):
+def _encode_global_state_base(game_state, effects, agent_key, opp_key, turn_count=0):
     """グローバル状態をエンコード (29次元)"""
     obs = []
 
@@ -293,3 +358,19 @@ def _encode_global_state(game_state, effects, agent_key, opp_key, turn_count=0):
     obs.append(min(turn_count, MAX_TURNS) / MAX_TURNS)
 
     return obs  # 1 + 2 + 20 + 2 + 2 + 1 + 1 = 29
+
+
+def _encode_global_state(game_state, effects, agent_key, opp_key, turn_count=0):
+    obs = _encode_global_state_base(game_state, effects, agent_key, opp_key, turn_count)
+
+    pending = getattr(game_state, "pending_choice", None)
+    if pending and pending.get("chooser_key") == agent_key:
+        reaction = pending.get("reaction")
+        obs.append(1.0)
+        obs.append(1.0 if reaction is None else 0.0)
+        obs.append(1.0 if reaction == "カウンター" else 0.0)
+        obs.append(1.0 if reaction == "ブロック" else 0.0)
+    else:
+        obs.extend([0.0, 0.0, 0.0, 0.0])
+
+    return obs  # 29 + 4 = 33

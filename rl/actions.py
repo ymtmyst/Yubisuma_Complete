@@ -27,6 +27,10 @@ from yubisuma_constants import (
 
 # === エンコード ===
 
+CHOICE_SKILL = "チョイス"
+CHOICE_PREFIX = CHOICE_SKILL + ":"
+
+
 def encode_tp_action(skill_idx, thumb_count):
     """TPの行動をインデックスにエンコード"""
     return skill_idx * NUM_THUMB_OPTIONS + thumb_count
@@ -103,6 +107,11 @@ def get_action_mask(game_state, agent_key):
     me = game_state.get_player(agent_key)
     opp = game_state.get_opponent(agent_key)
     effects = game_state.effects
+
+    pending_choice = getattr(game_state, "pending_choice", None)
+    if pending_choice and pending_choice.get("chooser_key") == agent_key:
+        _mask_choice_target_actions(mask, me)
+        return mask
     
     if is_tp:
         _mask_tp_actions(mask, game_state, me, opp, agent_key, effects)
@@ -143,13 +152,13 @@ def _mask_tp_actions(mask, game_state, me, opp, agent_key, effects):
             continue
         
         # チョイス展開
-        if skill_name.startswith("チョイス:"):
+        if skill_name.startswith(CHOICE_PREFIX):
             target = skill_name.split(":")[1]
             # チョイスが宣言可能 + 対象がストックにある + フェーズ内未使用
             available = [s for s in me.stock if s not in me.choice_used_this_phase]
-            if target in available:
+            if available and target == available[0]:
                 # ドロップ封印チェック
-                if "チョイス" not in me.drop_blocked_skills:
+                if CHOICE_SKILL not in me.drop_blocked_skills:
                     valid_skills.add(idx)
             continue
         
@@ -209,6 +218,18 @@ def _is_skill_valid(skill_name, me, opp, effects, agent_key, first_restricted):
             return False
     
     return True
+
+
+def _mask_choice_target_actions(mask, player):
+    """Mask target-selection actions for an already declared Choice."""
+    available = [s for s in player.stock if s not in player.choice_used_this_phase]
+    for idx, skill in enumerate(TP_SKILL_OPTIONS):
+        if not isinstance(skill, str) or not skill.startswith(CHOICE_PREFIX):
+            continue
+        target = skill.split(":")[1]
+        if target in available:
+            # Thumb count was fixed when Choice was declared.
+            mask[encode_tp_action(idx, 0)] = True
 
 
 def _mask_ntp_actions(mask, game_state, me, opp, agent_key, effects):

@@ -21,12 +21,14 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from rl.config import (
     TOTAL_ACTIONS, OBS_TOTAL, REWARD_WIN, REWARD_LOSE,
     REWARD_DRAW, MAX_TURNS,
+    NUM_PERSONA_TP, NUM_PERSONA_NTP,
 )
 from rl.observation import encode_observation, encode_observation_for_dim
 from rl.model_utils import load_maskable_ppo
 from rl.actions import (
     decode_action, get_action_mask, encode_tp_action, encode_ntp_action,
     action_to_readable, NUM_TP_ACTIONS,
+    CHOICE_SKILL,
 )
 from yubisuma_constants import KEY_PLAYER, KEY_COMPUTER
 from yubisuma_base import Player, count_total_thumbs
@@ -56,6 +58,17 @@ class YubisumaEnv(gym.Env):
         self.opponent_key = None
         self.turn_count = 0
 
+        # Persona (UVFA + DIAYN, ICLR 2019)
+        # エピソード単位で固定。reset() でランダムサンプル。
+        # 学習中は分化を促し、評価/推論時は外部から P_TP0=0 に固定して柔軟運用。
+        self.agent_persona_tp = 0
+        self.agent_persona_ntp = 0
+        self.opp_persona_tp = 0
+        self.opp_persona_ntp = 0
+        # 外部から persona を強制したい時の override (None なら reset でランダム)
+        self._forced_agent_persona_tp = None
+        self._forced_agent_persona_ntp = None
+
         # エピソード記録
         self.episode_turns = []
 
@@ -64,12 +77,26 @@ class YubisumaEnv(gym.Env):
     
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
-        
+
         self.game_state = _create_game_state()
+        self.game_state.pending_choice = None
         self.turn_count = 0
         self.episode_turns = []
         self.last_opponent_action = None
-        
+
+        # Persona の割り当て (override がなければランダム)
+        if self._forced_agent_persona_tp is not None:
+            self.agent_persona_tp = int(self._forced_agent_persona_tp)
+        else:
+            self.agent_persona_tp = int(self.np_random.integers(NUM_PERSONA_TP))
+        if self._forced_agent_persona_ntp is not None:
+            self.agent_persona_ntp = int(self._forced_agent_persona_ntp)
+        else:
+            self.agent_persona_ntp = int(self.np_random.integers(NUM_PERSONA_NTP))
+        # 対戦相手 persona もランダム (リーグ側で固定したい場合は set_opponent_persona で上書き)
+        self.opp_persona_tp = int(self.np_random.integers(NUM_PERSONA_TP))
+        self.opp_persona_ntp = int(self.np_random.integers(NUM_PERSONA_NTP))
+
         # エージェントのプレイヤー割り当て（ランダム）
         if self.np_random.random() < 0.5:
             self.agent_key = KEY_PLAYER
@@ -77,24 +104,45 @@ class YubisumaEnv(gym.Env):
         else:
             self.agent_key = KEY_COMPUTER
             self.opponent_key = KEY_PLAYER
-        
+
         # 先手をランダムに決定 (np_randomを使いGymシードを有効化)
         keys = [KEY_PLAYER, KEY_COMPUTER]
         self.game_state.current_player_key = keys[self.np_random.integers(2)]
         self.game_state.effects.first_player_key = self.game_state.current_player_key
-        
+
         # フェーズ開始処理
         self._on_phase_start(self.game_state.current_player_key)
-        
+
         # 相手が先手でスキップ中なら自動処理
         self._auto_advance()
-        
-        obs = encode_observation(self.game_state, self.agent_key, self.turn_count)
+
+        obs = self._agent_obs()
         info = self._get_info()
 
         return obs, info
+
+    def _agent_obs(self):
+        """エージェントの persona を反映した観測ベクトル。"""
+        return encode_observation(
+            self.game_state, self.agent_key, self.turn_count,
+            persona_tp=self.agent_persona_tp,
+            persona_ntp=self.agent_persona_ntp,
+        )
+
+    def set_agent_persona(self, persona_tp=None, persona_ntp=None):
+        """評価時等に persona を外部から強制設定する (None なら reset でランダムに戻す)。"""
+        self._forced_agent_persona_tp = persona_tp
+        self._forced_agent_persona_ntp = persona_ntp
+
+    def set_opponent_persona(self, persona_tp, persona_ntp):
+        """リーグ等が対戦相手 persona を上書きする用 (即時反映)。"""
+        self.opp_persona_tp = int(persona_tp)
+        self.opp_persona_ntp = int(persona_ntp)
     
     def step(self, action):
+        if self._has_pending_choice_for(self.agent_key):
+            return self._step_pending_choice(action)
+
         decoded = decode_action(action)
         is_agent_tp = (self.game_state.current_player_key == self.agent_key)
         
@@ -133,7 +181,7 @@ class YubisumaEnv(gym.Env):
             thumbs = {KEY_PLAYER: ntp_thumbs, KEY_COMPUTER: tp_thumbs}
         
         # チョイスの特別処理: 選択対象を事前に設定
-        if choice_target:
+        if choice_target and skill != CHOICE_SKILL:
             tp = self.game_state.get_player(tp_key)
             tp._pending_choice_target = choice_target
         
@@ -142,13 +190,24 @@ class YubisumaEnv(gym.Env):
             'turn': self.turn_count,
             'tp_key': tp_key,
             'skill': skill,
-            'choice_target': choice_target,
+            'choice_target': None,
             'thumbs': thumbs.copy(),
             'reaction': reaction,
             'agent_is_tp': is_agent_tp,
         }
         
         # ターン解決（内部print抑制）
+        if skill == CHOICE_SKILL:
+            self._start_pending_choice(tp_key, thumbs, reaction, is_agent_tp, turn_record)
+            if is_agent_tp:
+                obs = self._agent_obs()
+                return obs, 0.0, False, False, self._get_info()
+            choice_target = self._get_opponent_choice_target()
+            self.game_state.pending_choice = None
+            turn_record['choice_target'] = choice_target
+            if self.last_opponent_action is not None:
+                self.last_opponent_action['choice_target'] = choice_target
+
         self._resolve_turn_silent(tp_key, skill, thumbs, reaction, choice_target)
         
         self.turn_count += 1
@@ -170,8 +229,8 @@ class YubisumaEnv(gym.Env):
         
         # 報酬
         reward = self._compute_reward(terminated, truncated)
-        
-        obs = encode_observation(self.game_state, self.agent_key, self.turn_count)
+
+        obs = self._agent_obs()
         info = self._get_info()
 
         # エピソード完了時にサマリをinfoに含める (AnalysisCallbackが主プロセスで収集)
@@ -179,13 +238,97 @@ class YubisumaEnv(gym.Env):
             info['episode_summary'] = self._get_episode_summary()
 
         return obs, reward, terminated, truncated, info
-    
+
     def action_masks(self):
         """MaskablePPO用のアクションマスク"""
         return get_action_mask(self.game_state, self.agent_key)
     
     # === 内部メソッド ===
     
+    def _has_pending_choice_for(self, player_key):
+        pending = getattr(self.game_state, "pending_choice", None)
+        return bool(pending and pending.get("chooser_key") == player_key)
+
+    def _start_pending_choice(self, tp_key, thumbs, reaction, agent_is_tp, turn_record):
+        self.game_state.pending_choice = {
+            "chooser_key": tp_key,
+            "tp_key": tp_key,
+            "thumbs": thumbs.copy(),
+            "reaction": reaction,
+            "agent_is_tp": agent_is_tp,
+            "turn_record": turn_record,
+        }
+
+    def _step_pending_choice(self, action):
+        pending = self.game_state.pending_choice
+        decoded = decode_action(action)
+        choice_target = decoded.get("choice_target")
+        tp = self.game_state.get_player(pending["tp_key"])
+        available = [s for s in tp.stock if s not in tp.choice_used_this_phase]
+        if choice_target not in available:
+            choice_target = available[0] if available else None
+
+        turn_record = pending["turn_record"]
+        turn_record["choice_target"] = choice_target
+        self.game_state.pending_choice = None
+
+        self._resolve_turn_silent(
+            pending["tp_key"],
+            CHOICE_SKILL,
+            pending["thumbs"],
+            pending["reaction"],
+            choice_target,
+        )
+        self.last_opponent_action = None
+        return self._finish_resolved_turn(pending["tp_key"], turn_record)
+
+    def _get_opponent_choice_target(self):
+        mask = get_action_mask(self.game_state, self.opponent_key)
+        valid_indices = np.where(mask)[0]
+        if len(valid_indices) == 0:
+            pending = self.game_state.pending_choice
+            tp = self.game_state.get_player(pending["tp_key"])
+            available = [s for s in tp.stock if s not in tp.choice_used_this_phase]
+            return available[0] if available else None
+
+        if self.opponent_policy is None:
+            action = int(random.choice(valid_indices))
+        else:
+            obs_dim = getattr(self.opponent_policy, "observation_dim", OBS_TOTAL)
+            opp_obs = encode_observation_for_dim(
+                self.game_state, self.opponent_key, self.turn_count, obs_dim=obs_dim,
+                persona_tp=self.opp_persona_tp, persona_ntp=self.opp_persona_ntp,
+            )
+            action_arr, _ = self.opponent_policy.predict(
+                opp_obs, action_masks=mask, deterministic=False
+            )
+            action = int(action_arr[0])
+            if action not in set(int(i) for i in valid_indices):
+                action = int(random.choice(valid_indices))
+
+        return decode_action(action).get("choice_target")
+
+    def _finish_resolved_turn(self, tp_key, turn_record):
+        self.turn_count += 1
+        self.episode_turns.append(turn_record)
+
+        terminated = self._check_victory()
+
+        if not terminated:
+            self._advance_game_state(tp_key)
+            self._auto_advance()
+
+        truncated = False
+        if not terminated and self.turn_count >= MAX_TURNS:
+            truncated = True
+
+        reward = self._compute_reward(terminated, truncated)
+        obs = self._agent_obs()
+        info = self._get_info()
+        if terminated or truncated:
+            info['episode_summary'] = self._get_episode_summary()
+        return obs, reward, terminated, truncated, info
+
     def _resolve_turn_silent(self, tp_key, skill, thumbs, reaction, choice_target=None):
         """ターンを解決（stdout抑制）"""
         import io
@@ -273,22 +416,17 @@ class YubisumaEnv(gym.Env):
         """ターン後のゲーム進行を処理"""
         gs = self.game_state
         effects = gs.effects
+        opp_key = gs.get_opponent_key(last_tp_key)
+        opp = gs.get_player(opp_key)
 
-        # タイム復帰チェック（最優先: 強制ターン中の追加ターンを無効化してTime使用者に戻る）
-        if hasattr(gs, '_time_return_to') and gs._time_return_to:
-            if gs._time_return_to != last_tp_key:
-                # 強制ターン終了: 追加ターンを破棄してTime使用者に戻る
-                # ※ _time_return_toはクリアしない → _auto_advanceがスキップ中かどうか検知に使用
-                next_key = gs._time_return_to
-                if effects.has_extra_turn(last_tp_key):
-                    effects.additional_turns[last_tp_key] = 0
-                gs.on_phase_end(last_tp_key)
-                gs.current_player_key = next_key
-                self._on_phase_start(next_key)
-                return
-            else:
-                # Time使用者が通常ターンを完了した（スキップなし）: クリアして通常進行
-                gs._time_return_to = None
+        # タイム効果チェック: last_tpが追加ターンを得た && opp(time使用者)がtime_active
+        if opp.time_active and effects.has_extra_turn(last_tp_key):
+            opp.time_active = False
+            effects.additional_turns[last_tp_key] = 0
+            gs.on_phase_end(last_tp_key)
+            gs.current_player_key = opp_key
+            self._on_phase_start(opp_key)
+            return
 
         # 追加ターンチェック
         if effects.has_extra_turn(last_tp_key):
@@ -296,34 +434,10 @@ class YubisumaEnv(gym.Env):
             # 同じTPが続けてターンを行う（次のstep()で処理）
             return
 
-        # フェーズ終了
+        # フェーズ終了 → 通常遷移
         gs.on_phase_end(last_tp_key)
-
-        # タイム効果チェック
-        opp_key = gs.get_opponent_key(last_tp_key)
-        current_player = gs.get_player(last_tp_key)
-        opponent = gs.get_opponent(last_tp_key)
-
-        next_key = opp_key
-
-        if current_player.time_active:
-            current_player.time_active = False
-            # タイム効果: 相手に1ターンだけ渡して戻る
-            gs.current_player_key = opp_key
-            self._on_phase_start(opp_key)
-            # タイム効果のフラグをセット（次のstep()後に復帰）
-            gs._time_return_to = last_tp_key
-            return
-
-        if opponent.time_active:
-            opponent.time_active = False
-            if effects.has_extra_turn(last_tp_key):
-                effects.additional_turns[last_tp_key] = 0
-            next_key = opp_key
-
-        # フェーズ遷移
-        gs.current_player_key = next_key
-        self._on_phase_start(next_key)
+        gs.current_player_key = opp_key
+        self._on_phase_start(opp_key)
     
     def _on_phase_start(self, player_key):
         """フェーズ開始処理"""
@@ -342,20 +456,13 @@ class YubisumaEnv(gym.Env):
                 player.quick_level = max(0, player.quick_level - 1)
             gs.on_phase_end(current_key)
 
-            # タイム復帰中にTime使用者がスキップされた場合:
-            # タイムは全処理に優先するため相手もスキップし、Time使用者に戻る
-            if hasattr(gs, '_time_return_to') and gs._time_return_to == current_key:
-                gs._time_return_to = None
-                opp_key = gs.get_opponent_key(current_key)
-                opp = gs.get_player(opp_key)
-                if opp.quick_level > 0:
-                    opp.quick_level = max(0, opp.quick_level - 1)
-                gs.effects.mark_first_phase_done(opp_key)
-                # Time使用者に戻る
+            # タイム+スキップ: スキップされた側がtime_activeなら、フェーズを戻す
+            # （スキップされても相手に連続行動を許さない）
+            if gs.get_player(current_key).time_active:
                 gs.current_player_key = current_key
                 self._on_phase_start(current_key)
                 player = gs.get_player(current_key)
-                continue  # skip_phases = 0 になったのでループ終了へ
+                continue
 
             # 相手にターンを渡す（通常スキップ）
             current_key = gs.get_opponent_key(current_key)
@@ -367,11 +474,13 @@ class YubisumaEnv(gym.Env):
         """対戦相手のTP行動を生成"""
         if self.opponent_policy is None:
             return self._random_tp_action()
-        
-        # 対戦相手の観測を作成（相手視点）
-        opp_obs = encode_observation(self.game_state, self.opponent_key, self.turn_count)
+
+        # 対戦相手の観測を作成（相手視点、相手 persona 付き）
         obs_dim = getattr(self.opponent_policy, "observation_dim", OBS_TOTAL)
-        opp_obs = encode_observation_for_dim(self.game_state, self.opponent_key, self.turn_count, obs_dim=obs_dim)
+        opp_obs = encode_observation_for_dim(
+            self.game_state, self.opponent_key, self.turn_count, obs_dim=obs_dim,
+            persona_tp=self.opp_persona_tp, persona_ntp=self.opp_persona_ntp,
+        )
         opp_mask = get_action_mask(self.game_state, self.opponent_key)
 
         action, _ = self.opponent_policy.predict(
@@ -384,12 +493,14 @@ class YubisumaEnv(gym.Env):
         if self.opponent_policy is None:
             return self._random_ntp_action()
 
-        # 対戦相手の観測を作成（相手視点でNTP）
-        opp_obs = encode_observation(self.game_state, self.opponent_key, self.turn_count)
+        # 対戦相手の観測を作成（相手視点でNTP、相手 persona 付き）
         obs_dim = getattr(self.opponent_policy, "observation_dim", OBS_TOTAL)
-        opp_obs = encode_observation_for_dim(self.game_state, self.opponent_key, self.turn_count, obs_dim=obs_dim)
+        opp_obs = encode_observation_for_dim(
+            self.game_state, self.opponent_key, self.turn_count, obs_dim=obs_dim,
+            persona_tp=self.opp_persona_tp, persona_ntp=self.opp_persona_ntp,
+        )
         opp_mask = get_action_mask(self.game_state, self.opponent_key)
-        
+
         action, _ = self.opponent_policy.predict(
             opp_obs, action_masks=opp_mask, deterministic=False
         )
@@ -432,12 +543,21 @@ class YubisumaEnv(gym.Env):
             'action_mask': self.action_masks(),
             'turn_count': self.turn_count,
             'agent_is_tp': self.game_state.current_player_key == self.agent_key,
+            # DIAYN discriminator のラベル
+            'agent_persona_tp': self.agent_persona_tp,
+            'agent_persona_ntp': self.agent_persona_ntp,
         }
         # 補助タスク用: 直前の相手行動
+        pending_choice = getattr(self.game_state, "pending_choice", None)
+        if pending_choice is not None:
+            info['pending_choice'] = {
+                'chooser_key': pending_choice.get('chooser_key'),
+                'reaction': pending_choice.get('reaction'),
+            }
         if self.last_opponent_action is not None:
             info['opponent_action'] = self.last_opponent_action
         return info
-    
+
     def _get_episode_summary(self):
         """エピソードの要約を返す"""
         return {
@@ -446,6 +566,8 @@ class YubisumaEnv(gym.Env):
             'agent_won': self.game_state.winner == self.agent_key,
             'total_turns': self.turn_count,
             'turns': self.episode_turns,
+            'agent_persona_tp': self.agent_persona_tp,
+            'agent_persona_ntp': self.agent_persona_ntp,
         }
 
     def set_opponent_path(self, path):
@@ -468,4 +590,5 @@ def _create_game_state():
     gs.current_player_key = None
     gs.game_over = False
     gs.winner = None
+    gs.pending_choice = None
     return gs

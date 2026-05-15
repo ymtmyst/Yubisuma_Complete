@@ -34,6 +34,7 @@ from rl.analysis import AnalysisDB
 from rl.callbacks import (
     SelfPlayCallback, AnalysisCallback, CheckpointCallback, AuxLossCallback,
     EntCoefScheduleCallback, RandomEvalCallback, SkillSnapshotCallback,
+    DiversityLossCallback,
 )
 
 
@@ -168,9 +169,15 @@ def train(args):
         analysis_db, SNAPSHOT_PATH,
         snapshot_freq=CHECKPOINT_FREQ, last_n=100, verbose=1,
     )
+    # DIAYN (Eysenbach et al. ICLR 2019): persona z 別に区別可能な行動分布へ自然分化
+    # 学習開始時 discriminator accuracy はランダム (1/7≈0.143) から始まり、
+    # 分化が成功していれば徐々に上昇する。wandb で diversity/disc_tp_acc を監視。
+    diversity_cb = DiversityLossCallback(verbose=1) if args.diversity else None
 
     callbacks = [selfplay_cb, analysis_cb, checkpoint_cb, aux_loss_cb, ent_coef_cb,
                  eval_cb, snapshot_cb]
+    if diversity_cb is not None:
+        callbacks.append(diversity_cb)
 
     # W&B コールバック追加
     if wandb_run is not None:
@@ -256,6 +263,15 @@ def main():
         "--db-path", type=str, default=None,
         help="Analysis DB path (default: rl_analysis/<run-id>.db)",
     )
+    parser.add_argument(
+        "--diversity", action="store_true",
+        help="Enable DIAYN diversity loss for persona分化 (Eysenbach et al. ICLR 2019)",
+    )
+    parser.add_argument(
+        "--no-diversity", dest="diversity", action="store_false",
+        help="Disable DIAYN diversity loss (baseline run)",
+    )
+    parser.set_defaults(diversity=True)
 
     args = parser.parse_args()
     train(args)

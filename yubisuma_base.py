@@ -30,7 +30,7 @@ class Player:
         self.choice_used_this_phase = set()  # このフェーズ中にチョイスで使用したスキル
 
         # === タイム ===
-        self.time_active = False        # タイム効果: 相手の次スキル後に自分のターン
+        self.time_active = False        # タイム効果: 相手が追加ターンを得た時に発動して自分のターンへ
 
         # === ドロップ ===
         self.drop_blocked_skills = set()  # ドロップで封じられたスキル

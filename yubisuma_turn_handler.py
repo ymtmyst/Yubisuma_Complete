@@ -84,7 +84,11 @@ class TurnHandler:
                 print(f"  {ntp.name}のブロックにより{tp.name}のスキル効果が無効化！")
         # 3. カウンター使用（対カウンタースキル以外）
         elif reaction == "カウンター":
-            TurnHandler._resolve_counter(gs, tp_key, skill, thumbs, total, charge_was_active)
+            # コピーがカウンターされた場合: 参照元スキルに依存した挙動
+            if skill_name == "コピー":
+                TurnHandler._resolve_copy_countered(gs, tp_key, thumbs, total)
+            else:
+                TurnHandler._resolve_counter(gs, tp_key, skill, thumbs, total, charge_was_active)
         # 4. 通常解決
         else:
             TurnHandler._resolve_skill_effect(gs, tp_key, skill, thumbs, total, was_skip_before, charge_was_active)
@@ -287,7 +291,7 @@ class TurnHandler:
             tp.used_ultimate = True
             tp.time_active = True
             effects.add_extra_turns(tp_key, 1)
-            print(f"  タイム！{ntp.name}の次スキル後、{tp.name}のターンになる + 追加1ターン")
+            print(f"  タイム！{ntp.name}が連続行動しようとした時、{tp.name}のターンになる + 追加1ターン")
             return
 
     @staticmethod
@@ -309,6 +313,70 @@ class TurnHandler:
 
         print(f"  コピー！「{prev_skill}」の効果を発動します")
         TurnHandler._execute_copied_skill(gs, tp_key, prev_skill, thumbs, total, upgrade_hand_to_win=True, was_skip_before=was_skip_before)
+
+    @staticmethod
+    def _resolve_copy_countered(gs, tp_key, thumbs, total):
+        """コピー宣言がカウンターされた場合の解決。
+        コピーは無効化されず、参照元スキルに対するカウンター処理に依存する。
+        対カウンタースキル参照時はその効果が発動し、コピー固有の
+        「このスキルを宣言して手を降ろす時、代わりに一発上がりする」が適用される。"""
+        tp = gs.get_player(tp_key)
+        ntp = gs.get_opponent(tp_key)
+        effects = gs.effects
+
+        if len(effects.turn_history) < 2:
+            print("  コピー失敗（参照可能なスキルがありません）")
+            return
+
+        prev_skill = effects.turn_history[-2][1]
+        if isinstance(prev_skill, str) and prev_skill not in REFERENCEABLE_SKILLS:
+            print("  コピー失敗（参照不可能なスキル）")
+            return
+
+        print(f"  コピー！参照元「{prev_skill}」に対してカウンター処理を適用")
+
+        # 参照元が数字: 通常の数字+カウンター処理（コピー昇格は適用されない）
+        if isinstance(prev_skill, int):
+            if total == prev_skill:
+                ntp.remove_hand()
+                print(f"    カウンター成功！数字的中により{ntp.name}が手を1つ降ろします！")
+            else:
+                tp.remove_hand()
+                print(f"    カウンター失敗！外れにより{tp.name}が手を1つ降ろします！")
+            return
+
+        # 参照元がフェイント: 対カウンター効果（手を降ろす+追加ターン）にコピー昇格適用
+        if prev_skill == "フェイント":
+            effects.add_extra_turns(tp_key, 1)
+            if effects.try_block_instant_win(ntp):
+                print(f"    {ntp.name}のガードによりコピー一発上がりが無効化！追加1ターンのみ獲得")
+            else:
+                tp.remove_all_hands()
+                print(f"    コピー(フェイント)成功！{tp.name}が一発上がり + 追加1ターン！")
+            return
+
+        # 参照元がロック: ロック対カウンター効果（自身の手は降ろさない、コピー昇格非適用）
+        if prev_skill == "ロック":
+            ntp.lock_debuff = 2
+            print(f"    コピー(ロック)成功！次の{tp.name}のターン中、{ntp.name}はカウンター不可！")
+            return
+
+        # 参照元がフラッシュ: カウンターフラッシュ（ntp側で一発上がり、コピー昇格非適用）
+        if prev_skill == "フラッシュ":
+            tp_thumbs = thumbs[tp.key]
+            ntp_thumbs = thumbs[ntp.key]
+            if tp_thumbs == ntp_thumbs:
+                if effects.try_block_instant_win(tp):
+                    print(f"    {tp.name}のガードによりカウンターフラッシュが無効化！")
+                else:
+                    ntp.remove_all_hands()
+                    print(f"    カウンター成功！{ntp.name}がフラッシュ効果で一発上がり！")
+            else:
+                print(f"    カウンターしたがフラッシュ条件不成立")
+            return
+
+        # その他のスキル（セメント・ガード・チャージ・クイック・スキップ）: 通常カウンター=効果なし
+        print(f"    カウンターにより「{prev_skill}」の効果は発動せず、何も起こりません")
 
     @staticmethod
     def _resolve_choice_with_reaction(gs, tp_key, thumbs, total, reaction):
