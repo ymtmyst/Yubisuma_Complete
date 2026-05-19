@@ -1,4 +1,4 @@
-# yubisuma_logic.py - 完全ルール版
+# yubisuma_logic.py - 完全ルール（新）版
 
 import random
 from yubisuma_constants import (
@@ -6,6 +6,7 @@ from yubisuma_constants import (
     MAX_HANDS, MIN_HANDS, NORMAL_SKILLS, ANTI_COUNTER_SKILLS,
     REFERENCE_SKILLS, ULTIMATE_SKILLS, OPPONENT_TURN_SKILLS,
     REFERENCEABLE_SKILLS, TURN_PLAYER_SKILLS, GAME_CONFIG,
+    STOCK_ALPHA_SKILLS,
 )
 from yubisuma_base import Player, count_total_thumbs
 from yubisuma_effects import EffectManager
@@ -37,18 +38,15 @@ def get_valid_skills(game_state, player_key):
     if player.skip_phases > 0:
         return []
 
-    # 先手1フェーズ目制限
-    first_restricted = effects.is_first_phase_restricted(player_key)
-
     for skill in TURN_PLAYER_SKILLS:
-        # 先手制限: フラッシュと必殺スキル不可
-        if first_restricted and (skill == "フラッシュ" or skill in ULTIMATE_SKILLS):
-            continue
         # 必殺スキル使用済みチェック
         if skill in ULTIMATE_SKILLS and player.used_ultimate:
             continue
         # リバーシが無効の場合
         if skill == "リバーシ" and not GAME_CONFIG["ENABLE_REVERSI"]:
+            continue
+        # ミラーが無効の場合
+        if skill == "ミラー" and not GAME_CONFIG["ENABLE_MIRROR"]:
             continue
         # ブロックはターンプレイヤーが宣言するスキルではない
         if skill == "ブロック":
@@ -64,10 +62,18 @@ def get_valid_skills(game_state, player_key):
             # ストックは数字（int）を対象外とする
             if skill == "ストック" and isinstance(prev, int):
                 continue
-        # チョイス: ストックが空でないか、フェーズ中未使用のものがあるか
+        # ストック+α 系（チョイス/オール/ドロップ）: 1フェーズ1回制限
+        if skill in STOCK_ALPHA_SKILLS:
+            if player.stock_alpha_used_this_phase:
+                continue
+        # チョイス: ストックが空でないか
         if skill == "チョイス":
             available = [s for s in player.stock if s not in player.choice_used_this_phase]
             if not available:
+                continue
+        # オール: ストックが空でないか
+        if skill == "オール":
+            if not player.stock:
                 continue
         # ドロップ: ストックが空でないか
         if skill == "ドロップ":
@@ -82,10 +88,6 @@ def get_player_guess_or_command(game_state, player_key):
     """プレイヤーの予想またはスキルの入力を取得"""
     player = game_state.get_player(player_key)
     valid_skills = get_valid_skills(game_state, player_key)
-
-    # 制限通知
-    if game_state.effects.is_first_phase_restricted(player_key):
-        print(MESSAGES["FIRST_PHASE_NOTICE"])
 
     while True:
         skill_list = "｜".join(valid_skills) if valid_skills else "なし"
@@ -121,18 +123,30 @@ def get_player_thumbs(max_hands, cement_state=None):
 
 
 def get_player_reaction(game_state, player_key):
-    """非ターンプレイヤーの反応（カウンター/ブロック/なし）を取得"""
+    """非ターンプレイヤーの反応（カウンター/ブロック/ミラー/なし）を取得"""
     player = game_state.get_player(player_key)
 
-    # ロックデバフでカウンター封じ
-    lock_blocked = player.lock_debuff > 0
+    # ロックデバフで相手ターン中スキル封じ
+    lock_blocked = player.lock_active
+    # ミラー（メイン）が宣言可能か
+    mirror_available = (
+        GAME_CONFIG["ENABLE_MIRROR"]
+        and player.mirror_ready
+        and not lock_blocked
+    )
 
     while True:
+        opts = []
+        if not lock_blocked:
+            opts.append("k:カウンター")
+        if not player.used_ultimate:
+            opts.append("b:ブロック")
+        if mirror_available:
+            opts.append("m:ミラー")
+        opts.append("n:なし")
         if lock_blocked:
             print(MESSAGES["LOCK_NOTICE"])
-            prompt = "相手ターン中スキルを宣言しますか？(b/n): "
-        else:
-            prompt = MESSAGES["COUNTER_PROMPT"]
+        prompt = "相手ターン中スキルを宣言しますか？(" + "/".join(opts) + "): "
 
         choice = input(prompt).strip().lower()
 
@@ -147,10 +161,12 @@ def get_player_reaction(game_state, player_key):
             if player.used_ultimate:
                 print(MESSAGES["ULTIMATE_USED"])
                 continue
-            if game_state.effects.is_first_phase_restricted(player_key):
-                print("先手1フェーズ目のため必殺スキルは使用できません！")
-                continue
             return "ブロック"
+        if choice == "m" or choice == "ミラー":
+            if not mirror_available:
+                print("ミラーは現在使用できません！")
+                continue
+            return "ミラー"
         print(MESSAGES["INVALID_INPUT"])
 
 
@@ -162,7 +178,7 @@ def get_choice_selection(player, reaction=None):
     if reaction:
         print(f"  ※相手は「{reaction}」を宣言しています")
     else:
-        print("  ※相手はカウンター/ブロックを宣言していません")
+        print("  ※相手は相手ターン中スキルを宣言していません")
     print("ストック一覧:")
     for i, s in enumerate(available):
         print(f"  {i + 1}. {s}")
@@ -174,6 +190,32 @@ def get_choice_selection(player, reaction=None):
             print(MESSAGES["INVALID_INPUT"])
         except ValueError:
             print(MESSAGES["NUMBER_REQUIRED"])
+
+
+def get_all_selection(player):
+    """オールでストックから発動順序を選択"""
+    if not player.stock:
+        return []
+    print("オール: ストックから発動するスキルを順番に選択（複数選択可能、空入力で終了）")
+    print("ストック一覧:")
+    for i, s in enumerate(player.stock):
+        print(f"  {i + 1}. {s}")
+    available = list(player.stock)
+    order = []
+    while available:
+        line = input(f"次に発動するスキルの番号 (現状{','.join(order) or 'なし'}, 空入力で終了): ").strip()
+        if not line:
+            break
+        try:
+            idx = int(line) - 1
+            if 0 <= idx < len(available):
+                order.append(available.pop(idx))
+                print(f"  → 「{order[-1]}」を{len(order)}番目に追加")
+            else:
+                print(MESSAGES["INVALID_INPUT"])
+        except ValueError:
+            print(MESSAGES["NUMBER_REQUIRED"])
+    return order
 
 
 class GameState:
@@ -219,8 +261,12 @@ class GameState:
                 parts.append("⚡")
             if plr.quick_level > 0:
                 parts.append(f"💨{plr.quick_level}")
-            if plr.lock_debuff > 0:
-                parts.append("🔒")  # ロックデバフ（カウンター不可）
+            if plr.mirror_ready:
+                parts.append("🪞")
+            if plr.lock_active:
+                parts.append("🔒")
+            elif plr.lock_pending:
+                parts.append("🔒…")
             if plr.skip_phases > 0:
                 parts.append(f"⏭{plr.skip_phases}")
             if plr.time_active:
@@ -241,13 +287,24 @@ class GameState:
         print(f"\n{cp.name}のターンです")
 
     def check_victory(self):
-        """勝利判定"""
+        """勝利判定
+        新ルール: 「スキルを宣言していないプレイヤーがいる間、ゲームに勝利することができない」
+        """
+        # 勝利前提条件: 両プレイヤーが少なくとも1回スキルを宣言済みか
+        both_declared = self.player.has_declared_skill and self.computer.has_declared_skill
+
         if self.player.get_active_hands() == 0:
+            if not both_declared:
+                print(MESSAGES["VICTORY_BLOCKED"])
+                return False
             print(MESSAGES["VICTORY"].format(name=self.player.name))
             self.game_over = True
             self.winner = KEY_PLAYER
             return True
         if self.computer.get_active_hands() == 0:
+            if not both_declared:
+                print(MESSAGES["VICTORY_BLOCKED"])
+                return False
             print(MESSAGES["VICTORY"].format(name=self.computer.name))
             self.game_over = True
             self.winner = KEY_COMPUTER
@@ -261,11 +318,14 @@ class GameState:
         # ガード解除（自分のフェーズ開始時に解除）
         player.guard_active = False
 
-        # フェーズ内チョイス制限リセット
+        # フェーズ内チョイス制限 & ストック+α 1フェーズ1回制限リセット
         player.reset_phase_state()
 
         # ドロップ封印解除
         player.drop_blocked_skills = set()
+
+        # ガード追加ターンの1フェーズ1回制限リセット
+        self.effects.guard_extra_turn_used_this_phase[player_key] = False
 
         # フェーズカウント
         self.effects.turns_in_current_phase = 0
@@ -274,10 +334,6 @@ class GameState:
         """フェーズ終了時の処理"""
         player = self.get_player(player_key)
 
-        # スキップカウンタ減少（フェーズ終了時に減少）
-        # ルール: 「次の相手のフェーズ中、スキルを宣言できない」
-        # → フェーズ中はskip_phases>0で封印、フェーズ終了時に消費
+        # スキップカウンタ減少
         if player.skip_phases > 0:
             player.skip_phases -= 1
-
-        self.effects.mark_first_phase_done(player_key)

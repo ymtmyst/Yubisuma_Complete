@@ -137,9 +137,9 @@ def _mask_tp_actions(mask, game_state, me, opp, agent_key, effects):
         mask[encode_tp_action(0, 0)] = True
         return
     
-    # 先手制限チェック
-    first_restricted = effects.is_first_phase_restricted(agent_key)
-    
+    # 先手制限は新ルールで廃止
+    first_restricted = False
+
     # 有効なスキル一覧を取得
     valid_skills = set()
     
@@ -179,21 +179,21 @@ def _mask_tp_actions(mask, game_state, me, opp, agent_key, effects):
 
 
 def _is_skill_valid(skill_name, me, opp, effects, agent_key, first_restricted):
-    """個別スキルの宣言可能性を判定"""
-    # 先手制限: フラッシュと必殺スキル不可
-    if first_restricted and (skill_name == "フラッシュ" or skill_name in ULTIMATE_SKILLS):
-        return False
-    
+    """個別スキルの宣言可能性を判定（新ルール: 先手制限廃止）"""
     # 必殺スキル使用済み
     if skill_name in ULTIMATE_SKILLS and me.used_ultimate:
         return False
-    
+
     # リバーシ無効
     if skill_name == "リバーシ" and not GAME_CONFIG["ENABLE_REVERSI"]:
         return False
-    
+
+    # ミラー無効
+    if skill_name == "ミラー" and not GAME_CONFIG.get("ENABLE_MIRROR", False):
+        return False
+
     # ブロック/カウンターはTP用ではない
-    if skill_name in ("ブロック", "カウンター"):
+    if skill_name in ("ブロック", "カウンター", "ミラー（メイン）"):
         return False
     
     # ドロップ封印
@@ -237,9 +237,10 @@ def _mask_ntp_actions(mask, game_state, me, opp, agent_key, effects):
     max_hands = me.get_active_hands()
     cement_min = me.cement if me.cement is not None else 0
     
-    lock_blocked = me.lock_debuff > 0
-    first_restricted = effects.is_first_phase_restricted(agent_key)
-    
+    # 新ルール: lock_active (フラグ方式) を使用
+    lock_blocked = me.lock_active
+    first_restricted = False  # 先手制限は新ルールで廃止
+
     for react_idx, reaction in enumerate(NTP_REACTION_OPTIONS):
         # リアクションの有効性チェック
         if reaction == "カウンター" and lock_blocked:

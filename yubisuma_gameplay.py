@@ -1,21 +1,55 @@
-# yubisuma_gameplay.py - 完全ルール版: メインゲームループ
+# yubisuma_gameplay.py - 完全ルール（新）版: メインゲームループ
 
 import random
 from yubisuma_constants import (
     GAME_RULES, KEY_PLAYER, KEY_COMPUTER, MESSAGES,
-    OPPONENT_TURN_SKILLS, ULTIMATE_SKILLS,
+    OPPONENT_TURN_SKILLS, ULTIMATE_SKILLS, GAME_CONFIG,
 )
 from yubisuma_logic import (
     GameState, get_player_guess_or_command, get_player_thumbs,
     get_player_reaction, computer_strategy, get_valid_skills,
+    get_choice_selection, get_all_selection,
 )
 from yubisuma_turn_handler import TurnHandler
+
+
+def _get_choice_data(gs, tp_key, skill, reaction):
+    """チョイス/オール宣言時、リアクション確認後にストックから選択
+    skill: TP が宣言したスキル名
+    reaction: NTP のリアクション (None/カウンター/ブロック/ミラー)
+    """
+    tp = gs.get_player(tp_key)
+    is_human = (tp_key == KEY_PLAYER)
+
+    if skill == "チョイス":
+        if is_human:
+            chosen = get_choice_selection(tp, reaction)
+        else:
+            available = [s for s in tp.stock if s not in tp.choice_used_this_phase]
+            if not available:
+                chosen = None
+            elif reaction == "カウンター" and "フェイント" in available:
+                chosen = "フェイント"
+            else:
+                chosen = random.choice(available)
+        return {"choice": chosen}
+
+    if skill == "オール":
+        if is_human:
+            order = get_all_selection(tp)
+        else:
+            # AI: ランダム順序で全ストック発動
+            order = list(tp.stock)
+            random.shuffle(order)
+        return {"all_order": order}
+
+    return None
 
 
 def execute_turn(gs, tp_key):
     """
     1ターンを実行。
-    全ての決定は同時公開：スキル宣言・指の数・カウンターは互いに見えない状態で決定する。
+    全ての決定は同時公開：スキル宣言・指の数・カウンター/ミラーは互いに見えない状態で決定する。
     """
     tp = gs.get_player(tp_key)
     ntp_key = gs.get_opponent_key(tp_key)
@@ -31,55 +65,41 @@ def execute_turn(gs, tp_key):
         return False
 
     # ==============================
-    # Phase 1: TP（ターンプレイヤー）の決定
-    #   - スキル/数字の宣言
-    #   - 指の数
+    # Phase 1: TP の決定（スキル + 指）
     # ==============================
     if is_human_turn:
-        # TP = 人間: スキル選択 + 指の数を入力
         skill = get_player_guess_or_command(gs, tp_key)
-        tp_cement = tp.cement
-        tp_thumbs = get_player_thumbs(tp.get_active_hands(), tp_cement)
-        # NTP(PC)の指はまだ未定
+        tp_thumbs = get_player_thumbs(tp.get_active_hands(), tp.cement)
         ntp_thumbs = None
     else:
-        # TP = PC: スキル + 指の数を内部で決定（表示しない）
         valid_skills = get_valid_skills(gs, tp_key)
         total_possible = tp.get_active_hands() + ntp.get_active_hands()
         choices = list(range(total_possible + 1))
         if valid_skills:
             choices.extend(valid_skills)
         skill = random.choice(choices)
-        tp_cement = tp.cement
-        tp_thumbs = computer_strategy(tp.get_active_hands(), cement_min=tp_cement)
-        # NTP(人間)の指はまだ未定
+        tp_thumbs = computer_strategy(tp.get_active_hands(), cement_min=tp.cement)
         ntp_thumbs = None
 
     # ==============================
-    # Phase 2: NTP（非ターンプレイヤー）の決定
-    #   - カウンター/ブロック/なし
-    #   - 指の数
-    #   ※TPの宣言を知らない状態で同時に決定
+    # Phase 2: NTP の決定（リアクション + 指）
     # ==============================
     if is_human_turn:
-        # NTP = PC: カウンター + 指の数を内部で決定
+        # NTP = PC
         choices = ["n", "n"]
-        if ntp.lock_debuff == 0:
+        if not ntp.lock_active:
             choices.append("カウンター")
-        if not ntp.used_ultimate and not gs.effects.is_first_phase_restricted(ntp_key):
+        if not ntp.used_ultimate:
             choices.append("ブロック")
-            
+        if GAME_CONFIG["ENABLE_MIRROR"] and ntp.mirror_ready and not ntp.lock_active:
+            choices.append("ミラー")
+
         comp_reaction = random.choice(choices)
         reaction = comp_reaction if comp_reaction != "n" else None
-        
-        ntp_cement = ntp.cement
-        ntp_thumbs = computer_strategy(ntp.get_active_hands(), cement_min=ntp_cement)
+        ntp_thumbs = computer_strategy(ntp.get_active_hands(), cement_min=ntp.cement)
     else:
-        # NTP = 人間: カウンター + 指の数を入力
-        # ※TPの宣言はまだ見えていない
         reaction = get_player_reaction(gs, ntp_key)
-        ntp_cement = ntp.cement
-        ntp_thumbs = get_player_thumbs(ntp.get_active_hands(), ntp_cement)
+        ntp_thumbs = get_player_thumbs(ntp.get_active_hands(), ntp.cement)
 
     # ==============================
     # Phase 3: 同時公開 → ターン解決
@@ -89,9 +109,13 @@ def execute_turn(gs, tp_key):
         KEY_COMPUTER: ntp_thumbs if is_human_turn else tp_thumbs,
     }
 
-    TurnHandler.resolve_turn(gs, tp_key, skill, thumbs, reaction)
+    # チョイス/オール: リアクション確認後にストックから選択
+    choice_data = None
+    if skill in ("チョイス", "オール"):
+        choice_data = _get_choice_data(gs, tp_key, skill, reaction)
 
-    # 勝利判定
+    TurnHandler.resolve_turn(gs, tp_key, skill, thumbs, reaction, choice_data)
+
     return gs.check_victory()
 
 
@@ -120,14 +144,15 @@ def play_game():
             if execute_turn(gs, current_key):
                 break  # 勝利
 
-            # タイム効果チェック: current_keyが追加ターンを得た && 相手がtime_active
+            # タイム効果チェック: current_keyが追加ターンを得ようとした && 相手がtime_active
+            # 新ルール: 「次に相手が2回続けてスキルを宣言しようとした時、代わりに自分がスキルを宣言する」
             opp = gs.get_opponent(current_key)
             if opp.time_active and gs.effects.has_extra_turn(current_key):
                 opp.time_active = False
                 lost = gs.effects.additional_turns[current_key]
                 gs.effects.additional_turns[current_key] = 0
                 cp_name = gs.get_player(current_key).name
-                print(f"  タイム効果！{cp_name}の追加{lost}ターンを無効化 → {opp.name}のターンへ！")
+                print(f"  タイム発動！{cp_name}の追加{lost}ターンを無効化 → {opp.name}のターンへ！")
                 break
 
             # 追加ターンチェック
@@ -145,11 +170,14 @@ def play_game():
         # フェーズ終了
         gs.on_phase_end(current_key)
 
-        # タイム+スキップ: スキップされた側がtime_activeなら、フェーズを戻す
-        # （スキップされても相手に連続行動を許さない）
+        # タイム × スキップ: スキップ宣言者が連続行動しようとする時、タイム保持者にターンを戻す
+        # 「スキップ: 通常の処理を行った後、本来はスキップ宣言側のターンになるところ、
+        #   代わりに宣言された側がターンを行う」
         cp = gs.get_player(current_key)
         if phase_was_skip and cp.time_active:
+            cp.time_active = False  # タイム消費
             next_key = current_key
+            print(f"  タイム発動！{cp.name}の連続フェーズに割り込みます")
         else:
             next_key = gs.get_opponent_key(current_key)
 

@@ -1,4 +1,4 @@
-# test_skills.py - 全スキルの単体テスト（修正版）
+# test_skills.py - 完全ルール（新）版: 全スキルの単体テスト
 import sys
 sys.path.insert(0, ".")
 
@@ -21,11 +21,13 @@ def test(name, condition):
         print(f"  NG: {name} <- FAILED")
 
 def make_gs():
+    """テスト用ゲーム状態（勝利前提条件は満たした状態で開始）"""
     gs = GameState()
     gs.current_player_key = KEY_PLAYER
     gs.effects.first_player_key = KEY_PLAYER
-    gs.effects.is_first_phase_done[KEY_PLAYER] = True
-    gs.effects.is_first_phase_done[KEY_COMPUTER] = True
+    # 勝利前提条件: 両プレイヤーがスキルを宣言した状態にする（テスト時の勝利判定簡略化）
+    gs.player.has_declared_skill = True
+    gs.computer.has_declared_skill = True
     return gs
 
 # ===== 数字 =====
@@ -42,7 +44,7 @@ test("数字外れ", gs.player.get_active_hands() == 2)
 print("\n=== フラッシュテスト ===")
 gs = make_gs()
 TurnHandler.resolve_turn(gs, KEY_PLAYER, "フラッシュ", {KEY_PLAYER: 1, KEY_COMPUTER: 1}, None)
-test("フラッシュ成功->一発上がり", gs.player.get_active_hands() == 0)
+test("フラッシュ成功->手を2つ降ろす", gs.player.get_active_hands() == 0)
 
 gs = make_gs()
 TurnHandler.resolve_turn(gs, KEY_PLAYER, "フラッシュ", {KEY_PLAYER: 1, KEY_COMPUTER: 0}, None)
@@ -61,12 +63,20 @@ TurnHandler.resolve_turn(gs, KEY_PLAYER, "フラッシュ", {KEY_PLAYER: 1, KEY_
 test("ガードでフラッシュ無効化", gs.player.get_active_hands() == 2)
 test("ガード消費済み", gs.computer.guard_active == False)
 
+# 新仕様: ガード追加ターンは1フェーズ1回制限
+gs = make_gs()
+# ガード1回目宣言
+TurnHandler.resolve_turn(gs, KEY_PLAYER, "ガード", {KEY_PLAYER: 0, KEY_COMPUTER: 0}, None)
+# ガード2回目宣言（同フェーズ内 = guard_extra_turn_used_this_phase が True のため追加ターン取得なし）
+TurnHandler.resolve_turn(gs, KEY_PLAYER, "ガード", {KEY_PLAYER: 0, KEY_COMPUTER: 0}, None)
+test("ガード2回宣言->追加ターンは1回のみ", gs.effects.additional_turns[KEY_PLAYER] == 1)
+
 # ===== チャージ =====
 print("\n=== チャージテスト ===")
 gs = make_gs()
 gs.player.charge_active = True
 TurnHandler.resolve_turn(gs, KEY_PLAYER, 2, {KEY_PLAYER: 1, KEY_COMPUTER: 1}, None)
-test("チャージ+数字的中->一発上がり", gs.player.get_active_hands() == 0)
+test("チャージ+数字的中->2回分発動で2手降ろし", gs.player.get_active_hands() == 0)
 test("チャージ消費", gs.player.charge_active == False)
 
 gs = make_gs()
@@ -79,14 +89,16 @@ gs = make_gs()
 gs.player.charge_active = True
 TurnHandler.resolve_turn(gs, KEY_PLAYER, 2, {KEY_PLAYER: 1, KEY_COMPUTER: 1}, "カウンター")
 test("チャージ+カウンター(当)->チャージ消費", gs.player.charge_active == False)
-test("チャージ+カウンター(当)->NTP手降ろし", gs.computer.get_active_hands() == 1)
+test("チャージ+カウンター(当)->NTPが2手降ろし", gs.computer.get_active_hands() == 0)
 test("チャージ+カウンター(当)->TP変化なし", gs.player.get_active_hands() == 2)
 
+# 新仕様: チャージ+数字はガードに防がれない（2手同時降ろしじゃない）
 gs = make_gs()
 gs.player.charge_active = True
 gs.computer.guard_active = True
 TurnHandler.resolve_turn(gs, KEY_PLAYER, 2, {KEY_PLAYER: 1, KEY_COMPUTER: 1}, None)
-test("チャージ+ガード->一発上がり無効", gs.player.get_active_hands() == 2)
+test("チャージ+ガード->ガード貫通で2手降ろし", gs.player.get_active_hands() == 0)
+test("チャージ+数字->ガード未消費", gs.computer.guard_active == True)
 
 gs = make_gs()
 gs.player.charge_active = True
@@ -103,7 +115,7 @@ test("クイック初回->レベル2", gs.player.quick_level == 2)
 gs = make_gs()
 gs.player.quick_level = 2
 TurnHandler.resolve_turn(gs, KEY_PLAYER, "クイック", {KEY_PLAYER: 0, KEY_COMPUTER: 0}, None)
-test("クイックLv2+再宣言->一発上がり", gs.player.get_active_hands() == 0)
+test("クイックLv2+再宣言->2手降ろし", gs.player.get_active_hands() == 0)
 
 gs = make_gs()
 gs.player.quick_level = 1
@@ -114,9 +126,19 @@ gs = make_gs()
 gs.player.quick_level = 2
 gs.computer.guard_active = True
 TurnHandler.resolve_turn(gs, KEY_PLAYER, "クイック", {KEY_PLAYER: 0, KEY_COMPUTER: 0}, None)
-test("クイック+ガード->一発上がり無効", gs.player.get_active_hands() == 2)
+test("クイックLv2+ガード->2手降ろし無効", gs.player.get_active_hands() == 2)
+test("クイックLv2+ガード->ガード消費", gs.computer.guard_active == False)
 
-# ===== セメント（Player管理）=====
+# 新仕様: 手が1つでクイックLv2 → ガード貫通
+gs = make_gs()
+gs.player.quick_level = 2
+gs.player.right_hand = False  # 手は1つ
+gs.computer.guard_active = True
+TurnHandler.resolve_turn(gs, KEY_PLAYER, "クイック", {KEY_PLAYER: 0, KEY_COMPUTER: 0}, None)
+test("クイックLv2+手1個+ガード->貫通", gs.player.get_active_hands() == 0)
+test("クイックLv2+手1個+ガード->ガード未消費", gs.computer.guard_active == True)
+
+# ===== セメント =====
 print("\n=== セメントテスト ===")
 gs = make_gs()
 TurnHandler.resolve_turn(gs, KEY_PLAYER, "セメント", {KEY_PLAYER: 1, KEY_COMPUTER: 2}, None)
@@ -134,41 +156,34 @@ TurnHandler.resolve_turn(gs, KEY_PLAYER, "フェイント", {KEY_PLAYER: 0, KEY_
 test("フェイント+カウンター->手降ろし", gs.player.get_active_hands() == 1)
 test("フェイント+カウンター->追加ターン", gs.effects.additional_turns[KEY_PLAYER] == 1)
 
-# ===== ロック（相手デバフ）=====
+# ===== ロック（新仕様: フラグ方式）=====
 print("\n=== ロックテスト ===")
 gs = make_gs()
 TurnHandler.resolve_turn(gs, KEY_PLAYER, "ロック", {KEY_PLAYER: 0, KEY_COMPUTER: 0}, "カウンター")
-# ロック発動: ntp.lock_debuff=2 → ターン末尾で-1 → 1
-test("ロック+カウンター->NTPデバフ=1", gs.computer.lock_debuff == 1)
-# 実際のテスト: resolve_turn内でntp.lock_debuffが減少するので
-# ロック発動直後のターン終了時: 2 が設定された後にntp.lock_debuff -= 1 で 1 になる
+test("ロック+カウンター->NTP.lock_pending=True", gs.computer.lock_pending == True)
+test("ロック+カウンター->NTP.lock_active=False(まだTPのターンが来てない)", gs.computer.lock_active == False)
 
 gs = make_gs()
 TurnHandler.resolve_turn(gs, KEY_PLAYER, "ロック", {KEY_PLAYER: 0, KEY_COMPUTER: 0}, None)
-test("ロック不発->変化なし", gs.computer.lock_debuff == 0)
+test("ロック不発->変化なし", gs.computer.lock_pending == False)
 
-# ===== スキップ =====
+# 新仕様: ロックは累積しない
+gs = make_gs()
+TurnHandler.resolve_turn(gs, KEY_PLAYER, "ロック", {KEY_PLAYER: 0, KEY_COMPUTER: 0}, "カウンター")
+TurnHandler.resolve_turn(gs, KEY_PLAYER, "ロック", {KEY_PLAYER: 0, KEY_COMPUTER: 0}, "カウンター")
+test("ロック2回->累積しない(pending=True、フラグなので変化なし)", gs.computer.lock_pending == True)
+
+# ===== スキップ（新仕様: チェーン削除）=====
 print("\n=== スキップテスト ===")
 gs = make_gs()
 TurnHandler.resolve_turn(gs, KEY_PLAYER, "スキップ", {KEY_PLAYER: 0, KEY_COMPUTER: 0}, None)
 test("スキップ->1フェーズ封印", gs.computer.skip_phases == 1)
 
+# 新仕様: スキップ連続宣言してもチェーン効果なし（毎回 +1 のみ）
 gs = make_gs()
-gs.effects.last_turn_was_skip[KEY_PLAYER] = True
 TurnHandler.resolve_turn(gs, KEY_PLAYER, "スキップ", {KEY_PLAYER: 0, KEY_COMPUTER: 0}, None)
-test("スキップ連鎖->2フェーズ封印", gs.computer.skip_phases == 2)
-
-# スキップ連鎖（コピー経由でスキップ効果発動後にスキップ宣言）
-print("\n=== スキップ連鎖（コピー経由）===")
-gs = make_gs()
-gs.effects.record_turn(KEY_COMPUTER, "スキップ")  # 前ターン: 相手がスキップ
-# コピーでスキップを発動
-TurnHandler.resolve_turn(gs, KEY_PLAYER, "コピー", {KEY_PLAYER: 0, KEY_COMPUTER: 0}, None)
-test("コピー(スキップ)->封印発動", gs.computer.skip_phases == 1)
-test("コピー(スキップ)->連鎖フラグON", gs.effects.last_turn_was_skip[KEY_PLAYER] == True)
-# 次ターンでスキップ宣言→連鎖
 TurnHandler.resolve_turn(gs, KEY_PLAYER, "スキップ", {KEY_PLAYER: 0, KEY_COMPUTER: 0}, None)
-test("コピー後スキップ->連鎖2フェーズ", gs.computer.skip_phases == 3)  # 1(コピー) + 2(連鎖)
+test("スキップ2連続->累積するがチェーン2倍はなし(+1+1=2)", gs.computer.skip_phases == 2)
 
 # ===== カウンター(数字) =====
 print("\n=== カウンター詳細テスト ===")
@@ -198,9 +213,9 @@ gs = make_gs()
 TurnHandler.resolve_turn(gs, KEY_PLAYER, "スキップ", {KEY_PLAYER: 0, KEY_COMPUTER: 0}, "ブロック")
 test("ブロック+スキップ->スキップ有効", gs.computer.skip_phases == 1)
 
-# ===== リバーシ（セメント含む入替）=====
+# ===== リバーシ（新仕様: ドロップを含む）=====
 print("\n=== リバーシテスト ===")
-GAME_CONFIG["ENABLE_REVERSI"] = True  # テスト用ON
+GAME_CONFIG["ENABLE_REVERSI"] = True
 gs = make_gs()
 gs.player.right_hand = False
 gs.computer.charge_active = True
@@ -212,16 +227,25 @@ test("リバーシ->チャージ入替(P)", gs.player.charge_active == True)
 test("リバーシ->セメント入替(P)", gs.player.cement == 2)
 test("リバーシ->セメント入替(C)", gs.computer.cement is None)
 
-# リバーシでスキップ/タイム/追加ターンは入替されない
+# 新仕様: ドロップはリバーシで入れ替えられる
+gs = make_gs()
+gs.player.drop_blocked_skills = {"ガード"}
+TurnHandler.resolve_turn(gs, KEY_PLAYER, "リバーシ", {KEY_PLAYER: 0, KEY_COMPUTER: 0}, None)
+test("リバーシ->ドロップ入替(P→C)", gs.computer.drop_blocked_skills == {"ガード"})
+test("リバーシ->ドロップ入替(P側はクリア)", gs.player.drop_blocked_skills == set())
+
+# フィールド効果（スキップ/タイム/ストック）はリバーシで入れ替えされない
 gs = make_gs()
 gs.player.skip_phases = 3
 gs.player.time_active = True
+gs.player.stock = ["ガード"]
 gs.effects.additional_turns[KEY_PLAYER] = 2
 TurnHandler.resolve_turn(gs, KEY_PLAYER, "リバーシ", {KEY_PLAYER: 0, KEY_COMPUTER: 0}, None)
 test("リバーシ->スキップ入替されない(P)", gs.player.skip_phases == 3)
 test("リバーシ->タイム入替されない(P)", gs.player.time_active == True)
+test("リバーシ->ストック入替されない(P)", gs.player.stock == ["ガード"])
 test("リバーシ->追加ターン入替されない", gs.effects.additional_turns[KEY_PLAYER] == 2)
-GAME_CONFIG["ENABLE_REVERSI"] = False  # 戻す
+GAME_CONFIG["ENABLE_REVERSI"] = False
 
 # ===== タイム =====
 print("\n=== タイムテスト ===")
@@ -230,17 +254,43 @@ TurnHandler.resolve_turn(gs, KEY_PLAYER, "タイム", {KEY_PLAYER: 0, KEY_COMPUT
 test("タイム->フラグ", gs.player.time_active == True)
 test("タイム->追加1ターン", gs.effects.additional_turns[KEY_PLAYER] == 1)
 
-# ===== コピー =====
+# ===== コピー（新仕様: 2回分発動）=====
 print("\n=== コピーテスト ===")
 gs = make_gs()
 gs.effects.record_turn(KEY_COMPUTER, "フラッシュ")
 TurnHandler.resolve_turn(gs, KEY_PLAYER, "コピー", {KEY_PLAYER: 1, KEY_COMPUTER: 1}, None)
-test("コピー(フラッシュ)->一発上がり", gs.player.get_active_hands() == 0)
+test("コピー(フラッシュ)->2手降ろし(2回発動するが手は2つしかないので)", gs.player.get_active_hands() == 0)
 
 gs = make_gs()
 gs.effects.record_turn(KEY_COMPUTER, 2)
 TurnHandler.resolve_turn(gs, KEY_PLAYER, "コピー", {KEY_PLAYER: 1, KEY_COMPUTER: 1}, None)
-test("コピー(数字2)+的中->一発上がり", gs.player.get_active_hands() == 0)
+test("コピー(数字2)+的中->2回数字発動で両手降ろし", gs.player.get_active_hands() == 0)
+
+# 新仕様: コピー×フェイント = 手2つ降ろし + 追加2ターン
+gs = make_gs()
+gs.effects.record_turn(KEY_COMPUTER, "フェイント")
+TurnHandler.resolve_turn(gs, KEY_PLAYER, "コピー", {KEY_PLAYER: 0, KEY_COMPUTER: 0}, "カウンター")
+test("コピー(フェイント)+カウンター->手2つ降ろし", gs.player.get_active_hands() == 0)
+test("コピー(フェイント)+カウンター->追加2ターン", gs.effects.additional_turns[KEY_PLAYER] == 2)
+
+# 新仕様: コピー×スキップ = 2フェーズスキップ
+gs = make_gs()
+gs.effects.record_turn(KEY_COMPUTER, "スキップ")
+TurnHandler.resolve_turn(gs, KEY_PLAYER, "コピー", {KEY_PLAYER: 0, KEY_COMPUTER: 0}, None)
+test("コピー(スキップ)->2フェーズ封印", gs.computer.skip_phases == 2)
+
+# 新仕様: コピー×ガード = 追加ターンは1回のみ
+gs = make_gs()
+gs.effects.record_turn(KEY_COMPUTER, "ガード")
+TurnHandler.resolve_turn(gs, KEY_PLAYER, "コピー", {KEY_PLAYER: 0, KEY_COMPUTER: 0}, None)
+test("コピー(ガード)->追加1ターンのみ", gs.effects.additional_turns[KEY_PLAYER] == 1)
+test("コピー(ガード)->ガードバフ付与", gs.player.guard_active == True)
+
+# 新仕様: コピー×ロック = フラグなので累積しない
+gs = make_gs()
+gs.effects.record_turn(KEY_COMPUTER, "ロック")
+TurnHandler.resolve_turn(gs, KEY_PLAYER, "コピー", {KEY_PLAYER: 0, KEY_COMPUTER: 0}, "カウンター")
+test("コピー(ロック)->lock_pending=True(累積なし)", gs.computer.lock_pending == True)
 
 # ===== ストック =====
 print("\n=== ストックテスト ===")
@@ -262,14 +312,71 @@ TurnHandler.resolve_turn(gs, KEY_PLAYER, "ドロップ", {KEY_PLAYER: 0, KEY_COM
 test("ドロップ->相手封印", gs.computer.drop_blocked_skills == {"ガード", "フラッシュ"})
 test("ドロップ->追加ターン", gs.effects.additional_turns[KEY_PLAYER] == 1)
 
-# ===== 先手制限 =====
-print("\n=== 先手制限テスト ===")
+# ===== オール（新スキル）=====
+print("\n=== オールテスト ===")
 gs = make_gs()
-gs.effects.is_first_phase_done[KEY_PLAYER] = False
+gs.player.stock = ["フラッシュ", "ガード"]
+TurnHandler.resolve_turn(
+    gs, KEY_PLAYER, "オール", {KEY_PLAYER: 1, KEY_COMPUTER: 1}, None,
+    choice_data={"all_order": ["フラッシュ", "ガード"]}
+)
+test("オール->ストック消滅", gs.player.stock == [])
+test("オール->フラッシュ発動で2手降ろし", gs.player.get_active_hands() == 0)
+# ガードも発動するが、もう手が0なので追加ターンだけ取得
+test("オール->ガード追加ターン", gs.effects.additional_turns[KEY_PLAYER] == 1)
+
+# ===== チョイス/オール/ドロップの1フェーズ1回制限 =====
+print("\n=== ストック+α 1フェーズ1回制限テスト ===")
+gs = make_gs()
+gs.player.stock = ["ガード"]
+TurnHandler.resolve_turn(
+    gs, KEY_PLAYER, "チョイス", {KEY_PLAYER: 0, KEY_COMPUTER: 0}, None,
+    choice_data={"choice": "ガード"}
+)
+test("チョイス1回目->stock_alpha_used_this_phase=True", gs.player.stock_alpha_used_this_phase == True)
 valid = get_valid_skills(gs, KEY_PLAYER)
-test("先手制限->フラッシュ不可", "フラッシュ" not in valid)
-test("先手制限->ブースト不可", "ブースト" not in valid)
-test("先手制限->ガードは可", "ガード" in valid)
+test("チョイス1回後->チョイス再宣言不可", "チョイス" not in valid)
+test("チョイス1回後->オール宣言不可", "オール" not in valid)
+test("チョイス1回後->ドロップ宣言不可", "ドロップ" not in valid)
+
+# ===== 勝利前提条件: スキル未宣言の場合勝利しない =====
+print("\n=== 勝利前提条件テスト ===")
+gs = GameState()
+gs.current_player_key = KEY_PLAYER
+gs.computer.left_hand = False
+gs.computer.right_hand = False  # 相手の手は全部0
+# プレイヤーがまだスキル宣言していない状態
+gs.player.has_declared_skill = False
+gs.computer.has_declared_skill = False
+result = gs.check_victory()
+test("両者スキル未宣言->勝利不可", result == False and gs.game_over == False)
+
+# 片方だけスキル宣言済み
+gs = GameState()
+gs.current_player_key = KEY_PLAYER
+gs.computer.left_hand = False
+gs.computer.right_hand = False
+gs.player.has_declared_skill = True
+gs.computer.has_declared_skill = False
+result = gs.check_victory()
+test("片方未宣言->勝利不可", result == False and gs.game_over == False)
+
+# 両方宣言済み
+gs = GameState()
+gs.current_player_key = KEY_PLAYER
+gs.computer.left_hand = False
+gs.computer.right_hand = False
+gs.player.has_declared_skill = True
+gs.computer.has_declared_skill = True
+result = gs.check_victory()
+test("両者宣言済み->勝利可能", result == True and gs.game_over == True)
+
+# ===== 先手1フェーズ目制限が廃止されているか確認 =====
+print("\n=== 先手制限廃止確認テスト ===")
+gs = make_gs()
+valid = get_valid_skills(gs, KEY_PLAYER)
+test("先手1フェーズ目でもフラッシュ宣言可", "フラッシュ" in valid)
+test("先手1フェーズ目でもブースト宣言可", "ブースト" in valid)
 
 # ===== リバーシOFF =====
 print("\n=== リバーシOFF設定テスト ===")
@@ -278,48 +385,48 @@ GAME_CONFIG["ENABLE_REVERSI"] = False
 valid = get_valid_skills(gs, KEY_PLAYER)
 test("リバーシOFF->リバーシ不可", "リバーシ" not in valid)
 
+# ===== ミラーOFF =====
+print("\n=== ミラーOFF設定テスト ===")
+gs = make_gs()
+GAME_CONFIG["ENABLE_MIRROR"] = False
+valid = get_valid_skills(gs, KEY_PLAYER)
+test("ミラーOFF->ミラー不可", "ミラー" not in valid)
+
+# ===== ミラーON =====
+print("\n=== ミラーON設定テスト ===")
+gs = make_gs()
+GAME_CONFIG["ENABLE_MIRROR"] = True
+valid = get_valid_skills(gs, KEY_PLAYER)
+test("ミラーON->ミラー宣言可", "ミラー" in valid)
+
+# ミラー（準備）宣言
+gs = make_gs()
+TurnHandler.resolve_turn(gs, KEY_PLAYER, "ミラー", {KEY_PLAYER: 0, KEY_COMPUTER: 0}, None)
+test("ミラー宣言->mirror_ready=True", gs.player.mirror_ready == True)
+
+# ミラー（メイン）反射（フラッシュを反射）
+gs = make_gs()
+gs.computer.mirror_ready = True
+TurnHandler.resolve_turn(gs, KEY_PLAYER, "フラッシュ", {KEY_PLAYER: 1, KEY_COMPUTER: 1}, "ミラー")
+test("ミラー反射->NTPが2手降ろし(勝利)", gs.computer.get_active_hands() == 0)
+test("ミラー反射->TPは変化なし", gs.player.get_active_hands() == 2)
+test("ミラー反射->mirror_ready消費", gs.computer.mirror_ready == False)
+
+GAME_CONFIG["ENABLE_MIRROR"] = False  # 戻す
+
 # ===== スキップのフェーズ封印動作テスト =====
 print("\n=== スキップ封印動作テスト ===")
 gs = make_gs()
 gs.computer.skip_phases = 1
-# on_phase_startでは減少しない（フェーズ中は封印有効）
 gs.on_phase_start(KEY_COMPUTER)
 test("フェーズ開始時->skip_phases維持", gs.computer.skip_phases == 1)
 valid = get_valid_skills(gs, KEY_COMPUTER)
 test("フェーズ中->スキル使用不可", valid == [])
-# on_phase_endで減少
 gs.on_phase_end(KEY_COMPUTER)
 test("フェーズ終了時->skip_phases減少", gs.computer.skip_phases == 0)
-# 次フェーズではスキル使用可能
 gs.on_phase_start(KEY_COMPUTER)
 valid = get_valid_skills(gs, KEY_COMPUTER)
 test("次フェーズ->スキル使用可能", len(valid) > 0)
-
-# ===== スキップ連鎖(コピーがカウンターで止められた場合) =====
-print("\n=== スキップ連鎖(コピー被カウンター) ===")
-gs = make_gs()
-# Turn 1: スキップ宣言
-TurnHandler.resolve_turn(gs, KEY_PLAYER, "スキップ", {KEY_PLAYER: 0, KEY_COMPUTER: 0}, None)
-test("T1: スキップ->連鎖フラグON", gs.effects.last_turn_was_skip[KEY_PLAYER] == True)
-# Turn 2: コピー(スキップ)がカウンターで止められる
-TurnHandler.resolve_turn(gs, KEY_PLAYER, "コピー", {KEY_PLAYER: 0, KEY_COMPUTER: 0}, "カウンター")
-test("T2: コピー被カウンター->連鎖フラグOFF", gs.effects.last_turn_was_skip[KEY_PLAYER] == False)
-# Turn 3: スキップ宣言 → 連鎖しない（コピーは宣言されたスキルではないのでフラグ不在）
-prev_skip = gs.computer.skip_phases
-TurnHandler.resolve_turn(gs, KEY_PLAYER, "スキップ", {KEY_PLAYER: 0, KEY_COMPUTER: 0}, None)
-test("T3: コピー被カウンター後スキップ->連鎖なし", gs.computer.skip_phases == prev_skip + 1)
-
-# ===== スキップ連鎖(スキップが被カウンター後にコピー) =====
-print("\n=== スキップ連鎖(スキップ被カウンター→コピー) ===")
-gs = make_gs()
-gs.effects.record_turn(KEY_COMPUTER, "スキップ")  # 1ターン前の履歴を設定
-# Turn 1: スキップ被カウンター → 宣言したので連鎖フラグON（条件A）
-TurnHandler.resolve_turn(gs, KEY_PLAYER, "スキップ", {KEY_PLAYER: 0, KEY_COMPUTER: 0}, "カウンター")
-test("T1: スキップ被カウンター->連鎖フラグON", gs.effects.last_turn_was_skip[KEY_PLAYER] == True)
-# Turn 2: コピー(スキップ) → 直前にスキップ宣言済みなので連鎖して2フェーズ封印
-prev_skip = gs.computer.skip_phases
-TurnHandler.resolve_turn(gs, KEY_PLAYER, "コピー", {KEY_PLAYER: 0, KEY_COMPUTER: 0}, None)
-test("T2: スキップ被カウンター後コピー(スキップ)->連鎖2フェーズ", gs.computer.skip_phases == prev_skip + 2)
 
 # ===== サマリ =====
 print(f"\n{'='*40}")

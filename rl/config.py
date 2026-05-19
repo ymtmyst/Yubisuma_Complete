@@ -132,8 +132,8 @@ LOOKAHEAD_N = 3               # エピソード末尾から何ステップ分を
 # Persona-conditioned policy が persona z 毎に区別可能な行動を取るよう、
 # discriminator q(z|s) の対数尤度を補助損失として最大化する。
 # Reward には介入せず、shared_net 経由で policy に分化を促す。
-LAMBDA_DIVERSITY_TP = 0.1     # TP軸 discriminator loss の重み
-LAMBDA_DIVERSITY_NTP = 0.03   # NTP軸 (判断機会少のため軽め)
+LAMBDA_DIVERSITY_TP = 1.0     # TP軸 discriminator loss の重み (診断実験: 0.1→1.0)
+LAMBDA_DIVERSITY_NTP = 0.3    # NTP軸 (診断実験: 0.03→0.3)
 DIAYN_SHARED_LR_RATIO = 0.1   # shared_net への back-prop は 1/10 速度 (AuxLoss と同じ思想)
 
 # === 訓練設定 ===

@@ -186,11 +186,14 @@ def _encode_self_state(player, effects, player_key):
     obs.append(float(player.charge_active))
     obs.append(player.quick_level / 2.0)
     obs.append((player.cement or 0) / 2.0)
-    obs.append(min(player.lock_debuff, 2) / 2.0)
+    # 新仕様: lock_debuff (カウンター方式) → lock_pending/lock_active (フラグ方式)
+    # 0.0=なし, 0.5=pending, 1.0=active
+    lock_state = 1.0 if player.lock_active else (0.5 if player.lock_pending else 0.0)
+    obs.append(lock_state)
     obs.append(min(player.skip_phases, SKIP_PHASES_MAX) / SKIP_PHASES_MAX)
     obs.append(float(player.used_ultimate))
     obs.append(float(player.time_active))
-    
+
     # ストック内容 (8次元) - 各スキルの所持数を最大ストック数8で正規化→[0,1]に収める
     stock_vec = [0.0] * len(STOCKABLE_SKILLS)
     for s in player.stock:
@@ -226,7 +229,9 @@ def _encode_self_state_legacy_v86(player):
     obs.append(player.quick_level / 2.0)
     obs.append(float(player.cement is not None))
     obs.append((player.cement or 0) / 2.0)
-    obs.append(min(player.lock_debuff, 2) / 2.0)
+    # legacy v86 encoder: lock_pending/lock_active を擬似的に旧 lock_debuff 値に変換
+    legacy_lock = 2 if player.lock_pending else (1 if player.lock_active else 0)
+    obs.append(min(legacy_lock, 2) / 2.0)
     obs.append(min(player.skip_phases, 2) / 2.0)
     obs.append(float(player.used_ultimate))
     obs.append(float(player.time_active))
@@ -264,7 +269,9 @@ def _encode_opponent_state(player, effects, player_key):
     obs.append(float(player.charge_active))
     obs.append(player.quick_level / 2.0)
     obs.append((player.cement or 0) / 2.0)
-    obs.append(min(player.lock_debuff, 2) / 2.0)
+    # 新仕様: lock_debuff (カウンター方式) → lock_pending/lock_active (フラグ方式)
+    lock_state = 1.0 if player.lock_active else (0.5 if player.lock_pending else 0.0)
+    obs.append(lock_state)
     obs.append(min(player.skip_phases, SKIP_PHASES_MAX) / SKIP_PHASES_MAX)
     obs.append(float(player.used_ultimate))
     obs.append(float(player.time_active))
@@ -305,7 +312,9 @@ def _encode_opponent_state_legacy_v86(player):
     obs.append(player.quick_level / 2.0)
     obs.append(float(player.cement is not None))
     obs.append((player.cement or 0) / 2.0)
-    obs.append(min(player.lock_debuff, 2) / 2.0)
+    # legacy v86 encoder
+    legacy_lock = 2 if player.lock_pending else (1 if player.lock_active else 0)
+    obs.append(min(legacy_lock, 2) / 2.0)
     obs.append(min(player.skip_phases, 2) / 2.0)
     obs.append(float(player.used_ultimate))
     obs.append(float(player.time_active))
@@ -327,9 +336,9 @@ def _encode_global_state_base(game_state, effects, agent_key, opp_key, turn_coun
     is_tp = float(game_state.current_player_key == agent_key)
     obs.append(is_tp)
 
-    # 先手制限 (2次元)
-    obs.append(float(effects.is_first_phase_restricted(agent_key)))
-    obs.append(float(effects.is_first_phase_restricted(opp_key)))
+    # 旧: 先手制限 (2次元) - 新ルールで廃止されたため常に 0.0 を出力（観測次元の互換性維持）
+    obs.append(0.0)
+    obs.append(0.0)
 
     # 前ターンスキル (20次元) - one-hot
     prev_skill_vec = [0.0] * PREV_SKILL_DIM
@@ -347,9 +356,9 @@ def _encode_global_state_base(game_state, effects, agent_key, opp_key, turn_coun
     obs.append(min(effects.additional_turns.get(agent_key, 0), 4) / 4.0)
     obs.append(min(effects.additional_turns.get(opp_key, 0), 4) / 4.0)
 
-    # スキップ連鎖 (2次元)
-    obs.append(float(effects.last_turn_was_skip.get(agent_key, False)))
-    obs.append(float(effects.last_turn_was_skip.get(opp_key, False)))
+    # 旧: スキップ連鎖 (2次元) - 新ルールで廃止されたため常に 0.0 を出力（観測次元の互換性維持）
+    obs.append(0.0)
+    obs.append(0.0)
 
     # フェーズ内ターン数 (1次元) - 実務上8以下
     obs.append(min(effects.turns_in_current_phase, PHASE_TURNS_MAX) / PHASE_TURNS_MAX)

@@ -1,9 +1,9 @@
-# yubisuma_turn_handler.py - 完全ルール版: ターン処理
+# yubisuma_turn_handler.py - 完全ルール（新）版: ターン処理
 
 from yubisuma_constants import (
     SKILLS, KEY_PLAYER, KEY_COMPUTER, NORMAL_SKILLS,
     ANTI_COUNTER_SKILLS, REFERENCE_SKILLS, ULTIMATE_SKILLS,
-    REFERENCEABLE_SKILLS, GAME_CONFIG,
+    REFERENCEABLE_SKILLS, GAME_CONFIG, STOCK_ALPHA_SKILLS,
 )
 from yubisuma_base import count_total_thumbs
 
@@ -12,8 +12,12 @@ class TurnHandler:
     """ターン内のスキル解決処理"""
 
     @staticmethod
-    def resolve_turn(gs, tp_key, skill, thumbs, reaction):
-        """ターンを解決する。"""
+    def resolve_turn(gs, tp_key, skill, thumbs, reaction, choice_data=None):
+        """ターンを解決する。
+        choice_data: チョイス/オール用の追加情報
+            - チョイス: {"choice": <スキル名>}
+            - オール: {"all_order": [スキル名のリスト]}
+        """
         tp = gs.get_player(tp_key)
         ntp_key = gs.get_opponent_key(tp_key)
         ntp = gs.get_opponent(tp_key)
@@ -21,6 +25,15 @@ class TurnHandler:
         total = count_total_thumbs(thumbs[KEY_PLAYER], thumbs[KEY_COMPUTER])
 
         skill_name = "数字" if isinstance(skill, int) else skill
+
+        # ターン開始時のリセット処理
+        tp.reset_turn_state()
+        ntp.reset_turn_state()
+
+        # ロックpending→active 転送（TPのターン開始時に、TPの相手がpending状態なら有効化）
+        if ntp.lock_pending:
+            ntp.lock_active = True
+            ntp.lock_pending = False
 
         # === 結果表示 ===
         print("\n=== 結果表示 ===")
@@ -31,12 +44,15 @@ class TurnHandler:
         if reaction:
             print(f"{ntp.name}が{reaction}を宣言！")
 
+        # === スキル宣言フラグ（勝利前提条件用）===
+        tp.has_declared_skill = True
+
         # === チャージ消費（数字宣言時に即時消費）===
         charge_was_active = False
         if isinstance(skill, int) and tp.charge_active:
             tp.charge_active = False
             charge_was_active = True
-            print(f"  -> {tp.name}のチャージが消費されました")
+            print(f"  -> {tp.name}のチャージが消費されました（効果を2回分発動）")
 
         # === ターン履歴記録 ===
         effects.record_turn(tp_key, skill)
@@ -44,24 +60,20 @@ class TurnHandler:
         # === クイックレベル記録（ターン終了時に減少）===
         quick_before = tp.quick_level
 
-        # === チョイス特別処理（カウンター確認後に選択）===
-        if skill_name == "チョイス":
-            TurnHandler._resolve_choice_with_reaction(gs, tp_key, thumbs, total, reaction)
-            # クイックレベル減少
-            if quick_before > 0:
-                tp.quick_level = max(0, quick_before - 1)
-            # ロックデバフ減少（NTPがデバフ持ちの場合）
-            if ntp.lock_debuff > 0:
-                ntp.lock_debuff -= 1
-            return
-
-        # === スキップ連鎖判定 ===
-        was_skip_before = effects.last_turn_was_skip[tp_key]
-        effects.last_turn_was_skip[tp_key] = False  # いったん初期化（効果発動時に再セット）
-
-        # === 必殺スキル宣言フラグ（効果の発動有無に関わらず宣言時に確定）===
+        # === 必殺スキル宣言フラグ ===
         if skill_name in ULTIMATE_SKILLS:
             tp.used_ultimate = True
+
+        # === ストック+α 系の1フェーズ1回制限フラグ ===
+        if skill_name in STOCK_ALPHA_SKILLS:
+            tp.stock_alpha_used_this_phase = True
+
+        # === ミラー（メイン）反射処理 ===
+        if reaction == "ミラー":
+            ntp.mirror_ready = False  # ミラー（メイン）使用後、準備状態を消費
+            TurnHandler._resolve_mirror_reflection(gs, tp_key, skill, thumbs, total, charge_was_active)
+            TurnHandler._end_of_turn_cleanup(gs, tp_key, quick_before, skill_name)
+            return
 
         # === 解決フェーズ ===
 
@@ -71,7 +83,7 @@ class TurnHandler:
         # 2. ブロック使用
         elif reaction == "ブロック":
             ntp.used_ultimate = True
-            # スキップはブロック無効。コピーがスキップをコピーする場合も同様
+            # スキップはブロック無効
             is_skip_effect = skill_name == "スキップ"
             if not is_skip_effect and skill_name == "コピー" and len(effects.turn_history) >= 2:
                 copied_skill = effects.turn_history[-2][1]
@@ -79,32 +91,42 @@ class TurnHandler:
                     is_skip_effect = True
             if is_skip_effect:
                 print(f"  ブロックはスキップに対しては無効！")
-                TurnHandler._resolve_skill_effect(gs, tp_key, skill, thumbs, total, was_skip_before, charge_was_active)
+                TurnHandler._resolve_skill_effect(gs, tp_key, skill, thumbs, total, charge_was_active, choice_data)
             else:
                 print(f"  {ntp.name}のブロックにより{tp.name}のスキル効果が無効化！")
         # 3. カウンター使用（対カウンタースキル以外）
         elif reaction == "カウンター":
-            # コピーがカウンターされた場合: 参照元スキルに依存した挙動
             if skill_name == "コピー":
+                # 参照スキルへのカウンター: 参照元のスキルに準拠
                 TurnHandler._resolve_copy_countered(gs, tp_key, thumbs, total)
+            elif skill_name in ("チョイス", "オール"):
+                # 参照スキル（ドロップを除く）へのカウンター
+                TurnHandler._resolve_stock_alpha_countered(gs, tp_key, thumbs, total, skill_name, choice_data)
             else:
                 TurnHandler._resolve_counter(gs, tp_key, skill, thumbs, total, charge_was_active)
         # 4. 通常解決
         else:
-            TurnHandler._resolve_skill_effect(gs, tp_key, skill, thumbs, total, was_skip_before, charge_was_active)
+            TurnHandler._resolve_skill_effect(gs, tp_key, skill, thumbs, total, charge_was_active, choice_data)
 
-        # 条件A: スキップを宣言したターンは効果不発（被カウンター等）でも連鎖フラグを立てる
-        if skill_name == "スキップ":
-            effects.last_turn_was_skip[tp_key] = True
+        TurnHandler._end_of_turn_cleanup(gs, tp_key, quick_before, skill_name)
 
-        # === クイックレベル減少（ターン終了時）===
+    @staticmethod
+    def _end_of_turn_cleanup(gs, tp_key, quick_before, skill_name):
+        """ターン終了時の後処理"""
+        tp = gs.get_player(tp_key)
+        ntp = gs.get_opponent(tp_key)
+
+        # クイックレベル減少
         if quick_before > 0:
             tp.quick_level = max(0, quick_before - 1)
 
-        # === ロックデバフ減少（NTPがデバフ持ちの場合、このターンで消費）===
-        if ntp.lock_debuff > 0:
-            ntp.lock_debuff -= 1
+        # ロック状態の解除（自分のターン終了でNTPのロックが切れる）
+        if ntp.lock_active:
+            ntp.lock_active = False
 
+    # =========================
+    # 対カウンタースキル + カウンター
+    # =========================
     @staticmethod
     def _resolve_anti_counter(gs, tp_key, skill_name):
         """対カウンタースキル + カウンターの解決"""
@@ -112,43 +134,52 @@ class TurnHandler:
         ntp = gs.get_opponent(tp_key)
 
         if skill_name == "フェイント":
-            tp.remove_hand()
-            gs.effects.add_extra_turns(tp_key, 1)
-            print(f"  フェイント成功！{tp.name}が手を1つ降ろし、追加1ターンを得ました！")
+            if tp.remove_hand():
+                gs.effects.add_extra_turns(tp_key, 1)
+                print(f"  フェイント成功！{tp.name}が手を1つ降ろし、追加1ターンを得ました！")
+            else:
+                gs.effects.add_extra_turns(tp_key, 1)
+                print(f"  フェイント発動（手は降ろせず）、追加1ターンを獲得")
         elif skill_name == "ロック":
-            # ロックは相手へのデバフ
-            ntp.lock_debuff = 2  # 次の関連ターンで1に、その次のターン終了で0に
-            print(f"  ロック成功！次の{tp.name}のターン中、{ntp.name}はカウンター不可！")
+            # ロックは相手へのデバフ（フラグ方式、累積なし）
+            ntp.lock_pending = True
+            print(f"  ロック成功！次の{tp.name}のターン中、{ntp.name}は相手ターン中スキル宣言不可！")
 
+    # =========================
+    # カウンター（対カウンタースキル以外）
+    # =========================
     @staticmethod
     def _resolve_counter(gs, tp_key, skill, thumbs, total, charge_was_active):
-        """カウンターの解決（対カウンタースキル以外）"""
+        """カウンターの解決"""
         tp = gs.get_player(tp_key)
         ntp = gs.get_opponent(tp_key)
 
         if isinstance(skill, int):
-            if total == skill:
-                ntp.remove_hand()
-                print(f"  カウンター成功！数字的中により{ntp.name}が手を1つ降ろします！")
-            else:
-                tp.remove_hand()
-                print(f"  カウンター失敗！外れにより{tp.name}が手を1つ降ろします！")
+            # チャージで2回分発動の場合、カウンターも2回分発動
+            fire_count = 2 if charge_was_active else 1
+            for i in range(fire_count):
+                if total == skill:
+                    ntp.remove_hand()
+                    print(f"  カウンター成功！数字的中により{ntp.name}が手を1つ降ろします！({i+1}/{fire_count})")
+                else:
+                    tp.remove_hand()
+                    print(f"  カウンター失敗！外れにより{tp.name}が手を1つ降ろします！({i+1}/{fire_count})")
         elif skill == "フラッシュ":
             tp_thumbs = thumbs[tp.key]
             ntp_thumbs = thumbs[ntp.key]
             if tp_thumbs == ntp_thumbs:
-                if gs.effects.try_block_instant_win(tp):
-                    print(f"  {tp.name}のガードによりカウンターフラッシュが無効化！")
-                else:
-                    ntp.remove_all_hands()
-                    print(f"  カウンター成功！{ntp.name}がフラッシュ効果で一発上がり！")
+                # カウンターフラッシュ: ntp が手を2つ降ろす（2手同時降ろし）
+                TurnHandler._attempt_two_hand_drop(gs, ntp, tp, "カウンターフラッシュ")
             else:
                 print(f"  カウンターしたがフラッシュ条件不成立（指の数が不一致）")
         else:
             print(f"  カウンターにより{skill}の効果は発動せず、何も起こりません")
 
+    # =========================
+    # 通常スキル効果の解決
+    # =========================
     @staticmethod
-    def _resolve_skill_effect(gs, tp_key, skill, thumbs, total, was_skip_before, charge_was_active):
+    def _resolve_skill_effect(gs, tp_key, skill, thumbs, total, charge_was_active, choice_data=None):
         """スキル効果の通常解決"""
         tp = gs.get_player(tp_key)
         ntp_key = gs.get_opponent_key(tp_key)
@@ -157,18 +188,16 @@ class TurnHandler:
 
         # --- 数字 ---
         if isinstance(skill, int):
-            if total == skill:
-                if charge_was_active:
-                    if effects.try_block_instant_win(ntp):
-                        print(f"  {ntp.name}のガードによりチャージ一発上がりが無効化！")
+            fire_count = 2 if charge_was_active else 1
+            for i in range(fire_count):
+                if total == skill:
+                    if tp.remove_hand():
+                        print(f"  的中！{tp.name}が手を1つ降ろします！({i+1}/{fire_count})")
                     else:
-                        tp.remove_all_hands()
-                        print(f"  チャージ効果！数字的中で{tp.name}が一発上がり！")
+                        print(f"  的中したが、手を降ろせない状態です ({i+1}/{fire_count})")
                 else:
-                    tp.remove_hand()
-                    print(f"  的中！{tp.name}が手を1つ降ろします！")
-            else:
-                print("  予想が外れました。")
+                    print(f"  予想が外れました。({i+1}/{fire_count})")
+                    break  # 外れたら2回目も外れる（同じ指数のため）
             return
 
         # --- フラッシュ ---
@@ -176,11 +205,7 @@ class TurnHandler:
             tp_thumbs = thumbs[tp.key]
             ntp_thumbs = thumbs[ntp.key]
             if tp_thumbs == ntp_thumbs:
-                if effects.try_block_instant_win(ntp):
-                    print(f"  {ntp.name}のガードによりフラッシュが無効化！")
-                else:
-                    tp.remove_all_hands()
-                    print(f"  フラッシュ成功！{tp.name}が一発上がり！")
+                TurnHandler._attempt_two_hand_drop(gs, tp, ntp, "フラッシュ")
             else:
                 print("  フラッシュ失敗（指の数が不一致）")
             return
@@ -200,43 +225,49 @@ class TurnHandler:
         # --- ガード ---
         if skill == "ガード":
             tp.guard_active = True
-            effects.add_extra_turns(tp_key, 1)
-            print(f"  {tp.name}がガードを展開！一発上がりを1回無効化 + 追加1ターン")
+            # 追加1ターンは1フェーズ中に一度だけ発動
+            if not effects.guard_extra_turn_used_this_phase[tp_key]:
+                effects.add_extra_turns(tp_key, 1)
+                effects.guard_extra_turn_used_this_phase[tp_key] = True
+                print(f"  {tp.name}がガードを展開！2手同時降ろしを無効化 + 追加1ターン")
+            else:
+                print(f"  {tp.name}がガードを展開！2手同時降ろしを無効化（追加ターンは本フェーズ中既に取得済み）")
             return
 
         # --- チャージ ---
         if skill == "チャージ":
             tp.charge_active = True
-            print(f"  {tp.name}がチャージ！次の数字宣言で一発上がり！")
+            print(f"  {tp.name}がチャージ！次の数字宣言で効果を2回分発動！")
             return
 
         # --- クイック ---
         if skill == "クイック":
+            # quick_level==2: 「次の自分のターン中」に発動 → 手を2つ降ろす
+            # quick_level==1: 「その次の自分のターン中」に発動 → 手を1つ降ろす
+            # quick_level==0: 初回宣言 → quick_level=2 にセット
             if tp.quick_level == 2:
-                if effects.try_block_instant_win(ntp):
-                    print(f"  {ntp.name}のガードによりクイック一発上がりが無効化！")
-                else:
-                    tp.remove_all_hands()
-                    print(f"  クイック効果発動！{tp.name}が一発上がり！")
+                TurnHandler._attempt_two_hand_drop(gs, tp, ntp, "クイック")
                 tp.quick_level = 0
             elif tp.quick_level == 1:
-                tp.remove_hand()
-                print(f"  クイック効果発動！{tp.name}が手を1つ降ろします！")
+                if tp.remove_hand():
+                    print(f"  クイック効果発動！{tp.name}が手を1つ降ろします！")
                 tp.quick_level = 0
             else:
                 tp.quick_level = 2
-                print(f"  {tp.name}がクイックを宣言！次ターンで再宣言すると一発上がり！")
+                print(f"  {tp.name}がクイックを宣言！次の自分のターン中で再宣言すると手を2つ降ろします！")
             return
 
         # --- スキップ ---
         if skill == "スキップ":
-            if was_skip_before:
-                ntp.skip_phases += 2
-                print(f"  スキップ連鎖！{ntp.name}の次の2フェーズ中スキル封印！")
-            else:
-                ntp.skip_phases += 1
-                print(f"  スキップ！{ntp.name}の次のフェーズ中スキル封印！")
-            effects.last_turn_was_skip[tp_key] = True  # 効果が実際に発動した時のみ連鎖フラグを立てる
+            # 新ルール: チェーン効果削除、常に +1
+            ntp.skip_phases += 1
+            print(f"  スキップ！{ntp.name}の次のフェーズ中スキル封印！")
+            return
+
+        # --- ミラー（準備）---
+        if skill == "ミラー":
+            tp.mirror_ready = True
+            print(f"  {tp.name}がミラーを宣言！次の相手ターン中にミラー（メイン）を発動可能！")
             return
 
         # --- フェイント（カウンターされなかった場合）---
@@ -251,7 +282,7 @@ class TurnHandler:
 
         # --- コピー ---
         if skill == "コピー":
-            TurnHandler._resolve_copy(gs, tp_key, thumbs, total, was_skip_before)
+            TurnHandler._resolve_copy(gs, tp_key, thumbs, total)
             return
 
         # --- ストック ---
@@ -264,6 +295,28 @@ class TurnHandler:
                 print(f"  ストック失敗（参照可能なスキルがありません）")
             return
 
+        # --- チョイス ---
+        if skill == "チョイス":
+            chosen = choice_data.get("choice") if choice_data else None
+            if chosen is None:
+                print("  チョイス失敗（選択可能なスキルがありません）")
+                return
+            tp.choice_used_this_phase.add(chosen)
+            print(f"  チョイス！「{chosen}」の効果を発動します")
+            TurnHandler._execute_stocked_skill(gs, tp_key, chosen, thumbs, total)
+            return
+
+        # --- オール ---
+        if skill == "オール":
+            order = choice_data.get("all_order") if choice_data else list(tp.stock)
+            print(f"  オール！ストック内の {len(order)} 個のスキルを順番に発動します")
+            for idx, s in enumerate(order):
+                print(f"    [{idx+1}/{len(order)}] {s} を発動")
+                TurnHandler._execute_stocked_skill(gs, tp_key, s, thumbs, total)
+            tp.stock = []  # 発動後ストック全消滅
+            print(f"  オール完了！{tp.name}のストックを全て消費")
+            return
+
         # --- ドロップ ---
         if skill == "ドロップ":
             ntp.drop_blocked_skills = set(tp.stock)
@@ -274,29 +327,64 @@ class TurnHandler:
 
         # --- ブースト ---
         if skill == "ブースト":
-            tp.used_ultimate = True
             effects.add_extra_turns(tp_key, 3)
             print(f"  ブースト！{tp.name}が追加3ターンを獲得！")
             return
 
         # --- リバーシ ---
         if skill == "リバーシ":
-            tp.used_ultimate = True
             effects.swap_player_states(tp, ntp)
             print(f"  リバーシ！{tp.name}と{ntp.name}の状態が入れ替わりました！")
             return
 
         # --- タイム ---
         if skill == "タイム":
-            tp.used_ultimate = True
             tp.time_active = True
             effects.add_extra_turns(tp_key, 1)
             print(f"  タイム！{ntp.name}が連続行動しようとした時、{tp.name}のターンになる + 追加1ターン")
             return
 
+    # =========================
+    # 2手同時降ろし試行（ガード判定込み）
+    # =========================
     @staticmethod
-    def _resolve_copy(gs, tp_key, thumbs, total, was_skip_before=False):
-        """コピーの解決"""
+    def _attempt_two_hand_drop(gs, dropper, opponent, source_name):
+        """
+        dropper が手を2つ同時に降ろそうとする。opponent がガードを持っていれば発動。
+        ガード発動時: dropper の hands_lower_blocked_this_turn = True
+        """
+        # 既にこのターンで手降ろし無効化フラグが立っているなら無効
+        if dropper.hands_lower_blocked_this_turn:
+            print(f"  {source_name}は{opponent.name}のガードにより無効化されました（このターン中、手を降ろせません）")
+            return
+
+        # 2手降ろしの試行: dropper が現在2手持っていなければ「2手同時降ろし」にならない
+        if dropper.get_active_hands() < 2:
+            # 手が1つしかない場合は「同時に2つ」ではないのでガードのトリガーにならず通る
+            if dropper.remove_hand():
+                print(f"  {source_name}発動！{dropper.name}が手を1つ降ろします（ガード貫通）")
+            return
+
+        # 2手同時降ろしを試行 → ガードチェック
+        if gs.effects.try_block_two_hand_drop(opponent):
+            # ガード発動: そのターン中 dropper は手を降ろせない
+            dropper.hands_lower_blocked_this_turn = True
+            print(f"  {opponent.name}のガードにより{source_name}の2手同時降ろしが無効化！")
+            print(f"  → このターン中、{dropper.name}は手を降ろせなくなります")
+            # ガード発動時の追加効果: 「そのターンの終了後、自分のフェーズを終了する」
+            # ガード使用者のフェーズを終了するため、追加ターンをクリア
+            gs.effects.additional_turns[opponent.key] = 0
+            print(f"  ガード発動効果: {opponent.name}のターン終了後、フェーズを終了します")
+        else:
+            dropper.remove_two_hands()
+            print(f"  {source_name}成功！{dropper.name}が手を2つ降ろします！")
+
+    # =========================
+    # コピー（2回分発動）
+    # =========================
+    @staticmethod
+    def _resolve_copy(gs, tp_key, thumbs, total):
+        """コピーの解決: 参照元スキルを2回分発動"""
         tp = gs.get_player(tp_key)
         ntp = gs.get_opponent(tp_key)
         effects = gs.effects
@@ -311,15 +399,16 @@ class TurnHandler:
             print("  コピー失敗（参照不可能なスキル）")
             return
 
-        print(f"  コピー！「{prev_skill}」の効果を発動します")
-        TurnHandler._execute_copied_skill(gs, tp_key, prev_skill, thumbs, total, upgrade_hand_to_win=True, was_skip_before=was_skip_before)
+        print(f"  コピー！「{prev_skill}」の効果を2回分発動します")
+
+        # 2回ループで発動
+        for i in range(2):
+            print(f"    [{i+1}/2] 「{prev_skill}」を発動")
+            TurnHandler._execute_referenced_skill(gs, tp_key, prev_skill, thumbs, total)
 
     @staticmethod
     def _resolve_copy_countered(gs, tp_key, thumbs, total):
-        """コピー宣言がカウンターされた場合の解決。
-        コピーは無効化されず、参照元スキルに対するカウンター処理に依存する。
-        対カウンタースキル参照時はその効果が発動し、コピー固有の
-        「このスキルを宣言して手を降ろす時、代わりに一発上がりする」が適用される。"""
+        """コピー宣言がカウンターされた場合: 参照元のスキルに準拠した処理"""
         tp = gs.get_player(tp_key)
         ntp = gs.get_opponent(tp_key)
         effects = gs.effects
@@ -333,157 +422,141 @@ class TurnHandler:
             print("  コピー失敗（参照不可能なスキル）")
             return
 
-        print(f"  コピー！参照元「{prev_skill}」に対してカウンター処理を適用")
+        print(f"  コピー！参照元「{prev_skill}」に対してカウンター処理を2回分適用")
 
-        # 参照元が数字: 通常の数字+カウンター処理（コピー昇格は適用されない）
+        # 参照元が数字: カウンター処理を2回分（同じ指数なので同じ結果）
         if isinstance(prev_skill, int):
-            if total == prev_skill:
-                ntp.remove_hand()
-                print(f"    カウンター成功！数字的中により{ntp.name}が手を1つ降ろします！")
-            else:
-                tp.remove_hand()
-                print(f"    カウンター失敗！外れにより{tp.name}が手を1つ降ろします！")
+            for i in range(2):
+                if total == prev_skill:
+                    ntp.remove_hand()
+                    print(f"    [{i+1}/2] カウンター成功！数字的中により{ntp.name}が手を1つ降ろします")
+                else:
+                    tp.remove_hand()
+                    print(f"    [{i+1}/2] カウンター失敗！外れにより{tp.name}が手を1つ降ろします")
             return
 
-        # 参照元がフェイント: 対カウンター効果（手を降ろす+追加ターン）にコピー昇格適用
+        # 参照元が対カウンタースキル: 効果が2回分発動
         if prev_skill == "フェイント":
-            effects.add_extra_turns(tp_key, 1)
-            if effects.try_block_instant_win(ntp):
-                print(f"    {ntp.name}のガードによりコピー一発上がりが無効化！追加1ターンのみ獲得")
-            else:
-                tp.remove_all_hands()
-                print(f"    コピー(フェイント)成功！{tp.name}が一発上がり + 追加1ターン！")
+            for i in range(2):
+                if tp.remove_hand():
+                    gs.effects.add_extra_turns(tp_key, 1)
+                    print(f"    [{i+1}/2] フェイント成功！{tp.name}が手を1つ降ろし、追加1ターン獲得")
+                else:
+                    gs.effects.add_extra_turns(tp_key, 1)
+                    print(f"    [{i+1}/2] フェイント発動（手は降ろせず）、追加1ターン獲得")
             return
 
-        # 参照元がロック: ロック対カウンター効果（自身の手は降ろさない、コピー昇格非適用）
         if prev_skill == "ロック":
-            ntp.lock_debuff = 2
-            print(f"    コピー(ロック)成功！次の{tp.name}のターン中、{ntp.name}はカウンター不可！")
+            ntp.lock_pending = True  # 累積しないのでフラグセットは1回でOK
+            print(f"    コピー(ロック)成功！次の{tp.name}のターン中、{ntp.name}は相手ターン中スキル宣言不可！")
             return
 
-        # 参照元がフラッシュ: カウンターフラッシュ（ntp側で一発上がり、コピー昇格非適用）
+        # 参照元がフラッシュ: カウンターフラッシュを2回分（同じ指数なので2回ともガード判定）
         if prev_skill == "フラッシュ":
             tp_thumbs = thumbs[tp.key]
             ntp_thumbs = thumbs[ntp.key]
             if tp_thumbs == ntp_thumbs:
-                if effects.try_block_instant_win(tp):
-                    print(f"    {tp.name}のガードによりカウンターフラッシュが無効化！")
-                else:
-                    ntp.remove_all_hands()
-                    print(f"    カウンター成功！{ntp.name}がフラッシュ効果で一発上がり！")
+                for i in range(2):
+                    print(f"    [{i+1}/2] カウンターフラッシュ試行")
+                    TurnHandler._attempt_two_hand_drop(gs, ntp, tp, "カウンターフラッシュ")
             else:
                 print(f"    カウンターしたがフラッシュ条件不成立")
             return
 
-        # その他のスキル（セメント・ガード・チャージ・クイック・スキップ）: 通常カウンター=効果なし
+        # その他: 通常カウンター=効果なし
         print(f"    カウンターにより「{prev_skill}」の効果は発動せず、何も起こりません")
 
     @staticmethod
-    def _resolve_choice_with_reaction(gs, tp_key, thumbs, total, reaction):
-        """チョイスの解決（カウンター確認後に選択）"""
+    def _resolve_stock_alpha_countered(gs, tp_key, thumbs, total, skill_name, choice_data):
+        """チョイス/オールがカウンターされた場合: 各参照元スキルに準拠"""
+        # 簡略化: チョイスの選択スキルにカウンターを適用
+        # オールの場合は全スキルにカウンターを適用（複雑なので最初の1つだけにカウンター、残りは通る）
         tp = gs.get_player(tp_key)
-        ntp_key = gs.get_opponent_key(tp_key)
         ntp = gs.get_opponent(tp_key)
-        effects = gs.effects
 
-        # ブロック宣言: 先に必殺使用済みマーク（スキップ選択時はブロック無効のため選択後に判定）
-        if reaction == "ブロック":
-            ntp.used_ultimate = True
-
-        # プレイヤーがカウンター有無を見てからストックを選択
-        if tp.key == KEY_PLAYER:
-            from yubisuma_logic import get_choice_selection
-            chosen = get_choice_selection(tp, reaction)
-        else:
-            available = [s for s in tp.stock if s not in tp.choice_used_this_phase]
-            if available:
-                import random
-                # AIはカウンターされていたらフェイント優先
-                if reaction == "カウンター" and "フェイント" in available:
-                    chosen = "フェイント"
-                else:
-                    chosen = random.choice(available)
-            else:
-                chosen = None
-
-        if chosen is None:
-            print("  チョイス失敗（選択可能なスキルがありません）")
+        if skill_name == "チョイス":
+            chosen = choice_data.get("choice") if choice_data else None
+            if chosen is None:
+                print("  チョイス失敗（選択可能なスキルがありません）")
+                return
+            tp.choice_used_this_phase.add(chosen)
+            print(f"  チョイス！「{chosen}」をカウンター処理")
+            # カウンターを適用（参照元のスキルに準拠）
+            TurnHandler._apply_counter_to_skill(gs, tp_key, chosen, thumbs, total)
             return
 
-        tp.choice_used_this_phase.add(chosen)
-        print(f"  チョイス！「{chosen}」の効果を発動します")
-
-        # ブロック有効判定: スキップはブロック無効、それ以外はブロックで無効化
-        if reaction == "ブロック" and chosen != "スキップ":
-            print(f"  {ntp.name}のブロックにより{tp.name}のスキル効果が無効化！")
+        if skill_name == "オール":
+            # 全スキルにカウンターを適用するのは複雑なので、簡略実装: 各スキルにカウンター適用
+            order = choice_data.get("all_order") if choice_data else list(tp.stock)
+            print(f"  オール！{len(order)}個のスキルをカウンター処理")
+            for idx, s in enumerate(order):
+                print(f"    [{idx+1}/{len(order)}] {s} にカウンター適用")
+                TurnHandler._apply_counter_to_skill(gs, tp_key, s, thumbs, total)
+            tp.stock = []
             return
-
-        # スキップ連鎖判定（チョイスでスキップを選んだ場合も連鎖対象）
-        was_skip_before = effects.last_turn_was_skip[tp_key]
-        if chosen == "スキップ":
-            effects.last_turn_was_skip[tp_key] = True
-
-        # 選んだスキルにリアクションを適用
-        if chosen in ANTI_COUNTER_SKILLS and reaction == "カウンター":
-            # 対カウンタースキルをチョイス → 対カウンター効果発動
-            TurnHandler._resolve_anti_counter(gs, tp_key, chosen)
-        elif reaction == "カウンター":
-            # カウンターだが対カウンタースキルでない → カウンター処理
-            # チョイスで選んだスキルに対してカウンター適用
-            # フラッシュの場合はカウンター側がフラッシュ発動
-            if chosen == "フラッシュ":
-                tp_thumbs = thumbs[tp.key]
-                ntp_thumbs = thumbs[ntp.key]
-                if tp_thumbs == ntp_thumbs:
-                    if gs.effects.try_block_instant_win(tp):
-                        print(f"    {tp.name}のガードによりカウンターフラッシュが無効化！")
-                    else:
-                        ntp.remove_all_hands()
-                        print(f"    カウンター成功！{ntp.name}がフラッシュで一発上がり！")
-                else:
-                    print(f"    カウンターしたがフラッシュ条件不成立")
-            else:
-                print(f"    カウンターにより{chosen}の効果は発動せず、何も起こりません")
-        else:
-            # リアクションなし（またはブロック+スキップ選択）→ 通常効果発動
-            TurnHandler._execute_copied_skill(gs, tp_key, chosen, thumbs, total,
-                                               upgrade_hand_to_win=False,
-                                               was_skip_before=was_skip_before)
 
     @staticmethod
-    def _execute_copied_skill(gs, tp_key, skill_name, thumbs, total,
-                               upgrade_hand_to_win=False, was_skip_before=False):
-        """コピー/チョイスで参照したスキルの効果を実行"""
+    def _apply_counter_to_skill(gs, tp_key, skill_name, thumbs, total):
+        """単一スキルにカウンター処理を適用（参照元スキルに準拠）"""
+        tp = gs.get_player(tp_key)
+        ntp = gs.get_opponent(tp_key)
+
+        if skill_name == "フラッシュ":
+            tp_thumbs = thumbs[tp.key]
+            ntp_thumbs = thumbs[ntp.key]
+            if tp_thumbs == ntp_thumbs:
+                TurnHandler._attempt_two_hand_drop(gs, ntp, tp, "カウンターフラッシュ")
+            else:
+                print(f"    カウンターしたがフラッシュ条件不成立")
+            return
+
+        if skill_name == "フェイント":
+            if tp.remove_hand():
+                gs.effects.add_extra_turns(tp_key, 1)
+                print(f"    フェイント成功（カウンター経由）：{tp.name}が手を1つ降ろし、追加1ターン")
+            return
+
+        if skill_name == "ロック":
+            ntp.lock_pending = True
+            print(f"    ロック成功（カウンター経由）")
+            return
+
+        # その他のスキル: 通常カウンター → 効果なし
+        print(f"    「{skill_name}」はカウンターにより効果不発")
+
+    # =========================
+    # ストックされたスキル効果の発動（チョイス/オール用）
+    # =========================
+    @staticmethod
+    def _execute_stocked_skill(gs, tp_key, skill_name, thumbs, total):
+        """チョイス/オールで選択したスキルの効果を発動"""
+        # ストックされたスキルはカウンター反応を受けない（チョイス/オール自体への反応はメインで処理済）
+        TurnHandler._execute_referenced_skill(gs, tp_key, skill_name, thumbs, total)
+
+    @staticmethod
+    def _execute_referenced_skill(gs, tp_key, skill_name, thumbs, total):
+        """参照スキル経由で発動されるスキルの効果（コピー/チョイス/オール共通）"""
         tp = gs.get_player(tp_key)
         ntp = gs.get_opponent(tp_key)
         effects = gs.effects
 
         if isinstance(skill_name, int):
             if total == skill_name:
-                if upgrade_hand_to_win:
-                    if effects.try_block_instant_win(ntp):
-                        print(f"    {ntp.name}のガードにより無効化！")
-                    else:
-                        tp.remove_all_hands()
-                        print(f"    数字的中で一発上がり！")
+                if tp.remove_hand():
+                    print(f"      数字的中！{tp.name}が手を1つ降ろします")
                 else:
-                    tp.remove_hand()
-                    print(f"    的中！手を1つ降ろします！")
+                    print(f"      数字的中（手降ろし無効）")
             else:
-                print("    予想が外れました。")
+                print("      予想が外れました")
             return
 
         if skill_name == "フラッシュ":
             tp_thumbs = thumbs[tp.key]
             ntp_thumbs = thumbs[ntp.key]
             if tp_thumbs == ntp_thumbs:
-                if effects.try_block_instant_win(ntp):
-                    print(f"    {ntp.name}のガードにより無効化！")
-                else:
-                    tp.remove_all_hands()
-                    print(f"    フラッシュ効果で一発上がり！")
+                TurnHandler._attempt_two_hand_drop(gs, tp, ntp, "フラッシュ")
             else:
-                print(f"    フラッシュ条件不成立")
+                print(f"      フラッシュ条件不成立")
 
         elif skill_name == "セメント":
             for key in [KEY_PLAYER, KEY_COMPUTER]:
@@ -493,36 +566,138 @@ class TurnHandler:
                     new_cement = min(t, plr.get_active_hands())
                     if plr.cement is None or new_cement > plr.cement:
                         plr.cement = new_cement
-                    print(f"  {plr.name}に{new_cement}本セメント")
+                    print(f"      {plr.name}に{new_cement}本セメント")
 
         elif skill_name == "ガード":
             tp.guard_active = True
-            effects.add_extra_turns(tp_key, 1)
-            print(f"    ガード展開 + 追加1ターン")
+            # 追加1ターンは1フェーズ中に一度だけ発動
+            if not effects.guard_extra_turn_used_this_phase[tp_key]:
+                effects.add_extra_turns(tp_key, 1)
+                effects.guard_extra_turn_used_this_phase[tp_key] = True
+                print(f"      ガード展開 + 追加1ターン")
+            else:
+                print(f"      ガード展開（追加ターンは本フェーズ中既に取得済み）")
 
         elif skill_name == "チャージ":
             tp.charge_active = True
-            print(f"    チャージ付与！")
+            print(f"      チャージ付与！")
 
         elif skill_name == "クイック":
+            # 累積しない（quick_level = 2 を上書き）
             tp.quick_level = 2
-            print(f"    クイックバフ設定！")
+            print(f"      クイックバフ設定！")
 
         elif skill_name == "スキップ":
-            # スキップ連鎖判定（コピー/チョイス経由でも連鎖対象）
-            # update_skip_chainは呼び出し元で行われている場合と行われていない場合がある
-            # コピー経由の場合はここで連鎖判定
-            if was_skip_before:
-                ntp.skip_phases += 2
-                print(f"    スキップ連鎖！{ntp.name}の次の2フェーズ中スキル封印！")
-            else:
-                ntp.skip_phases += 1
-                print(f"    {ntp.name}の次フェーズスキル封印！")
-            # コピー経由でスキップ効果が発動した場合、連鎖フラグを立てる
-            effects.last_turn_was_skip[tp_key] = True
+            # 新ルール: スキップは累積する（参照スキルで複数回発動で +1 ずつ）
+            ntp.skip_phases += 1
+            print(f"      {ntp.name}の次のフェーズスキル封印（累計{ntp.skip_phases}）")
+
+        elif skill_name == "ミラー":
+            tp.mirror_ready = True
+            print(f"      {tp.name}のミラー（準備）状態を付与")
 
         elif skill_name == "フェイント":
-            print(f"    フェイント効果（カウンター不在のため不発）")
+            # チョイス/オール経由でフェイント発動: 通常効果（手降ろし+追加ターン）
+            if tp.remove_hand():
+                gs.effects.add_extra_turns(tp_key, 1)
+                print(f"      {tp.name}が手を1つ降ろし、追加1ターン")
 
         elif skill_name == "ロック":
-            print(f"    ロック効果（カウンター不在のため不発）")
+            ntp.lock_pending = True
+            print(f"      ロック付与！")
+
+    # =========================
+    # ミラー（メイン）反射処理
+    # =========================
+    @staticmethod
+    def _resolve_mirror_reflection(gs, tp_key, skill, thumbs, total, charge_was_active):
+        """ミラー（メイン）の反射処理: TPのスキル効果をNTPに反射"""
+        tp = gs.get_player(tp_key)
+        ntp = gs.get_opponent(tp_key)
+        effects = gs.effects
+
+        skill_name = "数字" if isinstance(skill, int) else skill
+        print(f"  ミラー反射！「{skill_name}」の効果を{ntp.name}が発動します")
+
+        # 数字: TP→NTPへ反射、NTPが手を降ろす（チャージ効果も反射）
+        if isinstance(skill, int):
+            fire_count = 2 if charge_was_active else 1
+            for i in range(fire_count):
+                if total == skill:
+                    ntp.remove_hand()
+                    print(f"    [{i+1}/{fire_count}] 数字的中！{ntp.name}が手を1つ降ろします")
+                else:
+                    print(f"    [{i+1}/{fire_count}] 予想が外れました")
+                    break
+            return
+
+        # フラッシュ: NTPが手を2つ降ろす（TPがガードを持っていれば TP がガード防御）
+        if skill == "フラッシュ":
+            if thumbs[tp.key] == thumbs[ntp.key]:
+                TurnHandler._attempt_two_hand_drop(gs, ntp, tp, "ミラーフラッシュ")
+            else:
+                print("    フラッシュ条件不成立")
+            return
+
+        # スキップ: TPのスキップ効果を反射 → TPが封印される
+        if skill == "スキップ":
+            tp.skip_phases += 1
+            print(f"    ミラー反射！{tp.name}の次のフェーズが封印されました")
+            return
+
+        # セメント: 通常通り両者に適用（既存ルール通り）
+        if skill == "セメント":
+            for key in [KEY_PLAYER, KEY_COMPUTER]:
+                t = thumbs[key]
+                plr = gs.get_player(key)
+                if t > 0:
+                    new_cement = min(t, plr.get_active_hands())
+                    if plr.cement is None or new_cement > plr.cement:
+                        plr.cement = new_cement
+                    print(f"    {plr.name}に{new_cement}本セメント")
+            return
+
+        # クイック: NTPに反射 → NTPがクイック効果を発動
+        if skill == "クイック":
+            if tp.quick_level == 2:
+                TurnHandler._attempt_two_hand_drop(gs, ntp, tp, "ミラークイック")
+                tp.quick_level = 0
+            elif tp.quick_level == 1:
+                ntp.remove_hand()
+                tp.quick_level = 0
+                print(f"    ミラークイック！{ntp.name}が手を1つ降ろします")
+            else:
+                # 初回宣言の場合、ミラーによりクイックバフがNTPに移る
+                ntp.quick_level = 2
+                print(f"    ミラー反射！{ntp.name}にクイックバフ付与")
+            return
+
+        # ガード/チャージ/ミラー（準備）: バフ系 → 反射してNTPに付与
+        if skill == "ガード":
+            ntp.guard_active = True
+            print(f"    ミラー反射！{ntp.name}にガード付与")
+            return
+        if skill == "チャージ":
+            ntp.charge_active = True
+            print(f"    ミラー反射！{ntp.name}にチャージ付与")
+            return
+        if skill == "ミラー":
+            ntp.mirror_ready = True
+            print(f"    ミラー反射！{ntp.name}にミラー（準備）付与")
+            return
+
+        # ドロップ: 反射 → TPがドロップを受ける
+        if skill == "ドロップ":
+            tp.drop_blocked_skills = set(ntp.stock)
+            print(f"    ミラー反射！{tp.name}は{ntp.name}のストックを使用不可")
+            return
+
+        # その他のスキル: ミラー対象外として扱う
+        print(f"    「{skill_name}」はミラーで反射しきれず、効果が不発に")
+
+
+# 互換性のためのモジュールレベル参照（旧コード対応）
+def get_choice_selection(player, reaction=None):
+    """互換性: yubisuma_logic.py からのインポートをサポート"""
+    from yubisuma_logic import get_choice_selection as _gcs
+    return _gcs(player, reaction)

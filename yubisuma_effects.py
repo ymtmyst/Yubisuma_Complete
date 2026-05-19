@@ -1,4 +1,4 @@
-# yubisuma_effects.py - 完全ルール版
+# yubisuma_effects.py - 完全ルール（新）版
 
 from yubisuma_constants import KEY_PLAYER, KEY_COMPUTER
 
@@ -15,14 +15,14 @@ class EffectManager:
 
         # フェーズ管理
         self.phase_count = 0
-        self.first_player_key = None      # 先手プレイヤーキー
-        self.is_first_phase_done = {KEY_PLAYER: False, KEY_COMPUTER: False}
+        self.first_player_key = None
 
         # 現在のフェーズ内でのターン数
         self.turns_in_current_phase = 0
 
-        # スキップ連鎖判定用: 直前ターンでスキップを宣言 or スキップ効果を発動したか
-        self.last_turn_was_skip = {KEY_PLAYER: False, KEY_COMPUTER: False}
+        # ガード追加ターン: 1フェーズ中に一度だけ発動するための制限フラグ
+        # コピーでガードを2回発動しても追加ターンは1回のみ
+        self.guard_extra_turn_used_this_phase = {KEY_PLAYER: False, KEY_COMPUTER: False}
 
     # === 追加ターン ===
     def add_extra_turns(self, player_key, count=1):
@@ -48,46 +48,26 @@ class EffectManager:
             return self.turn_history[-1][1]
         return None
 
-    # === 先手制限 ===
-    def is_first_phase_restricted(self, player_key):
-        """先手プレイヤーの開幕1フェーズ目かどうか"""
-        return (
-            player_key == self.first_player_key
-            and not self.is_first_phase_done[player_key]
-        )
-
-    def mark_first_phase_done(self, player_key):
-        """フェーズ完了を記録"""
-        self.is_first_phase_done[player_key] = True
-
     # === ガード ===
-    def try_block_instant_win(self, defender_player):
+    def try_block_two_hand_drop(self, defender_player):
         """
-        一発上がりをガードで防ぐ試行。
-        defender_player: 一発上がりされる側（＝ガードを持っている側）のPlayerオブジェクト
-        ガードが有効ならTrue（一発上がり無効化）、なければFalse
+        相手が手を同時に2つ降ろそうとした際、ガードによる無効化を試みる。
+        ガードが有効ならガードを消費し、攻撃側のターン中手降ろし無効フラグを立てる。
+        Returns: True=ガード発動（攻撃側のターン中手降ろし全無効化）, False=ガードなし
         """
         if defender_player.guard_active:
             defender_player.guard_active = False
             return True
         return False
 
-    # === スキップ連鎖判定 ===
-    def update_skip_chain(self, player_key, is_skip_effect):
-        """
-        スキップ連鎖状態を更新。
-        is_skip_effect: スキップを宣言した or スキップの効果を発動した（コピー経由含む）
-        Returns: 直前のターンがスキップだったか
-        """
-        was_skip = self.last_turn_was_skip[player_key]
-        self.last_turn_was_skip[player_key] = is_skip_effect
-        return was_skip
-
     # === リバーシ ===
     def swap_player_states(self, player1, player2):
         """2人のプレイヤーの状態を入れ替える
-        対象: 手, ガード, チャージ, クイック, ロック, セメント
-        除外: スキップ, タイム, ドロップ, ストック, 必殺使用済み, 追加ターン
+        新ルール分類:
+        - 対象（バフ）: ガード, クイック, チャージ, ミラー
+        - 対象（デバフ）: セメント, ロック, ドロップ
+        - 対象外（フィールド効果）: スキップ, ストック, タイム
+        - その他対象外: 必殺使用済み, 追加ターン, has_declared_skill
         """
         state1 = player1.get_swappable_state()
         state2 = player2.get_swappable_state()

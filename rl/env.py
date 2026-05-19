@@ -330,73 +330,24 @@ class YubisumaEnv(gym.Env):
         return obs, reward, terminated, truncated, info
 
     def _resolve_turn_silent(self, tp_key, skill, thumbs, reaction, choice_target=None):
-        """ターンを解決（stdout抑制）"""
+        """ターンを解決（stdout抑制）。新ルールでは choice_data を直接渡せる"""
         import io
         from contextlib import redirect_stdout
-        
-        # チョイスの選択を注入
+
+        # choice_data: チョイス選択を resolve_turn に直接渡す
+        choice_data = None
         if choice_target:
-            tp = self.game_state.get_player(tp_key)
-            tp._pending_choice_target = choice_target
-            
-            # チョイスの選択をオーバーライドするためのモンキーパッチ
-            original_resolve = TurnHandler._resolve_choice_with_reaction
-            
-            @staticmethod
-            def patched_choice(gs, tp_key_inner, thumbs_inner, total, reaction_inner):
-                tp_inner = gs.get_player(tp_key_inner)
-                ntp = gs.get_opponent(tp_key_inner)
-                effects = gs.effects
-                
-                chosen = getattr(tp_inner, '_pending_choice_target', None)
-                if chosen is None:
-                    # フォールバック
-                    available = [s for s in tp_inner.stock if s not in tp_inner.choice_used_this_phase]
-                    chosen = available[0] if available else None
-
-                if reaction_inner == "ブロック":
-                    ntp.used_ultimate = True
-                    # スキップはブロック無効: スキップ以外のみ早期return
-                    if chosen != "スキップ":
-                        return
-
-                if chosen is None:
-                    return
-
-                tp_inner.choice_used_this_phase.add(chosen)
-                
-                from yubisuma_constants import ANTI_COUNTER_SKILLS
-                was_skip_before = effects.last_turn_was_skip[tp_key_inner]
-                if chosen == "スキップ":
-                    effects.last_turn_was_skip[tp_key_inner] = True
-                
-                if chosen in ANTI_COUNTER_SKILLS and reaction_inner == "カウンター":
-                    TurnHandler._resolve_anti_counter(gs, tp_key_inner, chosen)
-                elif reaction_inner == "カウンター":
-                    if chosen == "フラッシュ":
-                        tp_thumbs = thumbs_inner[tp_inner.key]
-                        ntp_thumbs = thumbs_inner[ntp.key]
-                        if tp_thumbs == ntp_thumbs:
-                            if not gs.effects.try_block_instant_win(tp_inner):
-                                ntp.remove_all_hands()
-                    # その他のカウンター: 何も起こらない
+            if skill == "チョイス":
+                choice_data = {"choice": choice_target}
+            elif skill == "オール":
+                # choice_target がリストなら順序、文字列なら単一スキル
+                if isinstance(choice_target, list):
+                    choice_data = {"all_order": choice_target}
                 else:
-                    TurnHandler._execute_copied_skill(
-                        gs, tp_key_inner, chosen, thumbs_inner, total,
-                        upgrade_hand_to_win=False, was_skip_before=was_skip_before
-                    )
-            
-            TurnHandler._resolve_choice_with_reaction = patched_choice
-            try:
-                with redirect_stdout(io.StringIO()):
-                    TurnHandler.resolve_turn(self.game_state, tp_key, skill, thumbs, reaction)
-            finally:
-                TurnHandler._resolve_choice_with_reaction = original_resolve
-                if hasattr(tp, '_pending_choice_target'):
-                    delattr(tp, '_pending_choice_target')
-        else:
-            with redirect_stdout(io.StringIO()):
-                TurnHandler.resolve_turn(self.game_state, tp_key, skill, thumbs, reaction)
+                    choice_data = {"all_order": [choice_target]}
+
+        with redirect_stdout(io.StringIO()):
+            TurnHandler.resolve_turn(self.game_state, tp_key, skill, thumbs, reaction, choice_data)
     
     def _check_victory(self):
         """勝利判定（stdout抑制）"""

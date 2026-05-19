@@ -28,8 +28,10 @@ env.agent_key = KEY_PLAYER
 env.opponent_key = KEY_COMPUTER
 env.game_state.current_player_key = KEY_PLAYER
 env.game_state.effects.first_player_key = KEY_PLAYER
-env.game_state.effects.is_first_phase_done[KEY_PLAYER] = True
-env.game_state.effects.is_first_phase_done[KEY_COMPUTER] = True
+# 新ルール: 先手制限廃止のため is_first_phase_done は不要
+# 勝利前提条件回避: 両プレイヤーをスキル宣言済み状態にする
+env.game_state.player.has_declared_skill = True
+env.game_state.computer.has_declared_skill = True
 
 flash = "フラッシュ"
 feint = "フェイント"
