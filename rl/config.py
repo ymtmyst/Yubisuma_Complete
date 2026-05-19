@@ -23,11 +23,11 @@ TP_SKILL_OPTIONS = [
     # 数字 (0-4)
     0, 1, 2, 3, 4,
     # 通常スキル
-    "フラッシュ", "セメント", "ガード", "チャージ", "クイック", "スキップ",
+    "フラッシュ", "セメント", "ガード", "チャージ", "クイック", "スキップ", "ミラー",
     # 対カウンタースキル
     "フェイント", "ロック",
     # 参照スキル
-    "コピー", "ストック", "ドロップ",
+    "コピー", "ストック", "オール", "ドロップ",
     # 必殺スキル (ブロック/リバーシ除外)
     "ブースト", "タイム",
     # チョイス展開 (ストック可能な8スキルそれぞれ)
@@ -35,17 +35,17 @@ TP_SKILL_OPTIONS = [
     "チョイス:チャージ", "チョイス:クイック", "チョイス:スキップ",
     "チョイス:フェイント", "チョイス:ロック",
 ]
-NUM_TP_SKILLS = len(TP_SKILL_OPTIONS)  # 26
+NUM_TP_SKILLS = len(TP_SKILL_OPTIONS)  # 28
 NUM_THUMB_OPTIONS = 3  # 0, 1, 2
-NUM_TP_ACTIONS = NUM_TP_SKILLS * NUM_THUMB_OPTIONS  # 78
+NUM_TP_ACTIONS = NUM_TP_SKILLS * NUM_THUMB_OPTIONS  # 84
 
 # NTP (非ターンプレイヤー) の行動
-NTP_REACTION_OPTIONS = ["なし", "カウンター", "ブロック"]
-NUM_NTP_REACTIONS = len(NTP_REACTION_OPTIONS)  # 3
-NUM_NTP_ACTIONS = NUM_NTP_REACTIONS * NUM_THUMB_OPTIONS  # 9
+NTP_REACTION_OPTIONS = ["なし", "カウンター", "ブロック", "ミラー"]
+NUM_NTP_REACTIONS = len(NTP_REACTION_OPTIONS)  # 4
+NUM_NTP_ACTIONS = NUM_NTP_REACTIONS * NUM_THUMB_OPTIONS  # 12
 
 # 全行動空間
-TOTAL_ACTIONS = NUM_TP_ACTIONS + NUM_NTP_ACTIONS  # 87
+TOTAL_ACTIONS = NUM_TP_ACTIONS + NUM_NTP_ACTIONS  # 96
 
 # ストック可能スキル一覧 (チョイス展開用)
 STOCKABLE_SKILLS = [
@@ -72,7 +72,7 @@ OBS_OPP_TOTAL = OBS_OPP_BASE + OBS_OPP_DROP_BLOCKED + OBS_OPP_STOCK + OBS_OPP_CH
 # グローバル状態
 OBS_IS_TP = 1
 OBS_FIRST_RESTRICTED = 2  # me + opp
-OBS_PREV_SKILL = 20       # one-hot: 5数字 + 14スキル + None
+OBS_PREV_SKILL = 20       # one-hot: 5数字 + 14スキル + None (旧観測幅維持)
 OBS_EXTRA_TURNS = 2       # me + opp (各1)
 OBS_SKIP_CHAIN = 2        # me + opp
 OBS_PHASE_TURN = 1        # フェーズ内ターン数 (実務上8以下)
@@ -150,6 +150,45 @@ LEAGUE_CONFIG = {
     "random_weight": 0.2,      # ランダム対戦相手の選択確率
     "initial_weight": 0.1,     # 初期（弱い）対戦相手の選択確率
     "win_rate_threshold": 0.6, # 新規対戦相手追加の閾値
+}
+
+# === Opponent pool ===
+# Rewards stay terminal-only. These opponents only broaden the experience
+# distribution so long-horizon and combo strategies are seen during training.
+OPPONENT_POOL_CONFIG = {
+    "model_weight": 0.55,       # Frozen checkpoints from the league.
+    "biased_weight": 0.30,      # Frozen checkpoints with logit biases.
+    "rule_weight": 0.15,        # Lightweight scripted sparring policies.
+    "biased_temperature": 1.10,
+    "biased_presets": [
+        "fast_finish",
+        "cement_lock_flash",
+        "stock_choice",
+        "counter_block",
+        "tempo",
+    ],
+    "rule_presets": [
+        "fast_finish",
+        "cement_lock_flash",
+        "stock_choice",
+        "counter_block",
+        "tempo",
+    ],
+}
+
+# === Optional counterfactual search teacher ===
+# This does not change environment rewards. It samples legal actions in the
+# current state, rolls them out with random play, and distills terminal outcomes
+# into an auxiliary policy target.
+SEARCH_TEACHER_CONFIG = {
+    "enabled": False,
+    "freq": 4096,
+    "samples_per_action": 1,
+    "rollout_turns": 32,
+    "max_actions": 24,
+    "temperature": 0.35,
+    "loss_weight": 0.05,
+    "max_buffer": 256,
 }
 
 # === 報酬設定 ===

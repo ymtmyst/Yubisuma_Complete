@@ -11,7 +11,6 @@
 import gymnasium as gym
 from gymnasium import spaces
 import numpy as np
-import random
 import copy
 import sys
 import os
@@ -74,6 +73,7 @@ class YubisumaEnv(gym.Env):
 
         # 最新の相手行動（補助タスク用）
         self.last_opponent_action = None
+        self.opponent_spec = {"kind": "random", "preset": None, "step": None}
     
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
@@ -291,20 +291,7 @@ class YubisumaEnv(gym.Env):
             available = [s for s in tp.stock if s not in tp.choice_used_this_phase]
             return available[0] if available else None
 
-        if self.opponent_policy is None:
-            action = int(random.choice(valid_indices))
-        else:
-            obs_dim = getattr(self.opponent_policy, "observation_dim", OBS_TOTAL)
-            opp_obs = encode_observation_for_dim(
-                self.game_state, self.opponent_key, self.turn_count, obs_dim=obs_dim,
-                persona_tp=self.opp_persona_tp, persona_ntp=self.opp_persona_ntp,
-            )
-            action_arr, _ = self.opponent_policy.predict(
-                opp_obs, action_masks=mask, deterministic=False
-            )
-            action = int(action_arr[0])
-            if action not in set(int(i) for i in valid_indices):
-                action = int(random.choice(valid_indices))
+        action = self._get_opponent_action_index()
 
         return decode_action(action).get("choice_target")
 
@@ -350,14 +337,19 @@ class YubisumaEnv(gym.Env):
             TurnHandler.resolve_turn(self.game_state, tp_key, skill, thumbs, reaction, choice_data)
     
     def _check_victory(self):
-        """勝利判定（stdout抑制）"""
+        """勝利判定（新ルール: 両者のスキル宣言後のみ勝利確定）"""
         p = self.game_state.player
         c = self.game_state.computer
+        both_declared = p.has_declared_skill and c.has_declared_skill
         if p.get_active_hands() == 0:
+            if not both_declared:
+                return False
             self.game_state.game_over = True
             self.game_state.winner = KEY_PLAYER
             return True
         if c.get_active_hands() == 0:
+            if not both_declared:
+                return False
             self.game_state.game_over = True
             self.game_state.winner = KEY_COMPUTER
             return True
@@ -420,42 +412,49 @@ class YubisumaEnv(gym.Env):
             gs.current_player_key = current_key
             self._on_phase_start(current_key)
             player = gs.get_player(current_key)
+
+    def _get_opponent_action_index(self):
+        mask = get_action_mask(self.game_state, self.opponent_key)
+        valid_indices = np.where(mask)[0]
+        if len(valid_indices) == 0:
+            return 0
+
+        if self.opponent_policy is None:
+            return int(self.np_random.choice(valid_indices))
+
+        if hasattr(self.opponent_policy, "predict_action"):
+            action = int(self.opponent_policy.predict_action(
+                self.game_state,
+                self.opponent_key,
+                mask,
+                rng=self.np_random,
+            ))
+        else:
+            obs_dim = getattr(self.opponent_policy, "observation_dim", OBS_TOTAL) or OBS_TOTAL
+            opp_obs = encode_observation_for_dim(
+                self.game_state, self.opponent_key, self.turn_count, obs_dim=obs_dim,
+                persona_tp=self.opp_persona_tp, persona_ntp=self.opp_persona_ntp,
+            )
+            action_arr, _ = self.opponent_policy.predict(
+                opp_obs, action_masks=mask, deterministic=False
+            )
+            action = int(action_arr[0])
+
+        if action < 0 or action >= len(mask) or not mask[action]:
+            action = int(self.np_random.choice(valid_indices))
+        return action
     
     def _get_opponent_tp_action(self):
         """対戦相手のTP行動を生成"""
         if self.opponent_policy is None:
             return self._random_tp_action()
-
-        # 対戦相手の観測を作成（相手視点、相手 persona 付き）
-        obs_dim = getattr(self.opponent_policy, "observation_dim", OBS_TOTAL)
-        opp_obs = encode_observation_for_dim(
-            self.game_state, self.opponent_key, self.turn_count, obs_dim=obs_dim,
-            persona_tp=self.opp_persona_tp, persona_ntp=self.opp_persona_ntp,
-        )
-        opp_mask = get_action_mask(self.game_state, self.opponent_key)
-
-        action, _ = self.opponent_policy.predict(
-            opp_obs, action_masks=opp_mask, deterministic=False
-        )
-        return decode_action(int(action))
+        return decode_action(self._get_opponent_action_index())
 
     def _get_opponent_ntp_action(self):
         """対戦相手のNTP行動を生成"""
         if self.opponent_policy is None:
             return self._random_ntp_action()
-
-        # 対戦相手の観測を作成（相手視点でNTP、相手 persona 付き）
-        obs_dim = getattr(self.opponent_policy, "observation_dim", OBS_TOTAL)
-        opp_obs = encode_observation_for_dim(
-            self.game_state, self.opponent_key, self.turn_count, obs_dim=obs_dim,
-            persona_tp=self.opp_persona_tp, persona_ntp=self.opp_persona_ntp,
-        )
-        opp_mask = get_action_mask(self.game_state, self.opponent_key)
-
-        action, _ = self.opponent_policy.predict(
-            opp_obs, action_masks=opp_mask, deterministic=False
-        )
-        return decode_action(int(action))
+        return decode_action(self._get_opponent_action_index())
     
     def _random_tp_action(self):
         """ランダムなTP行動を生成"""
@@ -464,7 +463,7 @@ class YubisumaEnv(gym.Env):
         valid_indices = np.where(tp_mask)[0]
         if len(valid_indices) == 0:
             return decode_action(0)  # フォールバック
-        chosen = random.choice(valid_indices)
+        chosen = self.np_random.choice(valid_indices)
         return decode_action(int(chosen))
     
     def _random_ntp_action(self):
@@ -474,7 +473,7 @@ class YubisumaEnv(gym.Env):
         valid_indices = np.where(ntp_mask)[0]
         if len(valid_indices) == 0:
             return decode_action(NUM_TP_ACTIONS)  # フォールバック
-        chosen = random.choice(valid_indices) + NUM_TP_ACTIONS
+        chosen = self.np_random.choice(valid_indices) + NUM_TP_ACTIONS
         return decode_action(int(chosen))
     
     def _compute_reward(self, terminated, truncated):
@@ -519,18 +518,110 @@ class YubisumaEnv(gym.Env):
             'turns': self.episode_turns,
             'agent_persona_tp': self.agent_persona_tp,
             'agent_persona_ntp': self.agent_persona_ntp,
+            'opponent_kind': self.opponent_spec.get("kind"),
+            'opponent_preset': self.opponent_spec.get("preset"),
+            'opponent_step': self.opponent_spec.get("step"),
         }
 
     def set_opponent_path(self, path):
         """対戦相手モデルをパスから読み込んで設定。
         SubprocVecEnvからenv_method経由で呼ばれるためサブプロセス内で実行される。
         device='cpu'を強制: 16プロセス×GPUロードによるVRAM枯渇を防ぐ。"""
+        self.set_opponent_spec({"kind": "model", "path": path})
+
+    def set_opponent_spec(self, spec):
+        """Set opponent policy from a serializable league spec."""
+        self.opponent_spec = dict(spec or {"kind": "random", "preset": None, "step": None})
         try:
-            from rl.opponents import _FrozenPolicy
-            model = load_maskable_ppo(path, device='cpu')
-            self.opponent_policy = _FrozenPolicy(model)
+            from rl.opponents import create_opponent_policy
+            self.opponent_policy = create_opponent_policy(spec, device='cpu')
         except Exception as e:
-            print(f"[Env] 対戦相手読み込みエラー ({path}): {e}")
+            print(f"[Env] opponent load error ({spec}): {e}")
+            try:
+                from rl.opponents import RuleStrategyPolicy
+                self.opponent_policy = RuleStrategyPolicy("balanced")
+                self.opponent_spec = {"kind": "fallback_rule", "preset": "balanced", "step": None}
+            except Exception:
+                self.opponent_policy = None
+                self.opponent_spec = {"kind": "random", "preset": None, "step": None}
+
+    def get_search_teacher(self, samples_per_action=1, rollout_turns=32,
+                           max_actions=24, temperature=0.35):
+        """Return a counterfactual policy target from terminal random rollouts.
+
+        The target is reward-preserving: it is derived from actual terminal
+        outcomes, not from hand-written skill bonuses.
+        """
+        obs = self._agent_obs()
+        mask = self.action_masks()
+        legal = np.where(mask)[0]
+        if len(legal) <= 1:
+            return None
+
+        if max_actions and len(legal) > max_actions:
+            legal = self.np_random.choice(legal, size=max_actions, replace=False)
+            legal = np.asarray(legal, dtype=np.int64)
+
+        scores = []
+        samples = max(1, int(samples_per_action))
+        for action in legal:
+            total = 0.0
+            for _ in range(samples):
+                total += self._rollout_action_value(int(action), int(rollout_turns))
+            scores.append(total / samples)
+
+        scores = np.asarray(scores, dtype=np.float32)
+        target = np.zeros(TOTAL_ACTIONS, dtype=np.float32)
+        scaled = scores / max(1e-6, float(temperature))
+        scaled = scaled - float(np.max(scaled))
+        probs = np.exp(scaled)
+        prob_sum = float(probs.sum())
+        if not np.isfinite(prob_sum) or prob_sum <= 0:
+            probs = np.ones_like(probs) / len(probs)
+        else:
+            probs = probs / prob_sum
+        target[legal] = probs.astype(np.float32)
+        return {
+            "obs": obs,
+            "mask": mask.astype(np.bool_),
+            "target": target,
+        }
+
+    def _rollout_action_value(self, action, rollout_turns):
+        sim = self._clone_for_search()
+        try:
+            _, reward, terminated, truncated, _ = sim.step(action)
+            done = terminated or truncated
+            turns = 0
+            while not done and turns < rollout_turns:
+                mask = sim.action_masks()
+                legal = np.where(mask)[0]
+                if len(legal) == 0:
+                    break
+                next_action = int(sim.np_random.choice(legal))
+                _, reward, terminated, truncated, _ = sim.step(next_action)
+                done = terminated or truncated
+                turns += 1
+            return float(reward) if done else 0.0
+        except Exception:
+            return 0.0
+        finally:
+            sim.close()
+
+    def _clone_for_search(self):
+        sim = YubisumaEnv(opponent_policy=None, render_mode=None)
+        sim.game_state = copy.deepcopy(self.game_state)
+        sim.agent_key = self.agent_key
+        sim.opponent_key = self.opponent_key
+        sim.turn_count = self.turn_count
+        sim.agent_persona_tp = self.agent_persona_tp
+        sim.agent_persona_ntp = self.agent_persona_ntp
+        sim.opp_persona_tp = self.opp_persona_tp
+        sim.opp_persona_ntp = self.opp_persona_ntp
+        sim.episode_turns = copy.deepcopy(self.episode_turns)
+        sim.last_opponent_action = copy.deepcopy(self.last_opponent_action)
+        sim.opponent_spec = copy.deepcopy(self.opponent_spec)
+        return sim
 
 
 def _create_game_state():

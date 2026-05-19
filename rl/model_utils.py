@@ -31,7 +31,10 @@ def _is_compatibility_load_error(exc: Exception) -> bool:
     msg = str(exc)
     return (
         "aux_lookahead_head" in msg
+        or "aux_reaction_head" in msg
+        or "aux_skill_head" in msg
         or "parameter group that doesn't match the size of optimizer's group" in msg
+        or "size mismatch" in msg
     )
 
 
@@ -146,6 +149,11 @@ def _load_maskable_ppo_compat(
 
     compat_params = dict(params)
     compat_params.pop("policy.optimizer", None)
+    if "policy" in compat_params:
+        compat_params["policy"] = _filter_incompatible_state_dict(
+            compat_params["policy"],
+            model.policy.state_dict(),
+        )
     model.set_parameters(compat_params, exact_match=False, device=device)
 
     if pytorch_variables is not None:
@@ -158,3 +166,23 @@ def _load_maskable_ppo_compat(
         model.policy.reset_noise()
 
     return model
+
+
+def _filter_incompatible_state_dict(saved_state: dict[str, Any],
+                                    current_state: dict[str, Any]):
+    """Drop tensors whose shape no longer matches the current module.
+
+    Non-strict loading tolerates missing keys, but PyTorch still errors on keys
+    that exist with a different shape.  This lets old league checkpoints remain
+    usable as opponents after auxiliary heads or action dimensions change.
+    """
+    filtered = {}
+    for key, value in saved_state.items():
+        current = current_state.get(key)
+        if current is None:
+            continue
+        if hasattr(value, "shape") and hasattr(current, "shape"):
+            if tuple(value.shape) != tuple(current.shape):
+                continue
+        filtered[key] = value
+    return filtered

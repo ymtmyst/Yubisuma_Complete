@@ -2,7 +2,7 @@ import sys
 sys.path.insert(0, ".")
 
 from rl.actions import decode_action, encode_tp_action, get_action_mask
-from rl.config import TP_SKILL_OPTIONS, OBS_TOTAL
+from rl.config import TP_SKILL_OPTIONS, OBS_TOTAL, OBS_PERSONA, OBS_PENDING_CHOICE
 from rl.env import YubisumaEnv
 from yubisuma_constants import KEY_PLAYER, KEY_COMPUTER
 
@@ -48,7 +48,8 @@ obs, reward, terminated, truncated, info = env.step(tp_choice_action(flash, thum
 
 test("choice declaration creates pending state", env.game_state.pending_choice is not None)
 test("turn is not resolved before target selection", env.turn_count == 0)
-test("revealed counter is encoded", obs.shape == (OBS_TOTAL,) and obs[-4:].tolist() == [1.0, 0.0, 1.0, 0.0])
+pending_slice = obs[-(OBS_PERSONA + OBS_PENDING_CHOICE):-OBS_PERSONA]
+test("revealed counter is encoded", obs.shape == (OBS_TOTAL,) and pending_slice.tolist() == [1.0, 0.0, 1.0, 0.0])
 
 mask = get_action_mask(env.game_state, env.agent_key)
 valid_choice_targets = [

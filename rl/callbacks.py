@@ -22,6 +22,7 @@ from rl.config import (
     OBS_PERSONA, NUM_PERSONA_TP, NUM_PERSONA_NTP,
     LAMBDA_DIVERSITY_TP, LAMBDA_DIVERSITY_NTP,
     DIAYN_SHARED_LR_RATIO,
+    SEARCH_TEACHER_CONFIG,
 )
 
 
@@ -63,12 +64,17 @@ class SelfPlayCallback(BaseCallback):
             # リーグにチェックポイントを保存 (step番号で命名)
             self.league_manager.save_checkpoint(self.model, self.num_timesteps)
             # リーグからパスを選択してサブプロセスに配布
-            path, step = self.league_manager.select_opponent()
-            if path is not None:
-                self._set_opponent_by_path(path)
+            spec = self.league_manager.select_opponent()
+            if spec is not None:
+                self._set_opponent_by_spec(spec)
                 if self.verbose > 0:
-                    print(f"[SelfPlay] 対戦相手をstep {step:,}に更新 "
-                          f"(リーグサイズ: {self.league_manager.num_opponents})")
+                    kind = spec.get("kind", "model")
+                    preset = spec.get("preset")
+                    step = spec.get("step")
+                    preset_text = f"/{preset}" if preset else ""
+                    step_text = f" step {step:,}" if step is not None else ""
+                    print(f"[SelfPlay] opponent={kind}{preset_text}{step_text} "
+                          f"(league size: {self.league_manager.num_opponents})")
             else:
                 self._set_opponent_from_self()
         else:
@@ -85,6 +91,10 @@ class SelfPlayCallback(BaseCallback):
         """SubprocVecEnv/DummyVecEnv両対応: env_method経由でパスを全環境に配布。
         各環境の set_opponent_path() がサブプロセス内でモデルをロードする。"""
         self.env.env_method('set_opponent_path', path)
+
+    def _set_opponent_by_spec(self, spec):
+        """Distribute a model, biased-model, or rule opponent spec."""
+        self.env.env_method('set_opponent_spec', spec)
 
 
 class AnalysisCallback(BaseCallback):
@@ -149,6 +159,21 @@ class AnalysisCallback(BaseCallback):
                     )
                     stats['entropy'] = self.logger.name_to_value.get(
                         'train/entropy_loss', None
+                    )
+                    stats['aux_loss'] = self.logger.name_to_value.get(
+                        'train/aux_loss', None
+                    )
+                    stats['search_teacher_loss'] = self.logger.name_to_value.get(
+                        'train/search_teacher_loss', None
+                    )
+                    stats['diversity_loss'] = self.logger.name_to_value.get(
+                        'train/diversity_loss', None
+                    )
+                    stats['diversity_disc_tp_acc'] = self.logger.name_to_value.get(
+                        'diversity/disc_tp_acc', None
+                    )
+                    stats['diversity_disc_ntp_acc'] = self.logger.name_to_value.get(
+                        'diversity/disc_ntp_acc', None
                     )
                 except Exception:
                     pass
@@ -280,6 +305,96 @@ class AuxLossCallback(BaseCallback):
                       f"aux_loss={loss.item():.4f}")
 
         self._aux_computer.clear_buffer()
+
+
+class SearchTeacherCallback(BaseCallback):
+    """Auxiliary counterfactual policy distillation.
+
+    The env builds targets by trying legal actions and rolling them out to
+    terminal outcomes with random play. This keeps the reward function pure
+    while giving PPO extra signal on state-specific action value.
+    """
+
+    def __init__(self, config=None, verbose: int = 0):
+        super().__init__(verbose)
+        cfg = dict(SEARCH_TEACHER_CONFIG)
+        if config:
+            cfg.update(config)
+        self.config = cfg
+        self._last_collect = 0
+        self._buffer = []
+
+    def _on_step(self) -> bool:
+        if not self.config.get("enabled", False):
+            return True
+        freq = int(self.config.get("freq", 4096))
+        if self.num_timesteps - self._last_collect < freq:
+            return True
+        self._last_collect = self.num_timesteps
+
+        try:
+            results = self.training_env.env_method(
+                "get_search_teacher",
+                int(self.config.get("samples_per_action", 1)),
+                int(self.config.get("rollout_turns", 32)),
+                int(self.config.get("max_actions", 24)),
+                float(self.config.get("temperature", 0.35)),
+            )
+        except Exception as e:
+            if self.verbose > 0:
+                print(f"[SearchTeacher] collect skipped: {e}")
+            return True
+
+        for item in results:
+            if item is not None:
+                self._buffer.append(item)
+
+        max_buffer = int(self.config.get("max_buffer", 256))
+        if len(self._buffer) > max_buffer:
+            self._buffer = self._buffer[-max_buffer:]
+
+        if self.logger is not None:
+            self.logger.record("search_teacher/buffer", len(self._buffer))
+        return True
+
+    def _on_rollout_end(self) -> None:
+        if not self.config.get("enabled", False) or not self._buffer:
+            return
+
+        import torch
+
+        device = self.model.device
+        obs = torch.as_tensor(
+            np.array([x["obs"] for x in self._buffer]),
+            dtype=torch.float32,
+            device=device,
+        )
+        masks = torch.as_tensor(
+            np.array([x["mask"] for x in self._buffer]),
+            dtype=torch.bool,
+            device=device,
+        )
+        targets = torch.as_tensor(
+            np.array([x["target"] for x in self._buffer]),
+            dtype=torch.float32,
+            device=device,
+        )
+
+        dist = self.model.policy.get_distribution(obs, action_masks=masks)
+        probs = torch.clamp(dist.distribution.probs, min=1e-8)
+        loss = -(targets * torch.log(probs)).sum(dim=1).mean()
+        loss = loss * float(self.config.get("loss_weight", 0.05))
+
+        self.model.policy.optimizer.zero_grad()
+        loss.backward()
+        torch.nn.utils.clip_grad_norm_(self.model.policy.parameters(), 0.5)
+        self.model.policy.optimizer.step()
+
+        if self.logger is not None:
+            self.logger.record("train/search_teacher_loss", float(loss.item()))
+        if self.verbose > 0:
+            print(f"[SearchTeacher] Step {self.num_timesteps}: loss={loss.item():.4f}")
+        self._buffer.clear()
 
 
 class CheckpointCallback(BaseCallback):

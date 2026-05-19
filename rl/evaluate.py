@@ -32,7 +32,12 @@ def _get_model_obs(model, env):
     """Build an observation vector matching the loaded model's expected width."""
     obs_dim = int(model.observation_space.shape[0])
     return encode_observation_for_dim(
-        env.game_state, env.agent_key, env.turn_count, obs_dim=obs_dim
+        env.game_state,
+        env.agent_key,
+        env.turn_count,
+        obs_dim=obs_dim,
+        persona_tp=env.agent_persona_tp,
+        persona_ntp=env.agent_persona_ntp,
     )
 
 
@@ -60,7 +65,7 @@ def _bar(value, width=32, max_val=1.0):
     """テキストプログレスバーを生成"""
     filled = int(value / max_val * width) if max_val > 0 else 0
     return "#" * filled + "." * (width - filled)
-    return "█" * filled + "░" * (width - filled)
+    return "#" * filled + "." * (width - filled)
 
 
 def _skill_name(skill):
@@ -500,7 +505,7 @@ def show_stats(db_path=None, run_id=None):
     if win_history:
         print(f"\n=== 勝率推移 ===")
         for entry in win_history[-10:]:
-            bar = "█" * int(entry['win_rate'] * 40)
+            bar = "#" * int(entry['win_rate'] * 40)
             print(f"  Step {entry['step']:>8}: {entry['win_rate']:.1%} {bar}")
     
     # スキル使用統計
@@ -520,6 +525,22 @@ def show_stats(db_path=None, run_id=None):
         for r in react_stats:
             print(f"  {r['reaction']}: {r['count']} "
                   f"(勝率: {r['win_rate']:.1%})")
+
+    opponent_stats = db.get_opponent_stats()
+    if opponent_stats:
+        print(f"\n=== Opponent breakdown ===")
+        for o in opponent_stats:
+            label = o['kind'] if o['preset'] == '-' else f"{o['kind']}/{o['preset']}"
+            print(f"  {label}: {o['games']} games, "
+                  f"win={o['win_rate']:.1%}, avg_turns={o['avg_turns']:.1f}")
+
+    persona_stats = db.get_persona_stats()
+    if persona_stats:
+        print(f"\n=== Persona breakdown ===")
+        for p in persona_stats[:12]:
+            print(f"  TP{p['persona_tp']} NTP{p['persona_ntp']}: "
+                  f"{p['games']} games, win={p['win_rate']:.1%}, "
+                  f"avg_turns={p['avg_turns']:.1f}")
     
     # 指分布
     thumb_stats = db.get_thumb_distribution()
@@ -528,7 +549,7 @@ def show_stats(db_path=None, run_id=None):
         total = sum(t['count'] for t in thumb_stats)
         for t in thumb_stats:
             pct = t['count'] / total * 100 if total > 0 else 0
-            bar = "█" * int(pct)
+            bar = "#" * int(pct)
             print(f"  {t['thumbs']}本: {t['count']:>6} ({pct:>5.1f}%) {bar}")
     
     # エピソード長統計

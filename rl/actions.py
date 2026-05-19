@@ -1,8 +1,8 @@
 # rl/actions.py - 行動空間エンコーディング・デコーディング
 """
 離散行動空間の設計:
-  行動 [0, 77]:  TP行動 = skill_idx * 3 + thumb_idx
-  行動 [78, 86]: NTP行動 = 78 + reaction_idx * 3 + thumb_idx
+  TP行動 = skill_idx * 3 + thumb_idx
+  NTP行動 = NUM_TP_ACTIONS + reaction_idx * 3 + thumb_idx
 
 MaskablePPOで状態に応じた動的マスキングを行う。
 """
@@ -21,7 +21,7 @@ from rl.config import (
 from yubisuma_constants import (
     NORMAL_SKILLS, ANTI_COUNTER_SKILLS, REFERENCE_SKILLS,
     ULTIMATE_SKILLS, OPPONENT_TURN_SKILLS, REFERENCEABLE_SKILLS,
-    GAME_CONFIG,
+    GAME_CONFIG, STOCK_ALPHA_SKILLS,
 )
 
 
@@ -153,6 +153,8 @@ def _mask_tp_actions(mask, game_state, me, opp, agent_key, effects):
         
         # チョイス展開
         if skill_name.startswith(CHOICE_PREFIX):
+            if me.stock_alpha_used_this_phase:
+                continue
             target = skill_name.split(":")[1]
             # チョイスが宣言可能 + 対象がストックにある + フェーズ内未使用
             available = [s for s in me.stock if s not in me.choice_used_this_phase]
@@ -180,6 +182,10 @@ def _mask_tp_actions(mask, game_state, me, opp, agent_key, effects):
 
 def _is_skill_valid(skill_name, me, opp, effects, agent_key, first_restricted):
     """個別スキルの宣言可能性を判定（新ルール: 先手制限廃止）"""
+    # チョイス/オール/ドロップはいずれか1フェーズ1回のみ
+    if skill_name in STOCK_ALPHA_SKILLS and me.stock_alpha_used_this_phase:
+        return False
+
     # 必殺スキル使用済み
     if skill_name in ULTIMATE_SKILLS and me.used_ultimate:
         return False
@@ -216,6 +222,11 @@ def _is_skill_valid(skill_name, me, opp, effects, agent_key, first_restricted):
     if skill_name == "ドロップ":
         if not me.stock:
             return False
+
+    # オール: ストックが空でないか
+    if skill_name == "オール":
+        if not me.stock:
+            return False
     
     return True
 
@@ -240,6 +251,11 @@ def _mask_ntp_actions(mask, game_state, me, opp, agent_key, effects):
     # 新ルール: lock_active (フラグ方式) を使用
     lock_blocked = me.lock_active
     first_restricted = False  # 先手制限は新ルールで廃止
+    mirror_available = (
+        GAME_CONFIG.get("ENABLE_MIRROR", False)
+        and me.mirror_ready
+        and not lock_blocked
+    )
 
     for react_idx, reaction in enumerate(NTP_REACTION_OPTIONS):
         # リアクションの有効性チェック
@@ -250,6 +266,8 @@ def _mask_ntp_actions(mask, game_state, me, opp, agent_key, effects):
                 continue
             if first_restricted:
                 continue
+        if reaction == "ミラー" and not mirror_available:
+            continue
         
         # 指の本数
         for thumb in range(NUM_THUMB_OPTIONS):

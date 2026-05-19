@@ -42,7 +42,12 @@ class AnalysisDB:
                     winner TEXT,
                     agent_won INTEGER,
                     total_turns INTEGER,
-                    duration_ms REAL
+                    duration_ms REAL,
+                    agent_persona_tp INTEGER,
+                    agent_persona_ntp INTEGER,
+                    opponent_kind TEXT,
+                    opponent_preset TEXT,
+                    opponent_step INTEGER
                 );
 
                 CREATE TABLE IF NOT EXISTS turns (
@@ -72,6 +77,11 @@ class AnalysisDB:
                     aux_reaction_loss REAL,
                     aux_thumbs_loss REAL,
                     aux_skill_loss REAL,
+                    aux_loss REAL,
+                    search_teacher_loss REAL,
+                    diversity_loss REAL,
+                    diversity_disc_tp_acc REAL,
+                    diversity_disc_ntp_acc REAL,
                     league_size INTEGER,
                     opponent_generation INTEGER
                 );
@@ -91,9 +101,20 @@ class AnalysisDB:
                 CREATE INDEX IF NOT EXISTS idx_training_step ON training_stats(step);
             """)
             self._ensure_column(conn, "episodes", "run_id", "TEXT")
+            self._ensure_column(conn, "episodes", "agent_persona_tp", "INTEGER")
+            self._ensure_column(conn, "episodes", "agent_persona_ntp", "INTEGER")
+            self._ensure_column(conn, "episodes", "opponent_kind", "TEXT")
+            self._ensure_column(conn, "episodes", "opponent_preset", "TEXT")
+            self._ensure_column(conn, "episodes", "opponent_step", "INTEGER")
             self._ensure_column(conn, "training_stats", "run_id", "TEXT")
+            self._ensure_column(conn, "training_stats", "aux_loss", "REAL")
+            self._ensure_column(conn, "training_stats", "search_teacher_loss", "REAL")
+            self._ensure_column(conn, "training_stats", "diversity_loss", "REAL")
+            self._ensure_column(conn, "training_stats", "diversity_disc_tp_acc", "REAL")
+            self._ensure_column(conn, "training_stats", "diversity_disc_ntp_acc", "REAL")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_episodes_run ON episodes(run_id)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_training_run ON training_stats(run_id)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_episodes_opponent ON episodes(opponent_kind, opponent_preset)")
 
     def _ensure_column(self, conn, table, column, column_type):
         columns = [row[1] for row in conn.execute(f"PRAGMA table_info({table})")]
@@ -116,8 +137,9 @@ class AnalysisDB:
             cursor = conn.execute("""
                 INSERT INTO episodes
                 (timestamp, training_step, run_id, opponent_generation, agent_key,
-                 winner, agent_won, total_turns)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                 winner, agent_won, total_turns, agent_persona_tp, agent_persona_ntp,
+                 opponent_kind, opponent_preset, opponent_step)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 datetime.now().isoformat(),
                 training_step,
@@ -127,6 +149,11 @@ class AnalysisDB:
                 episode_data.get("winner"),
                 int(episode_data.get("agent_won", False)),
                 episode_data.get("total_turns", 0),
+                episode_data.get("agent_persona_tp"),
+                episode_data.get("agent_persona_ntp"),
+                episode_data.get("opponent_kind"),
+                episode_data.get("opponent_preset"),
+                episode_data.get("opponent_step"),
             ))
             episode_id = cursor.lastrowid
 
@@ -159,8 +186,10 @@ class AnalysisDB:
                 (timestamp, run_id, step, win_rate, avg_episode_length,
                  policy_loss, value_loss, entropy,
                  aux_reaction_loss, aux_thumbs_loss, aux_skill_loss,
+                 aux_loss, search_teacher_loss, diversity_loss,
+                 diversity_disc_tp_acc, diversity_disc_ntp_acc,
                  league_size, opponent_generation)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 datetime.now().isoformat(),
                 self.run_id,
@@ -173,6 +202,11 @@ class AnalysisDB:
                 stats.get("aux_reaction_loss"),
                 stats.get("aux_thumbs_loss"),
                 stats.get("aux_skill_loss"),
+                stats.get("aux_loss"),
+                stats.get("search_teacher_loss"),
+                stats.get("diversity_loss"),
+                stats.get("diversity_disc_tp_acc"),
+                stats.get("diversity_disc_ntp_acc"),
                 stats.get("league_size"),
                 stats.get("opponent_generation"),
             ))
@@ -479,7 +513,12 @@ class AnalysisDB:
                     ORDER BY agent_thumbs
                 """, (last_n_episodes,)).fetchall()
 
-        return [{"thumbs": t, "count": c} for t, c in rows]
+        def to_int(value):
+            if isinstance(value, bytes):
+                return int.from_bytes(value, byteorder="little", signed=True)
+            return int(value or 0)
+
+        return [{"thumbs": to_int(t), "count": c} for t, c in rows]
 
     def get_episode_length_stats(self, last_n_episodes=500):
         """Return episode length statistics."""
@@ -513,6 +552,80 @@ class AnalysisDB:
             "win_mean": statistics.mean(wins) if wins else 0,
             "loss_mean": statistics.mean(losses) if losses else 0,
         }
+
+    def get_opponent_stats(self, last_n_episodes=500):
+        """Return win rate grouped by opponent kind/preset."""
+        cutoff = self._recent_episode_cutoff_sql()
+        with self._connect() as conn:
+            if self.run_id:
+                rows = conn.execute(f"""
+                    SELECT COALESCE(opponent_kind, 'unknown') as kind,
+                           COALESCE(opponent_preset, '') as preset,
+                           COUNT(*) as games,
+                           SUM(agent_won) as wins,
+                           AVG(total_turns) as avg_turns
+                    FROM episodes
+                    WHERE run_id = ?
+                    AND id > {cutoff}
+                    GROUP BY kind, preset
+                    ORDER BY games DESC, kind, preset
+                """, (self.run_id, last_n_episodes, self.run_id)).fetchall()
+            else:
+                rows = conn.execute(f"""
+                    SELECT COALESCE(opponent_kind, 'unknown') as kind,
+                           COALESCE(opponent_preset, '') as preset,
+                           COUNT(*) as games,
+                           SUM(agent_won) as wins,
+                           AVG(total_turns) as avg_turns
+                    FROM episodes
+                    WHERE id > {cutoff}
+                    GROUP BY kind, preset
+                    ORDER BY games DESC, kind, preset
+                """, (last_n_episodes,)).fetchall()
+        return [{
+            "kind": kind,
+            "preset": preset or "-",
+            "games": games,
+            "wins": wins or 0,
+            "win_rate": (wins or 0) / games if games else 0.0,
+            "avg_turns": avg_turns or 0.0,
+        } for kind, preset, games, wins, avg_turns in rows]
+
+    def get_persona_stats(self, last_n_episodes=500):
+        """Return win rate grouped by sampled agent persona."""
+        cutoff = self._recent_episode_cutoff_sql()
+        with self._connect() as conn:
+            if self.run_id:
+                rows = conn.execute(f"""
+                    SELECT agent_persona_tp, agent_persona_ntp,
+                           COUNT(*) as games,
+                           SUM(agent_won) as wins,
+                           AVG(total_turns) as avg_turns
+                    FROM episodes
+                    WHERE run_id = ?
+                    AND id > {cutoff}
+                    GROUP BY agent_persona_tp, agent_persona_ntp
+                    ORDER BY games DESC, agent_persona_tp, agent_persona_ntp
+                """, (self.run_id, last_n_episodes, self.run_id)).fetchall()
+            else:
+                rows = conn.execute(f"""
+                    SELECT agent_persona_tp, agent_persona_ntp,
+                           COUNT(*) as games,
+                           SUM(agent_won) as wins,
+                           AVG(total_turns) as avg_turns
+                    FROM episodes
+                    WHERE id > {cutoff}
+                    GROUP BY agent_persona_tp, agent_persona_ntp
+                    ORDER BY games DESC, agent_persona_tp, agent_persona_ntp
+                """, (last_n_episodes,)).fetchall()
+        return [{
+            "persona_tp": tp,
+            "persona_ntp": ntp,
+            "games": games,
+            "wins": wins or 0,
+            "win_rate": (wins or 0) / games if games else 0.0,
+            "avg_turns": avg_turns or 0.0,
+        } for tp, ntp, games, wins, avg_turns in rows]
 
     def get_summary(self):
         """Return summary statistics."""

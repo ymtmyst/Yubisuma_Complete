@@ -34,7 +34,7 @@ from rl.analysis import AnalysisDB
 from rl.callbacks import (
     SelfPlayCallback, AnalysisCallback, CheckpointCallback, AuxLossCallback,
     EntCoefScheduleCallback, RandomEvalCallback, SkillSnapshotCallback,
-    DiversityLossCallback,
+    DiversityLossCallback, SearchTeacherCallback,
 )
 
 
@@ -173,9 +173,13 @@ def train(args):
     # 学習開始時 discriminator accuracy はランダム (1/7≈0.143) から始まり、
     # 分化が成功していれば徐々に上昇する。wandb で diversity/disc_tp_acc を監視。
     diversity_cb = DiversityLossCallback(verbose=1) if args.diversity else None
+    search_teacher_cb = SearchTeacherCallback(
+        config={"enabled": args.search_teacher},
+        verbose=1,
+    )
 
     callbacks = [selfplay_cb, analysis_cb, checkpoint_cb, aux_loss_cb, ent_coef_cb,
-                 eval_cb, snapshot_cb]
+                 eval_cb, snapshot_cb, search_teacher_cb]
     if diversity_cb is not None:
         callbacks.append(diversity_cb)
 
@@ -270,6 +274,10 @@ def main():
     parser.add_argument(
         "--no-diversity", dest="diversity", action="store_false",
         help="Disable DIAYN diversity loss (baseline run)",
+    )
+    parser.add_argument(
+        "--search-teacher", action="store_true",
+        help="Enable optional counterfactual rollout distillation (reward-preserving)",
     )
     parser.set_defaults(diversity=True)
 
