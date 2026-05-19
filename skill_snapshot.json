@@ -1,163 +1,163 @@
 {
-  "step": 3600000,
-  "updated_at": "2026-05-19 12:14:27",
+  "step": 5013504,
+  "updated_at": "2026-05-19 13:07:13",
   "episodes_sampled": 100,
-  "win_rate_%": 49.0,
-  "avg_turns": 7.2,
+  "win_rate_%": 43.0,
+  "avg_turns": 8.4,
   "skills_as_tp": {
     "コピー": {
-      "count": 55,
-      "turn_pct": 15.4,
-      "legal_count": 231,
-      "legal_use%": 23.8,
-      "win%": 63.4
+      "count": 92,
+      "turn_pct": 22.8,
+      "legal_count": 254,
+      "legal_use%": 36.2,
+      "win%": 65.5
     },
     "フェイント": {
-      "count": 41,
-      "turn_pct": 11.5,
-      "legal_count": 358,
-      "legal_use%": 11.5,
-      "win%": 56.8
+      "count": 51,
+      "turn_pct": 12.7,
+      "legal_count": 403,
+      "legal_use%": 12.7,
+      "win%": 58.1
     },
     "スキップ": {
-      "count": 35,
-      "turn_pct": 9.8,
-      "legal_count": 358,
-      "legal_use%": 9.8,
-      "win%": 58.6
-    },
-    "4": {
-      "count": 27,
-      "turn_pct": 7.5,
-      "legal_count": 358,
-      "legal_use%": 7.5,
-      "win%": 54.2
-    },
-    "クイック": {
-      "count": 27,
-      "turn_pct": 7.5,
-      "legal_count": 358,
-      "legal_use%": 7.5,
-      "win%": 47.4
+      "count": 44,
+      "turn_pct": 10.9,
+      "legal_count": 403,
+      "legal_use%": 10.9,
+      "win%": 43.8
     },
     "ガード": {
-      "count": 22,
-      "turn_pct": 6.1,
-      "legal_count": 358,
-      "legal_use%": 6.1,
-      "win%": 47.4
-    },
-    "2": {
-      "count": 21,
-      "turn_pct": 5.9,
-      "legal_count": 358,
-      "legal_use%": 5.9,
-      "win%": 64.7
-    },
-    "0": {
-      "count": 20,
-      "turn_pct": 5.6,
-      "legal_count": 358,
-      "legal_use%": 5.6,
-      "win%": 64.3
+      "count": 33,
+      "turn_pct": 8.2,
+      "legal_count": 403,
+      "legal_use%": 8.2,
+      "win%": 41.4
     },
     "チャージ": {
-      "count": 20,
-      "turn_pct": 5.6,
-      "legal_count": 358,
-      "legal_use%": 5.6,
-      "win%": 61.1
-    },
-    "1": {
-      "count": 18,
-      "turn_pct": 5.0,
-      "legal_count": 358,
-      "legal_use%": 5.0,
-      "win%": 53.3
+      "count": 31,
+      "turn_pct": 7.7,
+      "legal_count": 403,
+      "legal_use%": 7.7,
+      "win%": 48.3
     },
     "フラッシュ": {
+      "count": 29,
+      "turn_pct": 7.2,
+      "legal_count": 403,
+      "legal_use%": 7.2,
+      "win%": 47.6
+    },
+    "クイック": {
       "count": 18,
-      "turn_pct": 5.0,
-      "legal_count": 358,
-      "legal_use%": 5.0,
-      "win%": 61.1
+      "turn_pct": 4.5,
+      "legal_count": 403,
+      "legal_use%": 4.5,
+      "win%": 46.2
     },
-    "3": {
+    "4": {
       "count": 17,
-      "turn_pct": 4.7,
-      "legal_count": 358,
-      "legal_use%": 4.7,
-      "win%": 57.1
-    },
-    "セメント": {
-      "count": 13,
-      "turn_pct": 3.6,
-      "legal_count": 358,
-      "legal_use%": 3.6,
-      "win%": 33.3
-    },
-    "ロック": {
-      "count": 9,
-      "turn_pct": 2.5,
-      "legal_count": 358,
-      "legal_use%": 2.5,
-      "win%": 55.6
+      "turn_pct": 4.2,
+      "legal_count": 403,
+      "legal_use%": 4.2,
+      "win%": 43.8
     },
     "ブースト": {
-      "count": 8,
-      "turn_pct": 2.2,
-      "legal_count": 216,
-      "legal_use%": 3.7,
-      "win%": 37.5
+      "count": 17,
+      "turn_pct": 4.2,
+      "legal_count": 208,
+      "legal_use%": 8.2,
+      "win%": 64.7
     },
-    "ストック": {
-      "count": 4,
-      "turn_pct": 1.1,
-      "legal_count": 162,
+    "ロック": {
+      "count": 17,
+      "turn_pct": 4.2,
+      "legal_count": 403,
+      "legal_use%": 4.2,
+      "win%": 43.8
+    },
+    "0": {
+      "count": 15,
+      "turn_pct": 3.7,
+      "legal_count": 403,
+      "legal_use%": 3.7,
+      "win%": 38.5
+    },
+    "1": {
+      "count": 11,
+      "turn_pct": 2.7,
+      "legal_count": 403,
+      "legal_use%": 2.7,
+      "win%": 70.0
+    },
+    "セメント": {
+      "count": 10,
+      "turn_pct": 2.5,
+      "legal_count": 403,
       "legal_use%": 2.5,
       "win%": 50.0
     },
-    "タイム": {
-      "count": 2,
-      "turn_pct": 0.6,
-      "legal_count": 216,
-      "legal_use%": 0.9,
+    "ストック": {
+      "count": 7,
+      "turn_pct": 1.7,
+      "legal_count": 214,
+      "legal_use%": 3.3,
+      "win%": 28.6
+    },
+    "3": {
+      "count": 6,
+      "turn_pct": 1.5,
+      "legal_count": 403,
+      "legal_use%": 1.5,
       "win%": 50.0
     },
-    "ドロップ": {
-      "count": 1,
-      "turn_pct": 0.3,
-      "legal_count": 5,
-      "legal_use%": 20.0,
-      "win%": 100.0
+    "2": {
+      "count": 5,
+      "turn_pct": 1.2,
+      "legal_count": 403,
+      "legal_use%": 1.2,
+      "win%": 60.0
     },
     "オール": {
       "count": 0,
       "turn_pct": 0.0,
-      "legal_count": 5,
+      "legal_count": 4,
+      "legal_use%": 0.0,
+      "win%": 0.0
+    },
+    "タイム": {
+      "count": 0,
+      "turn_pct": 0.0,
+      "legal_count": 208,
       "legal_use%": 0.0,
       "win%": 0.0
     },
     "チョイス": {
       "count": 0,
       "turn_pct": 0.0,
-      "legal_count": 5,
+      "legal_count": 4,
+      "legal_use%": 0.0,
+      "win%": 0.0
+    },
+    "ドロップ": {
+      "count": 0,
+      "turn_pct": 0.0,
+      "legal_count": 4,
       "legal_use%": 0.0,
       "win%": 0.0
     }
   },
   "reactions_as_ntp": {
     "なし": {
-      "count": 194,
-      "pct": 52.9
+      "count": 221,
+      "pct": 50.3
     },
     "カウンター": {
-      "count": 129,
-      "pct": 35.1
+      "count": 161,
+      "pct": 36.7
     },
     "ブロック": {
-      "count": 44,
-      "pct": 12.0
+      "count": 57,
+      "pct": 13.0
     }
   }
 }
