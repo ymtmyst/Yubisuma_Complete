@@ -196,16 +196,17 @@ def get_all_selection(player):
     """オールでストックから発動順序を選択"""
     if not player.stock:
         return []
-    print("オール: ストックから発動するスキルを順番に選択（複数選択可能、空入力で終了）")
+    print("オール: ストック内の全スキルを発動します。発動順を選んでください。")
     print("ストック一覧:")
     for i, s in enumerate(player.stock):
         print(f"  {i + 1}. {s}")
     available = list(player.stock)
     order = []
     while available:
-        line = input(f"次に発動するスキルの番号 (現状{','.join(order) or 'なし'}, 空入力で終了): ").strip()
+        line = input(f"次に発動するスキルの番号 (現状{','.join(order) or 'なし'}, 残り{len(available)}個): ").strip()
         if not line:
-            break
+            print("オールは全てのストックを発動します。残りの順番も選んでください。")
+            continue
         try:
             idx = int(line) - 1
             if 0 <= idx < len(available):

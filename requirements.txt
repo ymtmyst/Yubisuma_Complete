@@ -14,6 +14,9 @@ gymnasium>=0.29.0
 # Numpy
 numpy>=1.24.0
 
+# Exact matrix-game solving
+scipy>=1.10.0
+
 # TensorBoard (optional)
 tensorboard>=2.15.0
 

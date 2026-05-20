@@ -14,7 +14,7 @@ from yubisuma_turn_handler import TurnHandler
 
 
 def _get_choice_data(gs, tp_key, skill, reaction):
-    """チョイス/オール宣言時、リアクション確認後にストックから選択
+    """チョイス/オール宣言時、リアクション確認後にストックから選択・順序指定
     skill: TP が宣言したスキル名
     reaction: NTP のリアクション (None/カウンター/ブロック/ミラー)
     """
@@ -109,7 +109,7 @@ def execute_turn(gs, tp_key):
         KEY_COMPUTER: ntp_thumbs if is_human_turn else tp_thumbs,
     }
 
-    # チョイス/オール: リアクション確認後にストックから選択
+    # チョイス/オール: リアクション確認後にストックから選択・順序指定
     choice_data = None
     if skill in ("チョイス", "オール"):
         choice_data = _get_choice_data(gs, tp_key, skill, reaction)

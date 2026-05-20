@@ -124,6 +124,23 @@ class TurnHandler:
         if ntp.lock_active:
             ntp.lock_active = False
 
+    @staticmethod
+    def _get_all_order(tp, choice_data):
+        """オール用の発動順を返す。指定漏れがあっても全ストックを必ず含める。"""
+        stock = list(tp.stock)
+        requested = choice_data.get("all_order") if choice_data else None
+        if not requested:
+            return stock
+
+        order = []
+        remaining = list(stock)
+        for skill in requested:
+            if skill in remaining:
+                order.append(skill)
+                remaining.remove(skill)
+        order.extend(remaining)
+        return order
+
     # =========================
     # 対カウンタースキル + カウンター
     # =========================
@@ -308,7 +325,7 @@ class TurnHandler:
 
         # --- オール ---
         if skill == "オール":
-            order = choice_data.get("all_order") if choice_data else list(tp.stock)
+            order = TurnHandler._get_all_order(tp, choice_data)
             print(f"  オール！ストック内の {len(order)} 個のスキルを順番に発動します")
             for idx, s in enumerate(order):
                 print(f"    [{idx+1}/{len(order)}] {s} を発動")
@@ -470,7 +487,7 @@ class TurnHandler:
     def _resolve_stock_alpha_countered(gs, tp_key, thumbs, total, skill_name, choice_data):
         """チョイス/オールがカウンターされた場合: 各参照元スキルに準拠"""
         # 簡略化: チョイスの選択スキルにカウンターを適用
-        # オールの場合は全スキルにカウンターを適用（複雑なので最初の1つだけにカウンター、残りは通る）
+        # オールの場合は全ストックスキルにカウンターを適用
         tp = gs.get_player(tp_key)
         ntp = gs.get_opponent(tp_key)
 
@@ -486,8 +503,7 @@ class TurnHandler:
             return
 
         if skill_name == "オール":
-            # 全スキルにカウンターを適用するのは複雑なので、簡略実装: 各スキルにカウンター適用
-            order = choice_data.get("all_order") if choice_data else list(tp.stock)
+            order = TurnHandler._get_all_order(tp, choice_data)
             print(f"  オール！{len(order)}個のスキルをカウンター処理")
             for idx, s in enumerate(order):
                 print(f"    [{idx+1}/{len(order)}] {s} にカウンター適用")

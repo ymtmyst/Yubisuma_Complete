@@ -1,0 +1,917 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Complete ルール最強 AI 作成計画書</title>
+  <style>
+    :root {
+      --ink: #17202a;
+      --muted: #5e6b78;
+      --line: #d7dee7;
+      --paper: #f7f9fc;
+      --panel: #ffffff;
+      --accent: #0f7c80;
+      --accent-2: #b23a48;
+      --accent-3: #6b5b95;
+      --ok: #16794c;
+      --warn: #a86600;
+      --code: #eef3f7;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--paper);
+      font-family: "Yu Gothic", "Meiryo", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.75;
+    }
+
+    header {
+      background: #17324d;
+      color: white;
+      padding: 44px 24px 34px;
+      border-bottom: 6px solid var(--accent);
+    }
+
+    .wrap {
+      width: min(1120px, calc(100% - 32px));
+      margin: 0 auto;
+    }
+
+    h1 {
+      margin: 0 0 12px;
+      font-size: clamp(28px, 4vw, 44px);
+      line-height: 1.18;
+      letter-spacing: 0;
+    }
+
+    h2 {
+      margin: 44px 0 14px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--line);
+      font-size: 25px;
+      letter-spacing: 0;
+    }
+
+    h3 {
+      margin: 28px 0 8px;
+      font-size: 19px;
+      letter-spacing: 0;
+    }
+
+    p {
+      margin: 0 0 13px;
+    }
+
+    main {
+      padding: 30px 0 56px;
+    }
+
+    .lead {
+      max-width: 900px;
+      margin: 0;
+      color: #dbe7f2;
+      font-size: 17px;
+    }
+
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 20px;
+      color: #eaf2f7;
+      font-size: 14px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      min-height: 30px;
+      padding: 4px 10px;
+      border: 1px solid rgba(255, 255, 255, .34);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, .08);
+    }
+
+    .section {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 24px;
+      margin: 18px 0;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 14px;
+    }
+
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 16px;
+      background: #fff;
+    }
+
+    .card h3 {
+      margin-top: 0;
+    }
+
+    .tag {
+      display: inline-block;
+      margin: 2px 4px 2px 0;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: #e8f4f4;
+      color: #075b5f;
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .tag.red {
+      background: #fae9ec;
+      color: #8f2432;
+    }
+
+    .tag.purple {
+      background: #f0ecf8;
+      color: #554580;
+    }
+
+    .tag.gray {
+      background: #eef1f4;
+      color: #4d5864;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0 4px;
+      font-size: 14px;
+    }
+
+    th,
+    td {
+      border: 1px solid var(--line);
+      padding: 10px 12px;
+      vertical-align: top;
+      text-align: left;
+    }
+
+    th {
+      background: #edf4f6;
+      font-weight: 700;
+    }
+
+    code {
+      padding: 2px 5px;
+      border-radius: 4px;
+      background: var(--code);
+      font-family: Consolas, "Courier New", monospace;
+      font-size: .95em;
+    }
+
+    .note {
+      border-left: 5px solid var(--accent);
+      padding: 12px 14px;
+      background: #eef8f8;
+      border-radius: 4px;
+      margin: 16px 0;
+    }
+
+    .warn {
+      border-left-color: var(--warn);
+      background: #fff6e7;
+    }
+
+    .danger {
+      border-left-color: var(--accent-2);
+      background: #fff0f2;
+    }
+
+    .ok {
+      border-left-color: var(--ok);
+      background: #edf8f2;
+    }
+
+    .small {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .roadmap {
+      counter-reset: phase;
+      display: grid;
+      gap: 12px;
+    }
+
+    .phase {
+      position: relative;
+      padding: 16px 16px 16px 54px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: white;
+    }
+
+    .phase::before {
+      counter-increment: phase;
+      content: counter(phase);
+      position: absolute;
+      left: 16px;
+      top: 18px;
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: var(--accent);
+      color: white;
+      text-align: center;
+      line-height: 26px;
+      font-weight: 700;
+    }
+
+    .phase h3 {
+      margin-top: 0;
+    }
+
+    .split {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(280px, 420px);
+      gap: 18px;
+      align-items: start;
+    }
+
+    ul {
+      margin: 8px 0 0;
+      padding-left: 1.4em;
+    }
+
+    li {
+      margin: 5px 0;
+    }
+
+    @media (max-width: 760px) {
+      header {
+        padding-top: 32px;
+      }
+
+      .section {
+        padding: 18px;
+      }
+
+      .split {
+        grid-template-columns: 1fr;
+      }
+
+      table {
+        display: block;
+        overflow-x: auto;
+        white-space: nowrap;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <h1>Complete ルール最強 AI 作成計画書</h1>
+      <p class="lead">
+        二人零和・同時手番・決定論的・不完全情報ゲームとして Complete ルールを定式化し、
+        ミラー/リバーシの ON/OFF すべてに対応する強 AI を作るための調査結果と実装計画。
+      </p>
+      <div class="meta">
+        <span class="pill">対象: <code>Complete/</code> ルール</span>
+        <span class="pill">方式: 均衡計算 + 検索 + 自己対戦学習</span>
+        <span class="pill">作成日: 2026-05-20</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="section">
+      <h2>結論</h2>
+      <p>
+        Complete ルールの最強 AI は、単一の DQN/PPO エージェントとして作るより、
+        <strong>ルール完全再現の純粋関数エンジン</strong>を土台にし、
+        小さな部分ゲームでは<strong>混合戦略ナッシュ均衡</strong>を解き、
+        大きな状態では<strong>深さ制限の反事実探索</strong>と<strong>自己対戦学習</strong>で近似するハイブリッド型が最も有望です。
+      </p>
+      <p>
+        既存の <code>basic_solver/</code> は公開状態ごとに同時手番の行列ゲームを解く良い先行実装です。
+        Complete ではスキル、バフ/デバフ、ストック、追加ターン、必殺、ミラー、リバーシが入るため、
+        全状態を素朴に列挙する厳密解法だけでは状態爆発します。したがって、
+        「厳密に解ける縮約部分」と「近似が必要な全体」を分けて設計します。
+      </p>
+      <div class="note ok">
+        推奨ゴールは、まず <strong>Complete-lite exact solver</strong> を作ってルールと均衡計算の正しさを固め、
+        次に <strong>Complete full の Expert Iteration / NFSP 系 AI</strong> を重ねる二段構えです。
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>調査対象</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>ファイル</th>
+            <th>確認した内容</th>
+            <th>AI 設計への意味</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>完全ルール（新）</code></td>
+            <td>最新仕様。勝利前提、ミラー準備/メイン、オール、タイム、リバーシ対象など。</td>
+            <td>この文書を主仕様として扱う。旧 <code>完全ルール.ini</code> と差分があるため仕様固定が必要。</td>
+          </tr>
+          <tr>
+            <td><code>ユビスマ ノーマルレギュレーション スキル解説まとめ.ini</code></td>
+            <td>各スキルの戦術的意味、組み合わせ、リスク、対策。</td>
+            <td>評価関数、探索の事前分布、教師データ生成時の特徴量に使える。</td>
+          </tr>
+          <tr>
+            <td><code>yubisuma_constants.py</code></td>
+            <td>スキル分類、<code>ENABLE_REVERSI</code>/<code>ENABLE_MIRROR</code>、参照可能スキル、1フェーズ制限。</td>
+            <td>4 構成の合法手生成に直結する。</td>
+          </tr>
+          <tr>
+            <td><code>yubisuma_base.py</code></td>
+            <td>手、ガード、チャージ、クイック、ミラー、セメント、ロック、スキップ、ストック、タイム等の状態。</td>
+            <td>状態ベクトル化の中心。リバーシ対象と非対象が明確。</td>
+          </tr>
+          <tr>
+            <td><code>yubisuma_turn_handler.py</code></td>
+            <td>同時公開後の効果解決、カウンター/ブロック/ミラー、コピー、チョイス、オール。</td>
+            <td>このロジックを副作用なしの <code>transition(state, joint_action)</code> へ移植する。</td>
+          </tr>
+          <tr>
+            <td><code>basic_solver/</code></td>
+            <td>割引 Shapley value iteration、ゼロ和行列ゲーム LP、Basic ルールの状態列挙。</td>
+            <td>Complete solver の原型。行列ゲーム解法は再利用候補。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="section">
+      <h2>ゲーム構造</h2>
+      <div class="grid">
+        <article class="card">
+          <h3>理論分類</h3>
+          <span class="tag">二人零和</span>
+          <span class="tag">同時手番</span>
+          <span class="tag">決定論的遷移</span>
+          <span class="tag">不完全情報</span>
+          <p>
+            各ターンで TP は「スキル/数字 + 指」、NTP は「相手ターン中スキル + 指」を同時に選ぶ。
+            公開後の解決は決定論的なので、確率は混合戦略と先手決定だけに由来する。
+          </p>
+        </article>
+        <article class="card">
+          <h3>価値関数の向き</h3>
+          <p>
+            <code>basic_solver</code> 同様、状態を「現在のターンプレイヤー視点」に正規化すると扱いやすい。
+            通常のターン交代では価値の符号を反転し、追加ターンでは同じ視点のまま継続する。
+          </p>
+        </article>
+        <article class="card">
+          <h3>勝利条件</h3>
+          <p>
+            両者が少なくとも 1 回スキルを宣言するまでは勝利不可。
+            数字宣言もコード上はスキル宣言として扱われているため、仕様上もその扱いで固定するのが自然。
+          </p>
+        </article>
+        <article class="card">
+          <h3>難所</h3>
+          <p>
+            ストック重複、オールの順序選択、追加ターン、タイム割り込み、ミラー反射、リバーシ状態交換が状態空間を大きくする。
+          </p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>スキル別の AI 観点</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>カテゴリ</th>
+            <th>主なスキル</th>
+            <th>AI が学ぶべきこと</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>即時得点</td>
+            <td>数字、フラッシュ、チャージ、クイック</td>
+            <td>指分布とカウンター分布を同時に混ぜる。終盤の数字、ロック/セメント後のフラッシュ、ガード下の攻めを評価する。</td>
+          </tr>
+          <tr>
+            <td>テンポ</td>
+            <td>ガード、フェイント、スキップ、ブースト、タイム</td>
+            <td>追加ターンの価値を局面依存で評価する。単なる手数ではなく、ガード解除やスキップ消費も含めて見る。</td>
+          </tr>
+          <tr>
+            <td>相手制約</td>
+            <td>セメント、ロック、ドロップ</td>
+            <td>相手の合法指・合法リアクション・合法スキルを狭めた後の将来価値を評価する。</td>
+          </tr>
+          <tr>
+            <td>参照/蓄積</td>
+            <td>コピー、ストック、チョイス、オール</td>
+            <td>直前スキルをめぐるメタゲームが中心。相手に参照されるリスクと、自分が参照する価値を比較する。</td>
+          </tr>
+          <tr>
+            <td>反射/交換</td>
+            <td>ミラー、リバーシ</td>
+            <td>バフ/デバフ/手数の所有権が変わるため、通常の評価関数を一段抽象化して「誰に効く効果か」を明示する。</td>
+          </tr>
+          <tr>
+            <td>防御必殺</td>
+            <td>ブロック</td>
+            <td>終盤まで温存する価値と、相手の詰め筋を止める価値を比較する。スキップだけは止められない点を明示する。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="section">
+      <h2>4 つのルール構成</h2>
+      <p>
+        <code>GAME_CONFIG</code> には <code>ENABLE_MIRROR</code> と <code>ENABLE_REVERSI</code> がある。
+        最強 AI は単一モデルにフラグを入力して汎化させるより、まず 4 構成を別々に評価し、
+        最後に共有ネットワーク + 構成条件付けへ統合するのが安全です。
+      </p>
+      <table>
+        <thead>
+          <tr>
+            <th>構成</th>
+            <th>特徴</th>
+            <th>優先度</th>
+            <th>実装上の注意</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Mirror OFF / Reversi OFF</td>
+            <td>Complete の基準形。状態交換と反射がない。</td>
+            <td>最優先</td>
+            <td>まずここで純粋エンジンと探索を完成させる。</td>
+          </tr>
+          <tr>
+            <td>Mirror ON / Reversi OFF</td>
+            <td>相手ターン中の反射が加わる。</td>
+            <td>高</td>
+            <td>ミラー準備状態、使用後解除、反射対象外の扱いをテストで固定。</td>
+          </tr>
+          <tr>
+            <td>Mirror OFF / Reversi ON</td>
+            <td>手・バフ・デバフの交換が加わる。</td>
+            <td>高</td>
+            <td>ストック、スキップ、タイム、必殺使用済みは交換対象外。</td>
+          </tr>
+          <tr>
+            <td>Mirror ON / Reversi ON</td>
+            <td>最も複雑な完全構成。</td>
+            <td>最終</td>
+            <td>探索幅が最大。前 3 構成のテスト資産を流用してから着手。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="section">
+      <h2>推奨アーキテクチャ</h2>
+      <div class="split">
+        <div>
+          <h3>中核方針</h3>
+          <p>
+            AI は「方策ネットワークだけ」ではなく、以下の 5 層で作る。
+            上に行くほど実戦で使い、下に行くほど正しさを支える構造です。
+          </p>
+          <ol>
+            <li><strong>Pure Rules Engine</strong>: 入力状態と同時行動から次状態を返す副作用なしの遷移関数。</li>
+            <li><strong>Legal Action Generator</strong>: TP/NTP の完全行動を列挙。チョイス/オールの選択も行動に含める。</li>
+            <li><strong>Exact Subgame Solver</strong>: 小さな状態では行列ゲーム LP と割引価値反復で混合均衡を解く。</li>
+            <li><strong>Search Policy</strong>: 大きな状態では深さ制限探索で葉をニューラル価値に委譲する。</li>
+            <li><strong>Learning Agent</strong>: 自己対戦で方策・平均方策・価値を学習し、探索結果を蒸留する。</li>
+          </ol>
+        </div>
+        <aside class="card">
+          <h3>なぜハイブリッドか</h3>
+          <p>
+            Complete は「均衡が本質」だが、状態が大きい。
+            Basic のような全状態厳密 solver は理想だが、ストックと追加ターンで難しくなる。
+            そのため、局所では厳密、全体では近似、という折衷が現実的に強い。
+          </p>
+        </aside>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>状態表現</h2>
+      <p>
+        状態は現在ターンプレイヤー視点に正規化する。プレイヤー固有名を消し、
+        <code>me</code>/<code>opp</code> の二者で表すと、先後の対称性を最大限使えます。
+      </p>
+      <table>
+        <thead>
+          <tr>
+            <th>特徴群</th>
+            <th>内容</th>
+            <th>圧縮方針</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>基本</td>
+            <td>残り手数、セメント最低指、両者の宣言済みフラグ、現在フェーズ中ターン数。</td>
+            <td>小さい整数として one-hot または埋め込み。</td>
+          </tr>
+          <tr>
+            <td>バフ</td>
+            <td>ガード、チャージ、クイック 0/1/2、ミラー準備。</td>
+            <td>ON/OFF とレベル。</td>
+          </tr>
+          <tr>
+            <td>デバフ</td>
+            <td>セメント、ロック pending/active、ドロップ封印集合。</td>
+            <td>封印集合はスキルごとのビット列。</td>
+          </tr>
+          <tr>
+            <td>フィールド効果</td>
+            <td>スキップ残フェーズ、ストック、タイム、追加ターン。</td>
+            <td>ストックはスキル別ビット集合。同一スキルの重複は持たず、有限集合として扱う。</td>
+          </tr>
+          <tr>
+            <td>履歴</td>
+            <td>直前スキル、直前行動、参照可否。</td>
+            <td>コピー/ストックのため、最低でも直前スキルは必須。</td>
+          </tr>
+          <tr>
+            <td>構成</td>
+            <td>ミラー有効、リバーシ有効。</td>
+            <td>4 構成別 solver と、最終的な条件付きモデルの入力。</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="note ok">
+        ストックは同一スキル重複不可とし、基本スキルと対カウンタースキルの有限集合として扱う。
+        具体的には、通常スキルの「フラッシュ、セメント、ガード、チャージ、クイック、スキップ、ミラー」と、
+        対カウンタースキルの「フェイント、ロック」が対象になる。
+        そのため Complete は「ストックが無限に伸びるゲーム」ではなく、Mirror ON なら最大 9 個、Mirror OFF なら最大 8 個のビット集合を持つ有限状態ゲームとして定式化できる。
+        これは exact solver と exploitability 評価にとって大きな追い風です。
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>行動表現</h2>
+      <p>
+        同時手番なので、1 ターンのゲーム単位は公開状態 <code>s</code> における行列ゲームです。
+        行は TP の完全行動、列は NTP の完全行動にします。
+      </p>
+      <table>
+        <thead>
+          <tr>
+            <th>プレイヤー</th>
+            <th>完全行動</th>
+            <th>例</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>TP</td>
+            <td>宣言スキル/数字、TP 指、チョイス選択、オール順序（全ストック強制発動）。</td>
+            <td><code>FLASH(tp_thumb=1)</code>, <code>NUM(total=3,tp_thumb=1)</code>, <code>CHOICE(skill=FEINT,tp_thumb=2)</code></td>
+          </tr>
+          <tr>
+            <td>NTP</td>
+            <td>リアクション、NTP 指。</td>
+            <td><code>COUNTER(ntp_thumb=1)</code>, <code>BLOCK(ntp_thumb=0)</code>, <code>MIRROR_MAIN(ntp_thumb=2)</code>, <code>NONE(ntp_thumb=1)</code></td>
+          </tr>
+        </tbody>
+      </table>
+      <p>
+        チョイスは相手リアクションを確認後に選べる実装になっているため、ゲーム理論的には同時手番の後に小さな逐次選択がある。
+        厳密に扱うなら、行列の各セル評価時に TP がそのセル内で最適なストック選択をするサブゲームとして解決する。
+        実戦版では「チョイス行動 = 反応別の選択ポリシー」として表す。
+        オールは好きな数を選ぶのではなく全ストックを必ず発動し、TP が選べるのは順番だけにする。
+        この変更で実戦上大きく変わるのは、カウンター確認後にストック内のフラッシュだけを外す選択ができない点です。
+      </p>
+    </section>
+
+    <section class="section">
+      <h2>解法設計</h2>
+      <div class="grid">
+        <article class="card">
+          <h3>Exact: 割引 Shapley 価値反復</h3>
+          <p>
+            Basic solver と同じく、各状態で payoff matrix を作り LP でゼロ和行列ゲームを解く。
+            非終端遷移は <code>gamma * V(next)</code>、ターン交代時は視点反転で符号を反転する。
+          </p>
+          <p><span class="tag">用途</span> 縮約 Complete、終盤、有限ストック検証</p>
+        </article>
+        <article class="card">
+          <h3>Search: ReBeL / depth-limited subgame</h3>
+          <p>
+            現在状態から数手先まで同時手番サブゲームを展開し、葉を価値ネットワークで評価する。
+            各節点では局所行列ゲームを解いて混合戦略を返す。
+          </p>
+          <p><span class="tag purple">用途</span> 実戦時の強化、詰め筋、必殺判断</p>
+        </article>
+        <article class="card">
+          <h3>Learning: NFSP / Deep CFR / R-NaD</h3>
+          <p>
+            自己対戦で best response 的な強化方策と平均方策を学ぶ。
+            完全な情報集合ゲームではないが、公開状態・同時行動の混合戦略近似として相性が良い。
+            全 Complete でスケールが厳しくなった段階では、Stratego 系の大規模不完全情報ゲームで実績のある
+            R-NaD も本命候補として比較する。
+          </p>
+          <p><span class="tag red">用途</span> 全 Complete、巨大状態、低 exploitability 方策</p>
+        </article>
+        <article class="card">
+          <h3>Opening Book / Endgame Table</h3>
+          <p>
+            重要局面は厳密 solver または大量探索で事前計算し、実戦時に即参照する。
+            特に残り手 1 の数字戦、ガード絡み、セメント固定局面は価値が高い。
+          </p>
+          <p><span class="tag gray">用途</span> 安定性、説明可能性、速度</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>ルール実装の優先課題</h2>
+      <div class="note danger">
+        最強 AI の前に、現行の対話ゲーム実装をそのまま学習環境に使うのは避けるべきです。
+        <code>print</code> や乱数、入力処理、副作用が混ざっているため、solver/学習用には純粋なルールエンジンが必要です。
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>課題</th>
+            <th>対応</th>
+            <th>完了条件</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>仕様差分</td>
+            <td><code>完全ルール（新）</code> を正とし、旧仕様との差分を <code>docs/rules_decisions.md</code> に固定。</td>
+            <td>開幕制限、フラッシュの「2手下ろし」、ガード、タイム、ミラー、リバーシの扱いが明文化される。</td>
+          </tr>
+          <tr>
+            <td>副作用除去</td>
+            <td><code>Complete/complete_solver/rules.py</code> に dataclass/NamedTuple ベースの状態と遷移を作る。</td>
+            <td>同じ <code>state, joint_action</code> から必ず同じ <code>Transition</code> が返る。</td>
+          </tr>
+          <tr>
+            <td>合法手生成</td>
+            <td>TP/NTP の完全行動列挙を状態依存で実装。</td>
+            <td>既存 <code>get_valid_skills</code> と照合する単体テストが通る。</td>
+          </tr>
+          <tr>
+            <td>有限ストック</td>
+            <td>同一スキル重複不可をルールとして固定し、ストックを有限ビット集合で表現する。</td>
+            <td>ストック総数が Mirror ON で最大 9 個、Mirror OFF で最大 8 個に収まる。</td>
+          </tr>
+          <tr>
+            <td>チョイス/オール</td>
+            <td>チョイスは行動に含めるかセル内サブゲームとして扱う。オールは全ストック強制発動で、順序のみを行動に含める。</td>
+            <td>後出し選択の強さと、オール内フラッシュの強制発動リスクが過小評価されない。</td>
+          </tr>
+          <tr>
+            <td>ミラー/リバーシ</td>
+            <td>ON/OFF を State/RulesConfig に持たせる。</td>
+            <td>4 構成すべてで同じテストスイートが走る。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="section">
+      <h2>ロードマップ</h2>
+      <div class="roadmap">
+        <article class="phase">
+          <h3>仕様固定とテストケース化</h3>
+          <p>
+            <code>完全ルール（新）</code> を主仕様として、各スキルの最小例を golden test にする。
+            Basic solver の <code>basic_rules_spec.md</code> と同じ形式で Complete 版の solver-facing spec を作成する。
+          </p>
+          <ul>
+            <li>数字/フラッシュ/セメント/ガード/チャージ/クイック/スキップの基本遷移</li>
+            <li>カウンター、フェイント、ロック、ブロックの相互作用</li>
+            <li>コピー、ストック、チョイス、オール、ドロップの参照処理</li>
+            <li>ミラー ON、リバーシ ON の個別テスト</li>
+          </ul>
+        </article>
+        <article class="phase">
+          <h3>Complete-lite exact solver</h3>
+          <p>
+            まず Mirror OFF / Reversi OFF で、有限ストック・必殺ありの縮約 solver を作る。
+            Basic の <code>solve_zero_sum_matrix</code> と価値反復を再利用し、厳密に近いベースラインを得る。
+          </p>
+          <ul>
+            <li>状態列挙、合法手列挙、遷移、payoff matrix 構築</li>
+            <li>割引率 <code>gamma=0.995〜0.9995</code> の感度分析</li>
+            <li>状態数、収束、初期局面価値、主要方策のレポート出力</li>
+            <li><code>ユビスマ ノーマルレギュレーション スキル解説まとめ.ini</code> と均衡方策の定性整合チェック</li>
+          </ul>
+        </article>
+        <article class="phase">
+          <h3>終盤表と戦術表</h3>
+          <p>
+            残り手 1/2、セメント固定、ガード/チャージ/クイック状態など頻出局面を事前計算する。
+            これを探索の葉評価と教師データに使う。
+          </p>
+        </article>
+        <article class="phase">
+          <h3>全 Complete 環境</h3>
+          <p>
+            Gymnasium 互換の自己対戦環境を作る。
+            ただし観測は「公開状態 + 自分の役割 + ルール構成」で、行動マスクを必須にする。
+          </p>
+        </article>
+        <article class="phase">
+          <h3>学習 AI</h3>
+          <p>
+            初期は MaskablePPO で合法手制約つきの強いベースラインを作り、
+            次に NFSP/Deep CFR/Expert Iteration/R-NaD へ進める。
+            PPO は勝率を上げやすいが、均衡から外れた exploitable な方策になりやすいため、最終形では平均方策と exploitability を中心に管理する。
+            4 構成全部入りでスケールが厳しくなった段階では、R-NaD を本命候補として比較する。
+          </p>
+        </article>
+        <article class="phase">
+          <h3>探索統合</h3>
+          <p>
+            実戦時は学習方策を事前分布として、局所サブゲーム探索を行う。
+            詰み・必殺・ミラー/リバーシ絡みの高リスク局面では探索深度を増やす。
+          </p>
+        </article>
+        <article class="phase">
+          <h3>4 構成の統合評価</h3>
+          <p>
+            Mirror/Reversi の 4 構成を同一評価基盤でリーグ戦させる。
+            最終的に構成フラグを入力する単一モデルへ蒸留するか、構成別モデルを採用するかを exploitability 主体で決める。
+          </p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>評価指標</h2>
+      <p>
+        主指標は勝率ではなく <strong>exploitability / NashConv / exact subgame との距離</strong> に置く。
+        勝率は重要な補助指標だが、特定相手に過適合した搾取可能 AI を「強い」と誤判定しないため、ナッシュ均衡からの逸脱を中心に評価する。
+      </p>
+      <table>
+        <thead>
+          <tr>
+            <th>指標</th>
+            <th>意味</th>
+            <th>目標</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>勝率</td>
+            <td>既存ランダム AI、ヒューリスティック AI、Basic solver 系 AI、過去チェックポイントとの対戦。</td>
+            <td>補助指標。各構成で安定して上位だが、単独では採用判断に使わない。</td>
+          </tr>
+          <tr>
+            <td>Exploitability 近似</td>
+            <td>固定方策に対する best response 探索でどれだけ搾取されるか。</td>
+            <td>主指標。勝率だけ高いが読まれる AI を避ける。</td>
+          </tr>
+          <tr>
+            <td>NashConv 近似</td>
+            <td>二者それぞれの改善余地の合計。</td>
+            <td>縮約ゲームでは定量的に低下させる。</td>
+          </tr>
+          <tr>
+            <td>Exact subgame KL divergence</td>
+            <td>exact solver がある局面で、学習 AI の混合方策と均衡方策の KL divergence を測る。</td>
+            <td>終盤・固定局面で小さくする。単なる一致率より定量的に追跡する。</td>
+          </tr>
+          <tr>
+            <td>.ini 定性サニティチェック</td>
+            <td>ガード後の数字頻度、フェイント-カウンターの混合、ロック後の攻撃などが戦術解説と矛盾しないか。</td>
+            <td>主要戦術を全て使うことは要求しない。均衡が少数方策を選ぶ場合は、その理由を価値差で説明できること。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="section">
+      <h2>実装ファイル案</h2>
+      <pre><code>Complete/
+  complete_solver/
+    __init__.py
+    rules_spec.md
+    state.py
+    actions.py
+    transition.py
+    matrix_game.py        # basic_solver から移植/共有
+    exact_solver.py
+    search.py
+    features.py
+    policy.py
+    evaluate.py
+    reports.py
+    tests/
+      test_core_skills.py
+      test_reference_skills.py
+      test_ultimates.py
+      test_mirror_reversi.py
+  complete_rl/
+    env.py
+    action_space.py
+    observation.py
+    train_maskable_ppo.py
+    train_nfsp.py
+    league.py
+    distill.py
+  results/
+    complete_lite/
+    mirror_on/
+    reversi_on/
+    full/</code></pre>
+      <p class="small">
+        既存の対話用 <code>yubisuma_gameplay.py</code> はそのまま残し、solver/学習用コードは別パッケージに分けるのが安全です。
+      </p>
+    </section>
+
+    <section class="section">
+      <h2>リスクと対策</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>リスク</th>
+            <th>影響</th>
+            <th>対策</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>状態爆発</td>
+            <td>厳密 solver が終わらない。</td>
+            <td>ストックのビット集合化、支配行動除去、終盤表、深さ制限探索へ切替。</td>
+          </tr>
+          <tr>
+            <td>チョイスの後出し性の過小評価</td>
+            <td>ストック戦略が弱くなる。</td>
+            <td>セル内サブゲームまたは反応別選択ポリシーで表現。</td>
+          </tr>
+          <tr>
+            <td>PPO の非均衡化</td>
+            <td>特定相手には強いが最適応答に弱い。</td>
+            <td>NFSP/Deep CFR/R-NaD、exploitability 測定、平均方策の保存。</td>
+          </tr>
+          <tr>
+            <td>仕様の曖昧さ</td>
+            <td>AI が違うゲームを最適化する。</td>
+            <td>solver-facing spec と golden tests を先に作る。</td>
+          </tr>
+          <tr>
+            <td>ミラー/リバーシのバグ</td>
+            <td>ON 構成の方策が壊れる。</td>
+            <td>4 構成すべてで同じシナリオテストを回す。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="section">
+      <h2>最初のマイルストーン</h2>
+      <div class="note">
+        最短で強さに近づく実装順は、次の 3 つです。
+      </div>
+      <ol>
+        <li>
+          <strong>Complete solver-facing spec を作る。</strong>
+          現行ルール文書と Python 実装から、曖昧さのないテスト可能な仕様に変換する。
+        </li>
+        <li>
+          <strong>Mirror OFF / Reversi OFF の純粋遷移関数を作る。</strong>
+          既存 <code>TurnHandler</code> の効果解決を print/input なしに移植する。
+        </li>
+        <li>
+          <strong>Complete-lite exact solver を動かす。</strong>
+          Basic solver の LP と価値反復を再利用し、初期局面と代表局面の混合方策を出す。
+        </li>
+      </ol>
+      <p>
+        この段階で「このゲームを AI がどう読んでいるか」を数表で見られるようになります。
+        そこから全 Complete の学習環境に進むと、強さと正しさの両方を積み上げられます。
+      </p>
+    </section>
+  </main>
+</body>
+</html>

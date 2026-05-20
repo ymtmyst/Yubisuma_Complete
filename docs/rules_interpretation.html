@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Complete Solver ルール解釈メモ</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #18222f;
+      --muted: #5c6977;
+      --line: #d8e0e8;
+      --paper: #ffffff;
+      --bg: #f5f7fa;
+      --accent: #0c6f78;
+      --warn: #9a5b00;
+      --bad: #9d2432;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--bg);
+      font-family: "Yu Gothic", "Meiryo", system-ui, sans-serif;
+      line-height: 1.7;
+    }
+    header {
+      background: #17324d;
+      color: #fff;
+      padding: 28px 24px;
+      border-bottom: 5px solid var(--accent);
+    }
+    main {
+      width: min(1120px, calc(100% - 32px));
+      margin: 24px auto 48px;
+    }
+    h1 { margin: 0 0 8px; font-size: 30px; }
+    h2 { margin: 0 0 10px; font-size: 21px; }
+    h3 { margin: 18px 0 8px; font-size: 17px; }
+    p { margin: 8px 0; }
+    .meta { color: #dce8f2; }
+    section {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 18px;
+      margin: 16px 0;
+    }
+    .note {
+      border-left: 5px solid var(--accent);
+    }
+    .warning {
+      border-left: 5px solid var(--warn);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+      font-size: 14px;
+    }
+    th, td {
+      border: 1px solid var(--line);
+      padding: 8px 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th { background: #edf4f6; }
+    code {
+      background: #eef3f7;
+      border-radius: 4px;
+      padding: 2px 5px;
+    }
+    .tag {
+      display: inline-block;
+      border-radius: 999px;
+      padding: 1px 8px;
+      font-size: 12px;
+      font-weight: 700;
+      background: #e8f4f4;
+      color: var(--accent);
+      white-space: nowrap;
+    }
+    .tag.warn { background: #fff3d8; color: var(--warn); }
+    .tag.no { background: #fae4e7; color: var(--bad); }
+    a { color: var(--accent); font-weight: 700; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Complete Solver ルール解釈メモ</h1>
+    <div class="meta">参照用HTML / 更新: 2026-05-20 / 対象: <code>complete_solver</code></div>
+  </header>
+  <main>
+    <section class="note">
+      <h2>目的</h2>
+      <p>このページは、AI/solver 実装で採用するルール解釈を一覧できるようにした参照メモです。詳細な変更履歴は <a href="rules_decisions.md">rules_decisions.md</a>、進捗は <a href="../AI_PROGRESS_CHECKLIST.md">AI_PROGRESS_CHECKLIST.md</a> を参照してください。</p>
+      <p>重要修正: <strong>ミラー対象は「手を降ろす」または「NTP にデバフを付与する」効果だけです。</strong> バフ系、スキップ、必殺スキル、対カウンタースキルは反射できません。</p>
+    </section>
+
+    <section>
+      <h2>基本モデル</h2>
+      <table>
+        <thead>
+          <tr><th>項目</th><th>solver 解釈</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>視点</td><td><code>State.me</code> は現在のターンプレイヤー、<code>State.opp</code> は非ターンプレイヤー。</td></tr>
+          <tr><td>同時行動</td><td>TP はスキル/数字と指、NTP は反応スキルと指を同時に選ぶ。</td></tr>
+          <tr><td>勝利条件</td><td>両者が少なくとも1回宣言済みでなければ、手が0になっても勝利しない。</td></tr>
+          <tr><td>追加ターン</td><td>追加ターン中は視点を入れ替えず、同じ TP が続けて行動する。</td></tr>
+          <tr><td>スキップ中</td><td>TP は数字もスキルも宣言できず、solver では <code>PASS</code> のみ合法。</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>ミラー解釈</h2>
+      <p>ミラー（メイン）は「相手が手を降ろす」または「自分にデバフが付与される」場合だけ、代わりに NTP がその効果を発動します。対象外の効果に対してミラーを宣言した場合、ミラーは消費され、TP の元スキルは通常どおり解決されます。</p>
+      <table>
+        <thead>
+          <tr><th>TP の宣言</th><th>ミラー可否</th><th>solver 解釈</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>数字</td><td><span class="tag">可</span></td><td>当たった場合、NTP が手を1つ降ろす。外れた場合は追加効果なし。</td></tr>
+          <tr><td>フラッシュ</td><td><span class="tag">可</span></td><td>条件成立時、NTP が手を2つ降ろす。</td></tr>
+          <tr><td>セメント</td><td><span class="tag">可</span></td><td>両者の上げた指に基づいて通常どおりセメントを適用する。</td></tr>
+          <tr><td>ガード</td><td><span class="tag no">不可</span></td><td>バフなので反射しない。ミラーは消費され、TP にガードが通常どおり付く。</td></tr>
+          <tr><td>チャージ</td><td><span class="tag no">不可</span></td><td>バフなので反射しない。ミラーは消費され、TP にチャージが通常どおり付く。</td></tr>
+          <tr><td>クイック</td><td><span class="tag no">不可</span></td><td>バフ/自己効果なので反射しない。ミラーは消費され、TP のクイックが通常どおり進む。</td></tr>
+          <tr><td>ミラー（準備）</td><td><span class="tag no">不可</span></td><td>バフなので反射しない。ミラーは消費され、TP にミラー準備が通常どおり付く。</td></tr>
+          <tr><td>ドロップ</td><td><span class="tag">可</span></td><td>NTP のストック集合を使って TP 側へドロップ封印を付ける。</td></tr>
+          <tr><td>スキップ</td><td><span class="tag no">不可</span></td><td>反射しない。ミラーは消費され、スキップは通常どおり NTP の次フェーズに適用される。</td></tr>
+          <tr><td>フェイント / ロック</td><td><span class="tag no">不可</span></td><td>対カウンタースキルは NTP がカウンターを宣言したときだけ誘発する。NTP はミラーを宣言しているため発動しない。</td></tr>
+          <tr><td>コピー / ストック / チョイス / オール</td><td><span class="tag">参照元準拠</span></td><td>参照元スキルごとにミラー可否を判定する。オールは全ストックを順に処理し、反射可能な効果が複数あればすべて反射する。</td></tr>
+          <tr><td>ブースト / リバーシ / タイム</td><td><span class="tag no">不可</span></td><td>手を降ろす効果でも NTP へのデバフ付与でもないため反射しない。ミラーは消費され、TP の必殺効果は通常どおり解決する。</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>参照・ストック</h2>
+      <table>
+        <thead>
+          <tr><th>項目</th><th>solver 解釈</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>コピー</td><td>直前の数字または参照可能スキルを2回分発動する。</td></tr>
+          <tr><td>ストック</td><td>直前の非数字・参照可能スキルだけをストックできる。</td></tr>
+          <tr><td>ストック集合</td><td>solver では重複なしの有限集合。すでに持っている同一スキルは追加しない。</td></tr>
+          <tr><td>チョイス</td><td>solver では選択対象を TP action に含める。同時行動モデルを保つため、反応後の隠れた後出し選択にはしない。</td></tr>
+          <tr><td>オール</td><td>全ストックを必ず発動する。指定順に不足があれば残りを決定的な順序で補う。</td></tr>
+          <tr><td>ドロップ</td><td>自分の現在ストックしているスキル集合を、相手の次フェーズで宣言不可にする。</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>リバーシ</h2>
+      <table>
+        <thead>
+          <tr><th>分類</th><th>交換するもの</th><th>交換しないもの</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>状態交換</td>
+            <td>手数、セメント、ガード、チャージ、クイック、ミラー準備、ロック、ドロップ封印</td>
+            <td>ストック、スキップ、タイム、必殺使用済み、追加ターン、宣言履歴</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="warning">
+      <h2>今後の確認ポイント</h2>
+      <p>ミラーの対象外スキルを宣言されたときは「ミラーが空振りして元スキルが通常解決される」方針で固定しています。今後は、この分類を既存の対話実装にも反映し、4構成の回帰テストで確認します。</p>
+    </section>
+  </main>
+</body>
+</html>

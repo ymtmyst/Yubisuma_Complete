@@ -1,0 +1,44 @@
+"""Skill constants for the Complete solver-facing rules."""
+
+NUMBER = "数字"
+FLASH = "フラッシュ"
+CEMENT = "セメント"
+GUARD = "ガード"
+CHARGE = "チャージ"
+QUICK = "クイック"
+SKIP = "スキップ"
+MIRROR_PREP = "ミラー"
+
+COUNTER = "カウンター"
+BLOCK = "ブロック"
+MIRROR_MAIN = "ミラー"
+NONE = "なし"
+
+FEINT = "フェイント"
+LOCK = "ロック"
+
+COPY = "コピー"
+STOCK = "ストック"
+CHOICE = "チョイス"
+ALL = "オール"
+DROP = "ドロップ"
+
+BOOST = "ブースト"
+REVERSI = "リバーシ"
+TIME = "タイム"
+
+PASS = "パス"
+
+NORMAL_SKILLS = frozenset(
+    {FLASH, CEMENT, GUARD, CHARGE, QUICK, SKIP, MIRROR_PREP}
+)
+ANTI_COUNTER_SKILLS = frozenset({FEINT, LOCK})
+REFERENCE_SKILLS = frozenset({COPY, STOCK, CHOICE, ALL, DROP})
+ULTIMATE_TP_SKILLS = frozenset({BOOST, REVERSI, TIME})
+STOCK_ALPHA_SKILLS = frozenset({CHOICE, ALL, DROP})
+
+REFERENCEABLE_SKILLS = NORMAL_SKILLS | ANTI_COUNTER_SKILLS
+STOCKABLE_WITH_MIRROR = REFERENCEABLE_SKILLS
+STOCKABLE_WITHOUT_MIRROR = REFERENCEABLE_SKILLS - {MIRROR_PREP}
+
+REACTIONS = (NONE, COUNTER, BLOCK, MIRROR_MAIN)

@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Complete Solver Report depth 2</title>
+  <style>
+    body {
+      margin: 0;
+      color: #17202a;
+      background: #f6f8fb;
+      font-family: "Yu Gothic", "Meiryo", system-ui, sans-serif;
+      line-height: 1.7;
+    }
+    header {
+      background: #17324d;
+      color: white;
+      padding: 28px 24px;
+      border-bottom: 5px solid #0f7c80;
+    }
+    main {
+      width: min(1180px, calc(100% - 32px));
+      margin: 24px auto 48px;
+    }
+    h1 { margin: 0 0 8px; font-size: 30px; }
+    h2 { margin: 0 0 8px; font-size: 21px; }
+    .meta { color: #dce8f2; }
+    .note, .scenario {
+      background: white;
+      border: 1px solid #d7dee7;
+      border-radius: 8px;
+      padding: 18px;
+      margin: 16px 0;
+    }
+    .note {
+      border-left: 5px solid #0f7c80;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+      font-size: 14px;
+    }
+    th, td {
+      border: 1px solid #d7dee7;
+      padding: 8px 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th { background: #edf4f6; }
+    .num {
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+    a { color: #0f6f78; font-weight: 700; }
+    .links {
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+      margin: 6px 0 0;
+    }
+    code {
+      background: #eef3f7;
+      padding: 2px 5px;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Complete Solver Report</h1>
+    <div class="meta">depth=2 / mirror=OFF / reversi=OFF / folder=results\complete_lite_depth2</div>
+  </header>
+  <main>
+    <section class="note">
+      <h2>まず見るファイル</h2>
+      <p>このページが入口です。全体比較は <a href="sanity_depth2.csv">sanity_depth2.csv</a>、詳細は各シナリオの CSV を見てください。</p>
+      <p><code>value</code> は局面全体の均衡価値、<code>probability</code> は混合戦略の確率、<code>pure action value</code> は相手の混合方策に対してその行動だけを選んだ場合の価値です。</p>
+      <p>HTML上の数値は読みやすさ優先で、0 は <code>0</code>、その他は小数第3位まで表示しています。CSV には元の高精度値を残しています。</p>
+    </section>
+    <section class="scenario">
+      <h2>Summary</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>scenario</th><th>description</th><th>value</th>
+            <th>number</th><th>flash</th><th>feint</th><th>skip</th><th>quick</th>
+            <th>NTP counter</th><th>NTP block</th>
+            <th>top TP</th><th>top NTP</th>
+          </tr>
+        </thead>
+        <tbody><tr><td><a href="locked_flash_depth2.csv">locked_flash</a></td><td>Opponent is cemented to two thumbs and cannot react this turn.</td><td class="num">1.000</td><td class="num">0</td><td class="num">1.000</td><td class="num">0</td><td class="num">0</td><td class="num">0</td><td class="num">0</td><td class="num">0</td><td>フラッシュ(thumb=2)</td><td>NTP(なし,thumb=2)</td></tr>
+<tr><td><a href="endgame_number_depth2.csv">endgame_number</a></td><td>Both players have one hand remaining.</td><td class="num">0.034</td><td class="num">0.077</td><td class="num">0</td><td class="num">0.068</td><td class="num">0.855</td><td class="num">0</td><td class="num">0.037</td><td class="num">0.892</td><td>スキップ(thumb=1)</td><td>NTP(ブロック,thumb=1)</td></tr>
+<tr><td><a href="initial_depth2.csv">initial</a></td><td>Initial public state.</td><td class="num">0.028</td><td class="num">0.240</td><td class="num">0</td><td class="num">0.052</td><td class="num">0.708</td><td class="num">0</td><td class="num">0.069</td><td class="num">0.777</td><td>スキップ(thumb=2)</td><td>NTP(ブロック,thumb=2)</td></tr></tbody>
+      </table>
+    </section>
+    
+            <section class="scenario">
+              <h2>locked_flash</h2>
+              <p>Opponent is cemented to two thumbs and cannot react this turn.</p>
+              <p class="links">
+                <a href="locked_flash_depth2.csv">CSVを開く</a>
+                <span>value: 1.000</span>
+              </p>
+              <table>
+                <thead>
+                  <tr>
+                    <th>role</th><th>action</th><th>skill</th>
+                    <th>probability</th><th>pure action value</th>
+                  </tr>
+                </thead>
+                <tbody><tr><td>TP</td><td>フラッシュ(thumb=2)</td><td>フラッシュ</td><td class="num">1.000</td><td class="num">1.000</td></tr>
+<tr><td>NTP</td><td>NTP(なし,thumb=2)</td><td>なし</td><td class="num">1.000</td><td class="num">1.000</td></tr>
+<tr><td>TP</td><td>NUM(total=0,thumb=0)</td><td>数字</td><td class="num">0</td><td class="num">-0.040</td></tr>
+<tr><td>TP</td><td>NUM(total=0,thumb=1)</td><td>数字</td><td class="num">0</td><td class="num">-0.040</td></tr>
+<tr><td>TP</td><td>NUM(total=0,thumb=2)</td><td>数字</td><td class="num">0</td><td class="num">-0.040</td></tr>
+<tr><td>TP</td><td>NUM(total=1,thumb=0)</td><td>数字</td><td class="num">0</td><td class="num">-0.040</td></tr>
+<tr><td>TP</td><td>NUM(total=1,thumb=1)</td><td>数字</td><td class="num">0</td><td class="num">-0.040</td></tr>
+<tr><td>TP</td><td>NUM(total=1,thumb=2)</td><td>数字</td><td class="num">0</td><td class="num">-0.040</td></tr></tbody>
+              </table>
+            </section>
+            
+            <section class="scenario">
+              <h2>endgame_number</h2>
+              <p>Both players have one hand remaining.</p>
+              <p class="links">
+                <a href="endgame_number_depth2.csv">CSVを開く</a>
+                <span>value: 0.034</span>
+              </p>
+              <table>
+                <thead>
+                  <tr>
+                    <th>role</th><th>action</th><th>skill</th>
+                    <th>probability</th><th>pure action value</th>
+                  </tr>
+                </thead>
+                <tbody><tr><td>NTP</td><td>NTP(ブロック,thumb=1)</td><td>ブロック</td><td class="num">0.892</td><td class="num">0.034</td></tr>
+<tr><td>TP</td><td>スキップ(thumb=1)</td><td>スキップ</td><td class="num">0.855</td><td class="num">0.034</td></tr>
+<tr><td>NTP</td><td>NTP(なし,thumb=0)</td><td>なし</td><td class="num">0.071</td><td class="num">0.034</td></tr>
+<tr><td>TP</td><td>フェイント(thumb=1)</td><td>フェイント</td><td class="num">0.068</td><td class="num">0.034</td></tr>
+<tr><td>TP</td><td>NUM(total=1,thumb=1)</td><td>数字</td><td class="num">0.038</td><td class="num">0.034</td></tr>
+<tr><td>TP</td><td>NUM(total=2,thumb=1)</td><td>数字</td><td class="num">0.038</td><td class="num">0.034</td></tr>
+<tr><td>NTP</td><td>NTP(カウンター,thumb=0)</td><td>カウンター</td><td class="num">0.037</td><td class="num">0.034</td></tr>
+<tr><td>TP</td><td>NUM(total=0,thumb=0)</td><td>数字</td><td class="num">0</td><td class="num">0.034</td></tr></tbody>
+              </table>
+            </section>
+            
+            <section class="scenario">
+              <h2>initial</h2>
+              <p>Initial public state.</p>
+              <p class="links">
+                <a href="initial_depth2.csv">CSVを開く</a>
+                <span>value: 0.028</span>
+              </p>
+              <table>
+                <thead>
+                  <tr>
+                    <th>role</th><th>action</th><th>skill</th>
+                    <th>probability</th><th>pure action value</th>
+                  </tr>
+                </thead>
+                <tbody><tr><td>NTP</td><td>NTP(ブロック,thumb=2)</td><td>ブロック</td><td class="num">0.777</td><td class="num">0.028</td></tr>
+<tr><td>TP</td><td>スキップ(thumb=2)</td><td>スキップ</td><td class="num">0.708</td><td class="num">0.028</td></tr>
+<tr><td>TP</td><td>NUM(total=2,thumb=2)</td><td>数字</td><td class="num">0.080</td><td class="num">0.028</td></tr>
+<tr><td>TP</td><td>NUM(total=3,thumb=2)</td><td>数字</td><td class="num">0.080</td><td class="num">0.028</td></tr>
+<tr><td>TP</td><td>NUM(total=4,thumb=2)</td><td>数字</td><td class="num">0.080</td><td class="num">0.028</td></tr>
+<tr><td>NTP</td><td>NTP(なし,thumb=0)</td><td>なし</td><td class="num">0.062</td><td class="num">0.028</td></tr>
+<tr><td>NTP</td><td>NTP(なし,thumb=2)</td><td>なし</td><td class="num">0.062</td><td class="num">0.028</td></tr>
+<tr><td>TP</td><td>フェイント(thumb=2)</td><td>フェイント</td><td class="num">0.052</td><td class="num">0.028</td></tr></tbody>
+              </table>
+            </section>
+            
+  </main>
+</body>
+</html>
