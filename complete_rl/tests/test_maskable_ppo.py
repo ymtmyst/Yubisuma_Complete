@@ -171,6 +171,41 @@ class MaskablePPOBaselineTests(unittest.TestCase):
             )
             self.assertEqual(evaluation.episodes, 1)
 
+    def test_curriculum_warmup_training(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            result = train_maskable_ppo(
+                total_timesteps=16,
+                output_dir=Path(tmp),
+                seed=77,
+                max_steps=20,
+                n_steps=8,
+                batch_size=4,
+                n_epochs=1,
+                eval_episodes=1,
+                verbose=0,
+                curriculum_warmup_steps=8,
+                curriculum_warmup_policy="none",
+            )
+            self.assertEqual(result.evaluation.episodes, 1)
+            self.assertTrue(result.artifacts.model_path.exists())
+
+    def test_episode_mixed_ntp_training_runs(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            result = train_maskable_ppo(
+                total_timesteps=16,
+                output_dir=Path(tmp),
+                seed=55,
+                max_steps=20,
+                n_steps=8,
+                batch_size=4,
+                n_epochs=1,
+                eval_episodes=1,
+                ntp_policy="episode_mixed_basic",
+                verbose=0,
+            )
+            self.assertEqual(result.evaluation.episodes, 1)
+            self.assertTrue(result.artifacts.model_path.exists())
+
     def test_saved_model_directory_evaluation_writes_summary(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

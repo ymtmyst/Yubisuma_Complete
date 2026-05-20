@@ -1,0 +1,339 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <title>NTP 方策分離設計案</title>
+  <style>
+    :root {
+      --bg: #f7f7f4;
+      --panel: #ffffff;
+      --ink: #202124;
+      --muted: #5f6368;
+      --line: #d8d7d0;
+      --accent: #0b6b6f;
+      --warn: #8a5300;
+      --danger: #9b1c1c;
+      --ok: #246b32;
+    }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: "Segoe UI", "Yu Gothic", "Meiryo", sans-serif;
+      line-height: 1.7;
+    }
+    main {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 28px 20px 56px;
+    }
+    h1 {
+      margin: 0 0 6px;
+      font-size: 28px;
+      letter-spacing: 0;
+    }
+    h2 {
+      margin: 0 0 12px;
+      font-size: 20px;
+      letter-spacing: 0;
+    }
+    h3 {
+      margin: 18px 0 8px;
+      font-size: 16px;
+      letter-spacing: 0;
+    }
+    p {
+      margin: 8px 0;
+    }
+    code {
+      padding: 1px 5px;
+      background: #eef1ef;
+      border: 1px solid #dde3df;
+      border-radius: 4px;
+      font-family: Consolas, "Courier New", monospace;
+    }
+    .lead {
+      color: var(--muted);
+      margin-bottom: 18px;
+    }
+    .section {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 18px;
+      margin: 16px 0;
+    }
+    .note {
+      border-left: 4px solid var(--accent);
+      background: #edf7f7;
+      padding: 10px 12px;
+      margin: 12px 0;
+    }
+    .warn {
+      border-left-color: var(--warn);
+      background: #fff6e5;
+    }
+    .danger {
+      border-left-color: var(--danger);
+      background: #fff0f0;
+    }
+    .ok {
+      border-left-color: var(--ok);
+      background: #eff8f0;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 10px 0 4px;
+      font-size: 14px;
+    }
+    th, td {
+      border: 1px solid var(--line);
+      padding: 8px 10px;
+      vertical-align: top;
+    }
+    th {
+      background: #eef1ef;
+      text-align: left;
+    }
+    ul, ol {
+      margin: 8px 0 8px 22px;
+      padding: 0;
+    }
+    .tag {
+      display: inline-block;
+      padding: 2px 8px;
+      margin: 0 4px 4px 0;
+      border-radius: 999px;
+      background: #e5f1f2;
+      color: #075b5f;
+      font-size: 12px;
+      font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+<main>
+  <h1>NTP 方策分離設計案</h1>
+  <p class="lead">作成日: 2026-05-21 / 対象: Complete ルール AI P9 診断・見直し</p>
+
+  <section class="section">
+    <h2>今回の到達点</h2>
+    <p>
+      この成果物は、NTP 方策を「反応選択」と「指選択」に分離するための設計案です。
+      現時点では実装・再学習には進まず、この設計の妥当性を確認する段階で停止します。
+    </p>
+    <div class="note">
+      承認待ちポイント:
+      この設計で問題なければ、次工程で小さな実装と確認表の生成に進みます。
+      承認前に再学習や4構成リーグ評価には進みません。
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>現状の問題</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>項目</th>
+          <th>現状</th>
+          <th>問題</th>
+          <th>分離で確認できること</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>named NTP policy</td>
+          <td><code>none</code>, <code>counter_first</code>, <code>block_first</code> など</td>
+          <td>反応選択と指選択が一体化している。</td>
+          <td>同じ反応率でも、指が最小固定か一様かで TP 方策が変わるかを確認できる。</td>
+        </tr>
+        <tr>
+          <td>指選択</td>
+          <td><code>_first_legal_reaction</code> が最初の合法手を返すため、低い指に偏りやすい。</td>
+          <td>数字宣言偏重がカウンター率由来なのか、相手指固定由来なのか切り分けられない。</td>
+          <td>最小指固定、一様ランダム、最悪応答を別条件として比較できる。</td>
+        </tr>
+        <tr>
+          <td>方策レポート</td>
+          <td>相手方策名ごとの TP 行動分布は見える。</td>
+          <td>NTP の反応率と指分布が明示されないため、評価条件の意味が曖昧。</td>
+          <td>反応率、指分布、TP 初手分布を同じ表で確認できる。</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="section">
+    <h2>提案する分離設計</h2>
+    <p>
+      NTP 方策を、次の2段階で定義します。最終的な NTP 行動は
+      <code>reaction policy</code> と <code>thumb policy</code> の組み合わせから生成します。
+    </p>
+    <table>
+      <thead>
+        <tr>
+          <th>層</th>
+          <th>役割</th>
+          <th>候補</th>
+          <th>必要理由</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>reaction policy</td>
+          <td>NTP が何の反応をするかを決める。</td>
+          <td>
+            <span class="tag">none_only</span>
+            <span class="tag">counter_only</span>
+            <span class="tag">block_first</span>
+            <span class="tag">random_reaction</span>
+          </td>
+          <td>0%/100%カウンターなど、人間視点で期待方策が明確な条件を作るため。</td>
+        </tr>
+        <tr>
+          <td>thumb policy</td>
+          <td>選ばれた反応の中で、NTP の指をどう出すかを決める。</td>
+          <td>
+            <span class="tag">lowest</span>
+            <span class="tag">uniform</span>
+            <span class="tag">highest</span>
+            <span class="tag">worst_response</span>
+          </td>
+          <td>数字宣言偏重が、相手の指が固定されていることへの過適応かを切り分けるため。</td>
+        </tr>
+        <tr>
+          <td>episode sampler</td>
+          <td>学習時に、エピソード単位で条件を選ぶ。</td>
+          <td>
+            <span class="tag">episode_grid</span>
+            <span class="tag">weighted_episode_grid</span>
+          </td>
+          <td>反応履歴から相手タイプを識別する学習は残しつつ、指条件の偏りを避けるため。</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="section">
+    <h2>最初に使うべき評価グリッド</h2>
+    <p>
+      初回は複雑な条件を増やさず、0% と 100% カウンターを主対象にします。
+      99% カウンターは必須ではありません。
+    </p>
+    <table>
+      <thead>
+        <tr>
+          <th>反応条件</th>
+          <th>指条件</th>
+          <th>期待される確認</th>
+          <th>警告条件</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>0%カウンター / none_only</td>
+          <td>lowest</td>
+          <td>現行 <code>none</code> に近い条件。数字宣言やガード偏重が、最小指固定に起因するかを見る。</td>
+          <td>勝ちに直結しない追加ターン行動だけが上位に残る。</td>
+        </tr>
+        <tr>
+          <td>0%カウンター / none_only</td>
+          <td>uniform</td>
+          <td>相手指が揺れると、フラッシュ・クイック・勝ち筋接続の評価が上がるかを見る。</td>
+          <td>lowest と uniform の差が説明不能に大きい。</td>
+        </tr>
+        <tr>
+          <td>100%カウンター / counter_only</td>
+          <td>lowest</td>
+          <td>現行 <code>counter_first</code> に近い条件。フェイントが上位に出るかを見る。</td>
+          <td>数字宣言が主力のままになる。</td>
+        </tr>
+        <tr>
+          <td>100%カウンター / counter_only</td>
+          <td>uniform</td>
+          <td>相手指の揺れに関係なく、フェイントが安定して高いかを見る。</td>
+          <td>指条件だけでフェイント評価が崩れる。</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="note warn">
+      99%カウンターは、ロックなどの状態依存・非線形スキルを見るには単純すぎる可能性があります。
+      そのため今回の基本診断には含めず、必要になった時点で「ロックが価値を持つ専用局面」を作って検証します。
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>実装する場合の最小変更案</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>対象</th>
+          <th>変更案</th>
+          <th>確認方法</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>complete_rl/env.py</code></td>
+          <td>
+            既存 named policy は互換維持しつつ、内部に
+            <code>ReactionPolicy</code> と <code>ThumbPolicy</code> 相当の小さな選択関数を追加する。
+          </td>
+          <td>既存テストが通ること。既存 policy 名の挙動は原則変えない。</td>
+        </tr>
+        <tr>
+          <td><code>complete_rl/policy_analysis.py</code></td>
+          <td>
+            レポート対象に <code>none_lowest</code>, <code>none_uniform</code>,
+            <code>counter_lowest</code>, <code>counter_uniform</code> を追加できるようにする。
+          </td>
+          <td>NTP 反応率と指分布を表に出す。</td>
+        </tr>
+        <tr>
+          <td>診断HTML</td>
+          <td>
+            4条件の上位行動、主要スキル使用率、追加ターン後の次手、警告を出す。
+          </td>
+          <td>0%/100% の期待方策と実際の方策を横並びで確認する。</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="note">
+      方針: 既存モデルの学習や4構成評価はまだ行いません。
+      まず分離された評価条件で、現在の方策異常を再現・説明できるかを確認します。
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>次工程のチェックリスト</h2>
+    <ol>
+      <li>この設計案について、反応条件と指条件の分け方が妥当か確認する。</li>
+      <li>問題なければ、最小実装として分離 policy を追加する。</li>
+      <li>実装後、4条件の小さなHTML表を生成する。</li>
+      <li>表に、NTP 反応率・NTP 指分布・TP 上位行動・警告を出す。</li>
+      <li>ユーザー確認後に、方策レポート拡張または報酬比較へ進む。</li>
+    </ol>
+  </section>
+
+  <section class="section">
+    <h2>AI側の解釈</h2>
+    <p>
+      現在の数字宣言偏重は、ルールそのものから必然的に出たものではなく、
+      学習・評価条件の混線によって見えにくくなっている可能性が高いです。
+      特に、<code>none</code> が「反応なし」だけでなく「低い指を出しがち」という条件まで含んでいるなら、
+      TP はその固定指に対して数字宣言で勝つ局所解を覚えやすくなります。
+    </p>
+    <p>
+      そのため、最初に直すべきなのは学習アルゴリズムではなく、評価条件の表現です。
+      反応と指を分けた上で、0%/100%カウンターという明快な条件で確認し、
+      それでも不自然なら報酬設計や学習に戻るのが安全です。
+    </p>
+    <div class="note ok">
+      この設計が承認された場合の次アクション:
+      小さな実装に進み、<code>results/ntp_policy_separation_check.html</code> のような確認表を生成します。
+    </div>
+  </section>
+</main>
+</body>
+</html>

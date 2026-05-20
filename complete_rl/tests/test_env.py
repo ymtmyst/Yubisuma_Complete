@@ -263,6 +263,71 @@ class NamedNTPPolicyTests(unittest.TestCase):
         self.assertEqual(counter_first_ntp_policy(state, config).reaction, COUNTER)
         self.assertEqual(block_first_ntp_policy(state, config).reaction, BLOCK)
 
+    def test_episode_mixed_policies_are_accepted(self) -> None:
+        for name in ("episode_mixed_basic", "episode_weighted_none_counter"):
+            with self.subTest(name=name):
+                env = CompleteEnv(opponent_policy=name)
+                obs, _ = env.reset(seed=5)
+                self.assertEqual(obs.shape, (OBS_SIZE,))
+
+    def test_episode_mixed_is_seed_deterministic(self) -> None:
+        env = CompleteEnv(opponent_policy="episode_mixed_basic")
+        obs0, _ = env.reset(seed=99)
+        action = int(np.where(env.action_masks())[0][0])
+        obs1, r1, t1, tr1, _ = env.step(action)
+
+        obs0b, _ = env.reset(seed=99)
+        obs2, r2, t2, tr2, _ = env.step(action)
+
+        np.testing.assert_array_equal(obs0, obs0b)
+        np.testing.assert_array_equal(obs1, obs2)
+        self.assertEqual(r1, r2)
+        self.assertEqual(t1, t2)
+        self.assertEqual(tr1, tr2)
+
+    def test_episode_mixed_changes_ntp_per_episode(self) -> None:
+        env = CompleteEnv(opponent_policy="episode_mixed_basic", max_steps=500)
+        seen_ids: set[int] = set()
+        for seed in range(20):
+            env.reset(seed=seed * 1000)
+            seen_ids.add(id(env._ntp_policy))
+        self.assertGreater(len(seen_ids), 1, "NTP policy fn should vary across episodes")
+
+    def test_nash_optimal_policy_returns_legal_action(self) -> None:
+        from complete_rl.nash_ntp import compute_nash_ntp_strategies
+        from complete_rl.env import _NASH_NTP_STRATEGY_CACHE
+        config = RulesConfig()
+        _NASH_NTP_STRATEGY_CACHE[config] = compute_nash_ntp_strategies(
+            config, max_states=30, vi_epsilon=1e-2
+        )
+        env = CompleteEnv(opponent_policy="nash_optimal")
+        obs, _ = env.reset(seed=7)
+        mask = env.action_masks()
+        legal = int(np.where(mask)[0][0])
+        obs2, reward, terminated, truncated, _ = env.step(legal)
+        self.assertEqual(obs2.shape, (OBS_SIZE,))
+
+    def test_nash_optimal_policy_is_seed_deterministic(self) -> None:
+        from complete_rl.nash_ntp import compute_nash_ntp_strategies
+        from complete_rl.env import _NASH_NTP_STRATEGY_CACHE
+        config = RulesConfig()
+        _NASH_NTP_STRATEGY_CACHE[config] = compute_nash_ntp_strategies(
+            config, max_states=30, vi_epsilon=1e-2
+        )
+        env = CompleteEnv(opponent_policy="nash_optimal")
+        obs0, _ = env.reset(seed=42)
+        action = int(np.where(env.action_masks())[0][0])
+        obs1, r1, t1, tr1, _ = env.step(action)
+
+        obs0b, _ = env.reset(seed=42)
+        obs2, r2, t2, tr2, _ = env.step(action)
+
+        np.testing.assert_array_equal(obs0, obs0b)
+        np.testing.assert_array_equal(obs1, obs2)
+        self.assertEqual(r1, r2)
+        self.assertEqual(t1, t2)
+        self.assertEqual(tr1, tr2)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -267,6 +267,7 @@ def build_model(
     batch_size: int = 64,
     n_epochs: int = 4,
     gamma: float = 0.99,
+    ent_coef: float = 0.0,
     device: str = "auto",
     tensorboard_log: str | None = None,
     verbose: int = 0,
@@ -288,6 +289,7 @@ def build_model(
         batch_size=batch_size,
         n_epochs=n_epochs,
         gamma=gamma,
+        ent_coef=ent_coef,
         seed=seed,
         device=device,
         tensorboard_log=tensorboard_log,
@@ -371,6 +373,7 @@ def train_maskable_ppo(
     batch_size: int = 64,
     n_epochs: int = 4,
     gamma: float = 0.99,
+    ent_coef: float = 0.0,
     eval_episodes: int = 20,
     ntp_policy: str = "random",
     reward_mode: str = "terminal",
@@ -381,8 +384,16 @@ def train_maskable_ppo(
     bc_max_states: int = 400,
     bc_epochs: int = 5,
     bc_lr: float = 1e-3,
+    curriculum_warmup_steps: int = 0,
+    curriculum_warmup_policy: str = "none",
 ) -> TrainingResult:
-    """Train and optionally save a MaskablePPO baseline."""
+    """Train and optionally save a MaskablePPO baseline.
+
+    When *curriculum_warmup_steps* > 0, training runs in two phases:
+    1. Warmup: *curriculum_warmup_steps* steps against *curriculum_warmup_policy*
+       with ``reward_mode="material"`` to establish decisive number-declaration play.
+    2. Main: remaining steps against *ntp_policy* with original *reward_mode*.
+    """
     env = make_env(
         config=config,
         seed=seed,
@@ -398,6 +409,7 @@ def train_maskable_ppo(
         batch_size=batch_size,
         n_epochs=n_epochs,
         gamma=gamma,
+        ent_coef=ent_coef,
         device=device,
         tensorboard_log=tensorboard_log,
         verbose=verbose,
@@ -419,7 +431,28 @@ def train_maskable_ppo(
             seed=seed,
             verbose=bool(verbose),
         )
-    model.learn(total_timesteps=total_timesteps)
+    if curriculum_warmup_steps > 0:
+        warmup_env = make_env(
+            config=config,
+            seed=seed,
+            max_steps=max_steps,
+            ntp_policy=curriculum_warmup_policy,
+            reward_mode="material",
+        )
+        model.set_env(warmup_env)
+        if verbose:
+            print(
+                f"Curriculum warmup: {curriculum_warmup_steps} steps "
+                f"vs {curriculum_warmup_policy} (material reward)..."
+            )
+        model.learn(total_timesteps=curriculum_warmup_steps)
+        main_steps = max(0, total_timesteps - curriculum_warmup_steps)
+        model.set_env(env)
+        if verbose:
+            print(f"Curriculum main: {main_steps} steps vs {ntp_policy}...")
+        model.learn(total_timesteps=main_steps)
+    else:
+        model.learn(total_timesteps=total_timesteps)
 
     evaluation = evaluate_model(
         model,
@@ -431,6 +464,66 @@ def train_maskable_ppo(
         reward_mode="terminal",
     )
 
+    artifacts = TrainingArtifacts(model_path=None, metrics_path=None)
+    if output_dir is not None:
+        artifacts = _write_artifacts(
+            model=model,
+            evaluation=evaluation,
+            output_dir=Path(output_dir),
+            config=config,
+            total_timesteps=total_timesteps,
+            seed=seed,
+            ntp_policy=ntp_policy,
+            reward_mode=reward_mode,
+        )
+    return TrainingResult(evaluation=evaluation, artifacts=artifacts)
+
+
+def finetune_saved_model(
+    model_path: str | Path,
+    config: RulesConfig = RulesConfig(),
+    *,
+    output_dir: str | Path | None = None,
+    seed: int = 0,
+    total_timesteps: int = 10_000,
+    max_steps: int = 500,
+    ntp_policy: str = "random",
+    reward_mode: str = "terminal",
+    eval_episodes: int = 20,
+    verbose: int = 0,
+) -> TrainingResult:
+    """Load a saved MaskablePPO model and continue training with a new environment.
+
+    Useful for curriculum fine-tuning: start from a specialist model and adapt
+    it to a different NTP policy without full retraining.
+    """
+    try:
+        from sb3_contrib import MaskablePPO
+    except ImportError as exc:
+        raise ImportError("Fine-tuning requires sb3-contrib.") from exc
+
+    model = MaskablePPO.load(str(model_path))
+    env = make_env(
+        config=config,
+        seed=seed,
+        max_steps=max_steps,
+        ntp_policy=ntp_policy,
+        reward_mode=reward_mode,
+    )
+    model.set_env(env)
+    if verbose:
+        print(f"Fine-tuning from {model_path}: {total_timesteps} steps vs {ntp_policy}...")
+    model.learn(total_timesteps=total_timesteps)
+
+    evaluation = evaluate_model(
+        model,
+        config=config,
+        episodes=eval_episodes,
+        seed=seed + 100_000,
+        max_steps=max_steps,
+        ntp_policy=ntp_policy,
+        reward_mode="terminal",
+    )
     artifacts = TrainingArtifacts(model_path=None, metrics_path=None)
     if output_dir is not None:
         artifacts = _write_artifacts(
@@ -546,6 +639,7 @@ def train_maskable_ppo_multi_seed(
     batch_size: int = 64,
     n_epochs: int = 4,
     gamma: float = 0.99,
+    ent_coef: float = 0.0,
     eval_episodes: int = 20,
     ntp_policy: str = "random",
     reward_mode: str = "terminal",
@@ -557,6 +651,8 @@ def train_maskable_ppo_multi_seed(
     bc_max_states: int = 400,
     bc_epochs: int = 5,
     bc_lr: float = 1e-3,
+    curriculum_warmup_steps: int = 0,
+    curriculum_warmup_policy: str = "none",
 ) -> MultiSeedResult:
     """Train the same MaskablePPO setting across multiple random seeds."""
     output = Path(output_dir)
@@ -588,6 +684,7 @@ def train_maskable_ppo_multi_seed(
             batch_size=batch_size,
             n_epochs=n_epochs,
             gamma=gamma,
+            ent_coef=ent_coef,
             eval_episodes=eval_episodes,
             ntp_policy=ntp_policy,
             reward_mode=reward_mode,
@@ -598,6 +695,8 @@ def train_maskable_ppo_multi_seed(
             bc_max_states=bc_max_states,
             bc_epochs=bc_epochs,
             bc_lr=bc_lr,
+            curriculum_warmup_steps=curriculum_warmup_steps,
+            curriculum_warmup_policy=curriculum_warmup_policy,
         )
         runs.append(
             SeedRunResult(
@@ -627,6 +726,7 @@ def train_maskable_ppo_all_configs(
     batch_size: int = 64,
     n_epochs: int = 4,
     gamma: float = 0.99,
+    ent_coef: float = 0.0,
     eval_episodes: int = 20,
     ntp_policy: str = "random",
     reward_mode: str = "terminal",
@@ -638,6 +738,8 @@ def train_maskable_ppo_all_configs(
     bc_max_states: int = 400,
     bc_epochs: int = 5,
     bc_lr: float = 1e-3,
+    curriculum_warmup_steps: int = 0,
+    curriculum_warmup_policy: str = "none",
 ) -> AllConfigsResult:
     """Train one MaskablePPO batch for each Mirror/Reversi configuration."""
     output = Path(output_dir)
@@ -659,6 +761,7 @@ def train_maskable_ppo_all_configs(
             batch_size=batch_size,
             n_epochs=n_epochs,
             gamma=gamma,
+            ent_coef=ent_coef,
             eval_episodes=eval_episodes,
             ntp_policy=ntp_policy,
             reward_mode=reward_mode,
@@ -670,6 +773,8 @@ def train_maskable_ppo_all_configs(
             bc_max_states=bc_max_states,
             bc_epochs=bc_epochs,
             bc_lr=bc_lr,
+            curriculum_warmup_steps=curriculum_warmup_steps,
+            curriculum_warmup_policy=curriculum_warmup_policy,
         )
         config_results.append(ConfigRunResult(label=label, config=config, result=result))
 
@@ -705,6 +810,8 @@ def main(argv: Iterable[str] | None = None) -> int:
     parser.add_argument("--batch-size", type=int)
     parser.add_argument("--n-epochs", type=int)
     parser.add_argument("--gamma", type=float)
+    parser.add_argument("--ent-coef", type=float, default=0.0,
+                        help="Entropy regularization coefficient (default: 0.0).")
     parser.add_argument("--eval-episodes", type=int)
     parser.add_argument(
         "--ntp-policy",
@@ -722,6 +829,14 @@ def main(argv: Iterable[str] | None = None) -> int:
         "--eval-model",
         type=Path,
         help="Evaluate a saved MaskablePPO model instead of training.",
+    )
+    parser.add_argument(
+        "--fine-tune-from",
+        type=Path,
+        help=(
+            "Load a saved MaskablePPO model and continue training with the "
+            "current NTP policy/reward settings instead of training from scratch."
+        ),
     )
     parser.add_argument(
         "--eval-dir",
@@ -778,6 +893,21 @@ def main(argv: Iterable[str] | None = None) -> int:
         default=1e-3,
         help="Adam learning rate for BC pre-training (default: 1e-3).",
     )
+    parser.add_argument(
+        "--curriculum-warmup-steps",
+        type=int,
+        default=0,
+        help=(
+            "If > 0, run a warmup phase of this many timesteps vs "
+            "--curriculum-warmup-policy (material reward) before main training."
+        ),
+    )
+    parser.add_argument(
+        "--curriculum-warmup-policy",
+        choices=_ntp_policy_choices(),
+        default="none",
+        help="NTP policy used during the curriculum warmup phase (default: none).",
+    )
     args = parser.parse_args(list(argv) if argv is not None else None)
 
     config = RulesConfig(enable_mirror=args.mirror, enable_reversi=args.reversi)
@@ -791,6 +921,7 @@ def main(argv: Iterable[str] | None = None) -> int:
     batch_size = args.batch_size if args.batch_size is not None else preset.batch_size
     n_epochs = args.n_epochs if args.n_epochs is not None else preset.n_epochs
     gamma = args.gamma if args.gamma is not None else preset.gamma
+    ent_coef = args.ent_coef if args.ent_coef != 0.0 else 0.0
     eval_episodes = (
         args.eval_episodes if args.eval_episodes is not None else preset.eval_episodes
     )
@@ -827,6 +958,26 @@ def main(argv: Iterable[str] | None = None) -> int:
         print(json.dumps(result.to_dict(), ensure_ascii=False, indent=2))
         return 0
 
+    if args.fine_tune_from:
+        result = finetune_saved_model(
+            args.fine_tune_from,
+            config=config,
+            output_dir=args.output_dir,
+            seed=args.seed,
+            total_timesteps=total_timesteps,
+            max_steps=max_steps,
+            ntp_policy=args.ntp_policy,
+            reward_mode=args.reward_mode,
+            eval_episodes=eval_episodes,
+            verbose=0 if args.quiet else 1,
+        )
+        print(json.dumps(result.evaluation.to_dict(), ensure_ascii=False, indent=2))
+        if result.artifacts.model_path:
+            print(f"Wrote {result.artifacts.model_path}")
+        if result.artifacts.metrics_path:
+            print(f"Wrote {result.artifacts.metrics_path}")
+        return 0
+
     if args.all_configs:
         result = train_maskable_ppo_all_configs(
             seeds=seeds or (args.seed,),
@@ -838,6 +989,7 @@ def main(argv: Iterable[str] | None = None) -> int:
             batch_size=batch_size,
             n_epochs=n_epochs,
             gamma=gamma,
+            ent_coef=ent_coef,
             eval_episodes=eval_episodes,
             ntp_policy=args.ntp_policy,
             reward_mode=args.reward_mode,
@@ -849,6 +1001,8 @@ def main(argv: Iterable[str] | None = None) -> int:
             bc_max_states=args.bc_max_states,
             bc_epochs=args.bc_epochs,
             bc_lr=args.bc_lr,
+            curriculum_warmup_steps=args.curriculum_warmup_steps,
+            curriculum_warmup_policy=args.curriculum_warmup_policy,
         )
         print(json.dumps(result.to_dict(), ensure_ascii=False, indent=2))
         if result.summary_path:
@@ -869,6 +1023,7 @@ def main(argv: Iterable[str] | None = None) -> int:
             batch_size=batch_size,
             n_epochs=n_epochs,
             gamma=gamma,
+            ent_coef=ent_coef,
             eval_episodes=eval_episodes,
             ntp_policy=args.ntp_policy,
             reward_mode=args.reward_mode,
@@ -880,6 +1035,8 @@ def main(argv: Iterable[str] | None = None) -> int:
             bc_max_states=args.bc_max_states,
             bc_epochs=args.bc_epochs,
             bc_lr=args.bc_lr,
+            curriculum_warmup_steps=args.curriculum_warmup_steps,
+            curriculum_warmup_policy=args.curriculum_warmup_policy,
         )
         print(json.dumps(result.to_dict(), ensure_ascii=False, indent=2))
         if result.summary_path:
@@ -899,6 +1056,7 @@ def main(argv: Iterable[str] | None = None) -> int:
         batch_size=batch_size,
         n_epochs=n_epochs,
         gamma=gamma,
+        ent_coef=ent_coef,
         eval_episodes=eval_episodes,
         ntp_policy=args.ntp_policy,
         reward_mode=args.reward_mode,
@@ -909,6 +1067,8 @@ def main(argv: Iterable[str] | None = None) -> int:
         bc_max_states=args.bc_max_states,
         bc_epochs=args.bc_epochs,
         bc_lr=args.bc_lr,
+        curriculum_warmup_steps=args.curriculum_warmup_steps,
+        curriculum_warmup_policy=args.curriculum_warmup_policy,
     )
 
     print(json.dumps(result.evaluation.to_dict(), ensure_ascii=False, indent=2))
@@ -1013,7 +1173,7 @@ def _parse_ntp_policies(value: str | None, default_policy: str) -> tuple[str, ..
 
 
 def _ntp_policy_choices() -> list[str]:
-    return ["random", *MIXED_NTP_POLICIES, *sorted(NAMED_NTP_POLICIES)]
+    return ["random", *MIXED_NTP_POLICIES, "nash_optimal", *sorted(NAMED_NTP_POLICIES)]
 
 
 def _iter_seed_models(directory: Path) -> tuple[tuple[int, Path], ...]:

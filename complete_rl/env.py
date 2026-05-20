@@ -68,11 +68,26 @@ from complete_solver.constants import (
     ULTIMATE_TP_SKILLS,
 )
 from complete_solver.transition import transition
-from complete_rl.obs import OBS_SIZE, encode_state
+from complete_rl.obs import N_REACTION_HISTORY, OBS_SIZE, encode_state
 
 OpponentPolicy = Callable[[State, RulesConfig], NTPAction]
 REWARD_MODES: tuple[str, ...] = ("terminal", "material")
-MIXED_NTP_POLICIES: tuple[str, ...] = ("mixed_basic", "weighted_none_counter")
+MIXED_NTP_POLICIES: tuple[str, ...] = (
+    "mixed_basic",
+    "weighted_none_counter",
+    "episode_mixed_basic",
+    "episode_weighted_none_counter",
+)
+
+# Module-level cache so Nash strategies are computed at most once per config.
+_NASH_NTP_STRATEGY_CACHE: dict[RulesConfig, dict] = {}
+
+
+def _get_nash_ntp_strategies(config: RulesConfig) -> dict:
+    if config not in _NASH_NTP_STRATEGY_CACHE:
+        from complete_rl.nash_ntp import compute_nash_ntp_strategies
+        _NASH_NTP_STRATEGY_CACHE[config] = compute_nash_ntp_strategies(config)
+    return _NASH_NTP_STRATEGY_CACHE[config]
 
 
 # ── Opponent policies ────────────────────────────────────────────────────
@@ -254,18 +269,37 @@ class CompleteEnv(gym.Env):
             raise ValueError(f"reward_mode must be one of {valid_modes}; got {reward_mode!r}")
         self.reward_mode = reward_mode
 
+        self._episode_ntp_pool: list[str] | None = None
+
         if opponent_policy == "random":
             self._ntp_policy: OpponentPolicy = self._seeded_random_ntp_policy
         elif opponent_policy == "mixed_basic":
             self._ntp_policy = self._seeded_mixed_basic_ntp_policy
         elif opponent_policy == "weighted_none_counter":
             self._ntp_policy = self._seeded_weighted_none_counter_ntp_policy
+        elif opponent_policy == "episode_mixed_basic":
+            pool = ["none", "counter_first", "block_first", "random"]
+            if config.enable_mirror:
+                pool.append("mirror_first")
+            self._episode_ntp_pool = pool
+            self._ntp_policy = self._seeded_random_ntp_policy  # replaced each reset
+        elif opponent_policy == "episode_weighted_none_counter":
+            self._episode_ntp_pool = [
+                "none", "none",
+                "counter_first", "counter_first",
+                "block_first",
+                "random",
+            ]
+            self._ntp_policy = self._seeded_random_ntp_policy  # replaced each reset
+        elif opponent_policy == "nash_optimal":
+            self._ntp_policy = self._seeded_nash_optimal_ntp_policy
+            self._nash_strategies = _get_nash_ntp_strategies(config)
         elif isinstance(opponent_policy, str) and opponent_policy in NAMED_NTP_POLICIES:
             self._ntp_policy = NAMED_NTP_POLICIES[opponent_policy]
         elif callable(opponent_policy):
             self._ntp_policy = opponent_policy
         else:
-            valid = ", ".join(["random", *MIXED_NTP_POLICIES, *sorted(NAMED_NTP_POLICIES)])
+            valid = ", ".join(["random", *MIXED_NTP_POLICIES, "nash_optimal", *sorted(NAMED_NTP_POLICIES)])
             raise ValueError(
                 "opponent_policy must be a callable or one of "
                 f"{valid}; got {opponent_policy!r}"
@@ -282,6 +316,7 @@ class CompleteEnv(gym.Env):
 
         self._state: State = State()
         self._steps: int = 0
+        self._reaction_history: list[str] = []
 
     # ── Gymnasium API ────────────────────────────────────────────────────
 
@@ -296,6 +331,13 @@ class CompleteEnv(gym.Env):
             self._rng.seed(seed)
         self._state = State()
         self._steps = 0
+        self._reaction_history = []
+        if self._episode_ntp_pool is not None:
+            chosen = self._rng.choice(self._episode_ntp_pool)
+            if chosen == "random":
+                self._ntp_policy = self._seeded_random_ntp_policy
+            else:
+                self._ntp_policy = NAMED_NTP_POLICIES[chosen]
         return encode_state(self._state), {}
 
     def step(
@@ -310,8 +352,14 @@ class CompleteEnv(gym.Env):
         self._steps += 1
         truncated = self._steps >= self.max_steps
 
+        # Record NTP reaction for observation history (most recent first).
+        self._reaction_history.insert(0, ntp_action.reaction)
+        if len(self._reaction_history) > N_REACTION_HISTORY:
+            self._reaction_history.pop()
+        history = tuple(self._reaction_history)
+
         if result.terminal_reward is not None:
-            obs = encode_state(self._state)   # return obs of terminal state
+            obs = encode_state(self._state, history)
             return obs, float(result.terminal_reward), True, truncated, {
                 "events": result.events,
                 "reward_mode": self.reward_mode,
@@ -319,7 +367,7 @@ class CompleteEnv(gym.Env):
 
         assert result.next_state is not None
         self._state = result.next_state
-        obs = encode_state(self._state)
+        obs = encode_state(self._state, history)
         shaped_reward = self._intermediate_reward(
             before_state,
             self._state,
@@ -367,6 +415,16 @@ class CompleteEnv(gym.Env):
         if config.enable_mirror:
             policy_names.append("mirror_first")
         return self._choose_named_ntp_policy(policy_names, state, config)
+
+    def _seeded_nash_optimal_ntp_policy(
+        self, state: State, config: RulesConfig
+    ) -> NTPAction:
+        """Sample NTP action from the Nash equilibrium NTP mixed strategy."""
+        entry = self._nash_strategies.get(state)
+        if entry is None:
+            return self._seeded_random_ntp_policy(state, config)
+        ntp_acts, probs = entry
+        return self._rng.choices(ntp_acts, weights=probs, k=1)[0]
 
     def _choose_named_ntp_policy(
         self,

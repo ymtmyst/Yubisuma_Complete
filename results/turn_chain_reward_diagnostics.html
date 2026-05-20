@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>Extra Turn Reward Diagnostics</title>
+<style>
+body { font-family: "Segoe UI", sans-serif; background: #f7f8fa; color: #222; margin: 0; }
+header { background: #263238; color: white; padding: 22px 32px; }
+main { max-width: 1240px; margin: 24px auto; padding: 0 16px 42px; }
+.card { background: white; border: 1px solid #d8dde6; border-radius: 8px; padding: 18px; margin-bottom: 18px; }
+h1 { font-size: 22px; margin: 0 0 4px; }
+h2 { font-size: 17px; margin: 0 0 12px; }
+p, li { line-height: 1.65; }
+table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+th, td { border-bottom: 1px solid #e5e8ef; padding: 7px 8px; text-align: left; vertical-align: top; }
+th { background: #eef2f7; font-weight: 650; }
+.warn { color: #9a3412; font-weight: 650; }
+</style>
+</head>
+<body>
+<header>
+  <h1>追加ターン・報酬診断</h1>
+  <p>学習なし / 深さ 4 / terminal-only と material-cumulative の比較</p>
+</header>
+<main>
+  <section class="card">
+    <h2>総合所見</h2>
+    <ul>
+      <li>ガード、ブースト、スキップ、タイムの追加ターン取得そのものには即時報酬が入っていません。</li>
+      <li class="warn">ただし、探索深さ内で追加ターンを使えるため、初手評価では追加ターン系が高く出やすいです。</li>
+      <li>terminal-only と material-cumulative の順位差が大きい場合は、報酬設計または葉評価の影響を疑うべきです。</li>
+      <li>ロックは今回の主検証から外し、即時報酬と候補表への掲載に留めています。</li>
+    </ul>
+  </section>
+  <section class="card">
+    <h2>即時報酬チェック</h2>
+    <table><thead><tr><th>TP行動</th><th>NTP反応</th><th>同一手番継続</th><th>即時報酬</th><th>イベント</th></tr></thead><tbody><tr><td>ガード, thumb=0</td><td>NTP(なし,thumb=0)</td><td>True</td><td>0.0</td><td>guard_extra_turn</td></tr><tr><td>ブースト, thumb=0</td><td>NTP(なし,thumb=0)</td><td>True</td><td>0.0</td><td>boost</td></tr><tr><td>スキップ, thumb=0</td><td>NTP(なし,thumb=0)</td><td>False</td><td>0.0</td><td>skip_applied</td></tr><tr><td>タイム, thumb=0</td><td>NTP(なし,thumb=0)</td><td>True</td><td>0.0</td><td>time_set</td></tr><tr><td>フェイント, thumb=0</td><td>NTP(カウンター,thumb=0)</td><td>True</td><td>0.04</td><td>feint_success</td></tr><tr><td>ロック, thumb=0</td><td>NTP(カウンター,thumb=0)</td><td>False</td><td>0.0</td><td>lock_success</td></tr><tr><td>数字宣言 total=0, thumb=0</td><td>NTP(カウンター,thumb=0)</td><td>False</td><td>-0.04</td><td>counter_number_hit_opp_scores</td></tr></tbody></table>
+  </section>
+  <section class="card">
+    <h2>初手候補の評価と代表的な次手</h2>
+    <table><thead><tr><th>条件</th><th>初手</th><th>分類</th><th>即時報酬</th><th>同一手番継続</th><th>terminal値</th><th>material値</th><th>terminal次手</th><th>material次手</th><th>イベント</th></tr></thead><tbody><tr><td>0%カウンター + 指は一様ランダム</td><td>ガード, thumb=0</td><td>通常スキル</td><td>0.0</td><td>True</td><td>0.3333</td><td>0.3544</td><td>タイム, thumb=0 (0.333)</td><td>タイム, thumb=0 (0.354)</td><td>guard_extra_turn</td></tr><tr><td>0%カウンター + 指は一様ランダム</td><td>ブースト, thumb=0</td><td>必殺スキル</td><td>0.0</td><td>True</td><td>0.0</td><td>0.09</td><td>ガード, thumb=0 (0.000)</td><td>ガード, thumb=0 (0.090)</td><td>boost</td></tr><tr><td>0%カウンター + 指は一様ランダム</td><td>スキップ, thumb=0</td><td>通常スキル</td><td>0.0</td><td>False</td><td>0.0</td><td>0.03</td><td>パス, thumb=0 (0.000)</td><td>パス, thumb=0 (-0.030)</td><td>skip_applied</td></tr><tr><td>0%カウンター + 指は一様ランダム</td><td>タイム, thumb=0</td><td>必殺スキル</td><td>0.0</td><td>True</td><td>0.3333</td><td>0.3544</td><td>ガード, thumb=0 (0.333)</td><td>ガード, thumb=0 (0.354)</td><td>time_set</td></tr><tr><td>0%カウンター + 指は一様ランダム</td><td>フラッシュ, thumb=0</td><td>通常スキル</td><td>0.09</td><td>False</td><td>-1.0</td><td>-0.97</td><td>コピー, thumb=0 (1.000)</td><td>コピー, thumb=0 (1.000)</td><td>flash_two_hands</td></tr><tr><td>0%カウンター + 指は一様ランダム</td><td>フラッシュ, thumb=1</td><td>通常スキル</td><td>0.0</td><td>False</td><td>-1.0</td><td>-0.97</td><td>ブースト, thumb=0 (1.000)</td><td>ブースト, thumb=0 (1.000)</td><td>flash_miss</td></tr><tr><td>0%カウンター + 指は一様ランダム</td><td>クイック, thumb=0</td><td>通常スキル</td><td>0.0</td><td>False</td><td>-1.0</td><td>-1.0</td><td>ブースト, thumb=0 (1.000)</td><td>ブースト, thumb=0 (1.000)</td><td>quick</td></tr><tr><td>0%カウンター + 指は一様ランダム</td><td>セメント, thumb=0</td><td>通常スキル</td><td>0.0</td><td>False</td><td>-1.0</td><td>-1.0</td><td>ブースト, thumb=0 (1.000)</td><td>ブースト, thumb=0 (1.000)</td><td>cement_applied</td></tr><tr><td>0%カウンター + 指は一様ランダム</td><td>チャージ, thumb=0</td><td>通常スキル</td><td>0.0</td><td>False</td><td>-1.0</td><td>-1.0</td><td>ブースト, thumb=0 (1.000)</td><td>ブースト, thumb=0 (1.000)</td><td>charge_set</td></tr><tr><td>0%カウンター + 指は一様ランダム</td><td>数字宣言 total=2, thumb=0</td><td>数字宣言</td><td>0.0</td><td>False</td><td>-1.0</td><td>-0.9867</td><td>ブースト, thumb=0 (1.000)</td><td>ブースト, thumb=0 (1.000)</td><td>number_miss</td></tr><tr><td>0%カウンター + 指は一様ランダム</td><td>数字宣言 total=0, thumb=0</td><td>数字宣言</td><td>0.04</td><td>False</td><td>-1.0</td><td>-0.9867</td><td>ブースト, thumb=0 (1.000)</td><td>ブースト, thumb=0 (1.000)</td><td>number_hit</td></tr><tr><td>0%カウンター + 指は一様ランダム</td><td>フェイント, thumb=0</td><td>対カウンター</td><td>0.0</td><td>False</td><td>-1.0</td><td>-1.0</td><td>コピー, thumb=0 (1.000)</td><td>コピー, thumb=0 (1.000)</td><td>feint_no_counter</td></tr><tr><td>0%カウンター + 指は一様ランダム</td><td>ロック, thumb=0</td><td>対カウンター</td><td>0.0</td><td>False</td><td>-1.0</td><td>-1.0</td><td>ブースト, thumb=0 (1.000)</td><td>ブースト, thumb=0 (1.000)</td><td>lock_no_counter</td></tr><tr><td>0%カウンター + 最小指固定</td><td>ガード, thumb=0</td><td>通常スキル</td><td>0.0</td><td>True</td><td>1.0</td><td>1.09</td><td>タイム, thumb=0 (1.000)</td><td>タイム, thumb=0 (1.090)</td><td>guard_extra_turn</td></tr><tr><td>0%カウンター + 最小指固定</td><td>ブースト, thumb=0</td><td>必殺スキル</td><td>0.0</td><td>True</td><td>0.0</td><td>0.09</td><td>ガード, thumb=0 (0.000)</td><td>ガード, thumb=0 (0.090)</td><td>boost</td></tr><tr><td>0%カウンター + 最小指固定</td><td>スキップ, thumb=0</td><td>通常スキル</td><td>0.0</td><td>False</td><td>0.0</td><td>0.09</td><td>パス, thumb=0 (0.000)</td><td>パス, thumb=0 (-0.090)</td><td>skip_applied</td></tr><tr><td>0%カウンター + 最小指固定</td><td>タイム, thumb=0</td><td>必殺スキル</td><td>0.0</td><td>True</td><td>1.0</td><td>1.09</td><td>ガード, thumb=0 (1.000)</td><td>ガード, thumb=0 (1.090)</td><td>time_set</td></tr><tr><td>0%カウンター + 最小指固定</td><td>フラッシュ, thumb=0</td><td>通常スキル</td><td>0.09</td><td>False</td><td>-1.0</td><td>-0.91</td><td>コピー, thumb=0 (1.000)</td><td>コピー, thumb=0 (1.000)</td><td>flash_two_hands</td></tr><tr><td>0%カウンター + 最小指固定</td><td>フラッシュ, thumb=1</td><td>通常スキル</td><td>0.0</td><td>False</td><td>-1.0</td><td>-1.04</td><td>ガード, thumb=0 (1.000)</td><td>ブースト, thumb=0 (1.040)</td><td>flash_miss</td></tr><tr><td>0%カウンター + 最小指固定</td><td>クイック, thumb=0</td><td>通常スキル</td><td>0.0</td><td>False</td><td>-1.0</td><td>-1.04</td><td>ガード, thumb=0 (1.000)</td><td>ブースト, thumb=0 (1.040)</td><td>quick</td></tr><tr><td>0%カウンター + 最小指固定</td><td>セメント, thumb=0</td><td>通常スキル</td><td>0.0</td><td>False</td><td>-1.0</td><td>-1.04</td><td>ガード, thumb=0 (1.000)</td><td>ブースト, thumb=0 (1.040)</td><td>cement_applied</td></tr><tr><td>0%カウンター + 最小指固定</td><td>チャージ, thumb=0</td><td>通常スキル</td><td>0.0</td><td>False</td><td>-1.0</td><td>-1.04</td><td>ガード, thumb=0 (1.000)</td><td>ブースト, thumb=0 (1.040)</td><td>charge_set</td></tr><tr><td>0%カウンター + 最小指固定</td><td>数字宣言 total=2, thumb=0</td><td>数字宣言</td><td>0.0</td><td>False</td><td>-1.0</td><td>-1.04</td><td>ガード, thumb=0 (1.000)</td><td>ブースト, thumb=0 (1.040)</td><td>number_miss</td></tr><tr><td>0%カウンター + 最小指固定</td><td>数字宣言 total=0, thumb=0</td><td>数字宣言</td><td>0.04</td><td>False</td><td>-1.0</td><td>-1.0</td><td>ガード, thumb=0 (1.000)</td><td>ブースト, thumb=0 (1.040)</td><td>number_hit</td></tr><tr><td>0%カウンター + 最小指固定</td><td>フェイント, thumb=0</td><td>対カウンター</td><td>0.0</td><td>False</td><td>-1.0</td><td>-1.04</td><td>ガード, thumb=0 (1.000)</td><td>ブースト, thumb=0 (1.040)</td><td>feint_no_counter</td></tr><tr><td>0%カウンター + 最小指固定</td><td>ロック, thumb=0</td><td>対カウンター</td><td>0.0</td><td>False</td><td>-1.0</td><td>-1.04</td><td>ガード, thumb=0 (1.000)</td><td>ブースト, thumb=0 (1.040)</td><td>lock_no_counter</td></tr></tbody></table>
+  </section>
+  <section class="card">
+    <h2>深さ感度</h2>
+    <table><thead><tr><th>条件</th><th>深さ</th><th>terminal首位</th><th>terminal値</th><th>material首位</th><th>material値</th></tr></thead><tbody><tr><td>0%カウンター + 指は一様ランダム</td><td>2</td><td>ガード, thumb=0</td><td>0.0</td><td>ガード, thumb=0</td><td>0.03</td></tr><tr><td>0%カウンター + 指は一様ランダム</td><td>3</td><td>ガード, thumb=0</td><td>0.3333</td><td>ガード, thumb=0</td><td>0.3544</td></tr><tr><td>0%カウンター + 指は一様ランダム</td><td>4</td><td>ガード, thumb=0</td><td>0.3333</td><td>ガード, thumb=0</td><td>0.3544</td></tr><tr><td>0%カウンター + 最小指固定</td><td>2</td><td>ガード, thumb=0</td><td>0.0</td><td>ガード, thumb=0</td><td>0.09</td></tr><tr><td>0%カウンター + 最小指固定</td><td>3</td><td>ガード, thumb=0</td><td>1.0</td><td>ガード, thumb=0</td><td>1.09</td></tr><tr><td>0%カウンター + 最小指固定</td><td>4</td><td>ガード, thumb=0</td><td>1.0</td><td>ガード, thumb=0</td><td>1.09</td></tr></tbody></table>
+  </section>
+  <section class="card">
+    <h2>連打プローブ</h2>
+    <p>指定スキルを合法な限り優先し、合法でなければ数字宣言へフォールバックした簡易プローブです。無限報酬化の有無を見るための粗い確認です。</p>
+    <table><thead><tr><th>優先スキル</th><th>ステップ</th><th>終端</th><th>打ち切り</th><th>累積material報酬</th><th>イベント抜粋</th></tr></thead><tbody><tr><td>ガード</td><td>24</td><td>False</td><td>True</td><td>0.0</td><td>guard_extra_turn, guard_no_extra_turn, guard_extra_turn, guard_no_extra_turn, guard_extra_turn, guard_no_extra_turn, guard_extra_turn, guard_no_extra_turn, guard_extra_turn, guard_no_extra_turn ...</td></tr><tr><td>スキップ</td><td>24</td><td>False</td><td>True</td><td>0.0</td><td>skip_applied, skip_pass, skip_applied, skip_pass, skip_applied, skip_pass, skip_applied, skip_pass, skip_applied, skip_pass ...</td></tr><tr><td>タイム</td><td>4</td><td>True</td><td>False</td><td>1.04</td><td>time_set, number_hit, time_set, time_interrupted_extra_turn, number_hit</td></tr><tr><td>ブースト</td><td>5</td><td>True</td><td>False</td><td>-0.92</td><td>boost, number_hit, number_hit, number_hit, boost</td></tr></tbody></table>
+  </section>
+  <section class="card">
+    <h2>次に見るべき点</h2>
+    <ul>
+      <li>追加ターン系の初手が高い場合、その次手がフラッシュ、クイック、数字、コピーなど勝利へ接続しているかを確認する。</li>
+      <li>terminal-onlyでも高いなら戦略上の価値、materialだけ高いなら報酬 shaping の副作用として扱う。</li>
+      <li>今回の表を承認後、必要ならレポート生成に「追加ターン後の勝ち筋」列を正式追加する。</li>
+    </ul>
+  </section>
+</main>
+</body>
+</html>

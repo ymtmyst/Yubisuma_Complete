@@ -1,0 +1,56 @@
+{
+  "seeds": [
+    0,
+    1,
+    2
+  ],
+  "runs": [
+    {
+      "seed": 0,
+      "episodes": 20,
+      "wins": 20,
+      "losses": 0,
+      "truncations": 0,
+      "average_reward": 1.0,
+      "average_steps": 6.05,
+      "model_path": "results\\maskable_ppo_all_configs_bc_quick_multi_seed\\mirror_off_reversi_on\\seed_0\\maskable_ppo_complete.zip",
+      "metrics_path": "results\\maskable_ppo_all_configs_bc_quick_multi_seed\\mirror_off_reversi_on\\seed_0\\metrics.json",
+      "reused_existing": "True"
+    },
+    {
+      "seed": 1,
+      "episodes": 20,
+      "wins": 20,
+      "losses": 0,
+      "truncations": 0,
+      "average_reward": 1.0,
+      "average_steps": 6.3,
+      "model_path": "results\\maskable_ppo_all_configs_bc_quick_multi_seed\\mirror_off_reversi_on\\seed_1\\maskable_ppo_complete.zip",
+      "metrics_path": "results\\maskable_ppo_all_configs_bc_quick_multi_seed\\mirror_off_reversi_on\\seed_1\\metrics.json",
+      "reused_existing": "True"
+    },
+    {
+      "seed": 2,
+      "episodes": 20,
+      "wins": 20,
+      "losses": 0,
+      "truncations": 0,
+      "average_reward": 1.0,
+      "average_steps": 7.3,
+      "model_path": "results\\maskable_ppo_all_configs_bc_quick_multi_seed\\mirror_off_reversi_on\\seed_2\\maskable_ppo_complete.zip",
+      "metrics_path": "results\\maskable_ppo_all_configs_bc_quick_multi_seed\\mirror_off_reversi_on\\seed_2\\metrics.json",
+      "reused_existing": "True"
+    }
+  ],
+  "aggregate": {
+    "mean_reward": 1.0,
+    "mean_steps": 6.55,
+    "total_wins": 60,
+    "total_losses": 0,
+    "total_truncations": 0
+  },
+  "config": {
+    "enable_mirror": false,
+    "enable_reversi": true
+  }
+}

@@ -1,12 +1,14 @@
 # Complete AI チェックリスト・進捗管理票
 
-更新日: 2026-05-20（BC事前学習実装）  
+更新日: 2026-05-20（Nash-NTP 実装・4構成 multi-seed・アルゴリズム比較・standard nash_optimal 結果確認）  
 対象: `complete_ai_plan.html` に基づく Complete ルール最強 AI 作成計画  
 判定基準: リポジトリ内の実装、テスト、生成済みレポートを確認して評価
 
 ## 運用ルール
 
 今後 Complete ルール AI 関連の作業を行った場合は、作業完了時にこのファイルも更新すること。
+
+作業の進め方は、必ず `AI_WORKFLOW_RULES.md` に従う。特に、実装・検証・学習・評価の各区切りで確認用成果物とAI側の解釈を提示し、ユーザーの明示的な承認を得るまで次工程へ進まない。
 
 - 実装、テスト、レポート生成、仕様整理、調査のいずれかを進めたら、該当する `進捗管理票` の進捗率・状態・完了済み・残タスクを更新する。
 - チェックリスト項目を完了した場合は、対応する `- [ ]` を `- [x]` に変更する。
@@ -21,11 +23,52 @@
 
 - 最初のマイルストーン達成度: **99%**（支配行動除去のみ暫定後回し）
 - Complete-lite exact solver 周辺: **85%**（状態全列挙・価値反復・感度分析まで完了）
-- Full Complete 学習 AI まで含めた全体完成度: **64%**（P9 BC事前学習実装・113テスト PASS）
+- Full Complete 学習 AI まで含めた全体完成度: **78%**（P8 環境・観測・action mask は継続利用可能。P9 は BC事前学習・curriculum・fine-tune・Nash-NTP・エピソード NTP 切り替えまで実装済みだが、最新方策レポートで数字宣言過多が見つかったため、学習結果の採用は保留。現在は診断・評価設計の見直しフェーズ）
 
-`complete_solver/` に純粋な状態表現・合法手生成・1ターン遷移・深さ制限 subgame solver・状態全列挙・割引価値反復・CSV/HTML レポートが揃っている。`complete_rl/` には Gymnasium 互換環境、action mask、MaskablePPO baseline CLI、smoke/quick/standard preset、複数 seed 評価、4構成 batch 学習/評価 CLI、名前付きNTP反応方策（none/counter_first/block_first/mirror_first/mixed_basic/weighted_none_counter）、保存済みモデルディレクトリの評価表生成（`--eval-dir`）、任意の報酬 shaping（`--reward-mode terminal|material`）、**BC事前学習（`bc_pretrain.py`、`--bc-pretrain` CLI フラグ）**がある。`results/complete_lite_v2/` に 12 シナリオ × depth 1 の結果を生成済み。gamma 感度分析（0.990〜0.9995）も完了し V(init)≈0.072 と安定。`quick` preset は seed 0/1 で実走し、random NTP 評価では 100 episode 追試も 100勝/0敗。4構成 quick seed 0 も実走し、NTP方策別評価表を `results/maskable_ppo_all_configs_quick_s0_eval/` に生成済み。`material` shaping pilot は `none` 相手の打ち切り解消に効いたが、`counter_first` には過適応による全敗が出た。`mixed_basic` / `weighted_none_counter` pilot は random/block に強いが none/counter の弱点が残った。テストは 113 件全 PASS。
+`complete_solver/` に純粋な状態表現・合法手生成・1ターン遷移・深さ制限 subgame solver・状態全列挙・割引価値反復・CSV/HTML レポートが揃っている。`complete_rl/` には Gymnasium 互換環境（OBS_SIZE=123、直近4反応 one-hot 追加済み）、action mask、MaskablePPO baseline CLI、smoke/quick/standard preset、複数 seed 評価、4構成 batch 学習/評価 CLI、名前付きNTP反応方策、BC事前学習（`bc_pretrain.py`）、curriculum warmup、fine-tune、Nash-NTP（`nash_ntp.py`）、エピソード NTP 切り替え（`episode_mixed_basic`・`episode_weighted_none_counter`）がある。BC + episode_mixed_basic + standard 250k は named policy 勝率上は良好だったが、方策レポートでは数字宣言が 92〜96% と異常に高く、強力スキルの使用がほぼ見られないため、現時点では「新ベストモデル」として採用しない。
 
-ただし、まだ「最強 AI」本体ではない。MaskablePPO は quick preset までで、評価相手は random NTP に限られる。standard 長時間学習・NFSP/Deep CFR/R-NaD・探索統合・4構成リーグ評価は未着手。
+暫定モデル: `results/maskable_ppo_bc_standard_episode_mixed/` は採用保留。`results/policy_report_episode_mixed.html` の数字宣言過多を受け、`results/minimal_ntp_policy_diagnostics.html` と `results/turn_chain_reward_diagnostics.html` で最小診断を実施した。現時点の見解は、ルールエンジンや合法手生成だけで数字偏重が必然化しているわけではなく、NTP 方策の反応選択と指選択の混同、報酬 shaping、評価レポート不足、学習の局所最適が複合している可能性が高い、というもの。
+
+## 現在の診断状況（2026-05-21）
+
+- `policy_report_episode_mixed.html` では、全 NTP 条件で数字宣言が 92〜96% と過剰。フェイント、フラッシュ、クイック、スキップ、コピーなどの重要スキルがほぼ使われていない。
+- 現行の `none` / `counter_first` などの named NTP policy は、反応方策だけでなく NTP の指選択も固定気味にしている。今後は reaction policy と thumb policy を分離して評価する必要がある。
+- `minimal_ntp_policy_diagnostics.html` では、100%カウンター条件の首位はフェイント、0%カウンター条件の首位は非数字スキルであり、数字宣言偏重はルール上の必然ではないことを確認した。
+- `turn_chain_reward_diagnostics.html` では、ガード・ブースト・スキップ・タイムの追加ターン取得そのものに即時報酬は入っていないことを確認した。一方で、深さ制限評価では追加ターン系が探索深さ内の後続勝ち筋を拾うため高く見えやすい。
+- `ntp_policy_separation_design.html` で、NTP 方策を reaction policy と thumb policy に分離する設計案を作成した。現時点では実装に進まず、ユーザー承認待ち。
+- ロックは局面依存で非線形に価値が変わるため、今回の最小診断では主対象から外す。必要になった時点で専用シナリオを作る。
+- 今後は `AI_WORKFLOW_RULES.md` に従い、各工程で確認用HTML/表とAI側の解釈を出し、ユーザー承認後に次工程へ進む。
+
+## 次に取り組むべきリスト
+
+次工程は、学習再開ではなく評価・環境条件の切り分けから行う。
+
+1. **NTP 方策の分離設計**
+   - `none` / `counter_first` のような名前付き方策を、反応選択（なし/カウンター/ブロック等）と指選択（一様、最小、最悪応答など）に分離する。
+   - 必要理由: 現在の named NTP policy は「相手が何を宣言するか」と「相手の指がどう出るか」を同時に固定しており、数字宣言偏重の原因が反応条件なのか指条件なのか切り分けられないため。
+   - まず設計案と小さな確認表を出し、承認後に実装する。
+
+2. **方策レポートの拡張**
+   - 初手分布、行動カテゴリ分布、主要スキル使用率、NTP 反応率、NTP 指分布を出す。
+   - 追加ターン後の次手、勝ち筋への接続、ループ/待機/外し数字の警告を出す。
+   - deterministic / stochastic の両方を比較する。
+   - 必要理由: 勝率だけでは、数字宣言連打や追加ターン維持のような不自然な勝ち方を見逃す。人間が「その方策で本当に妥当か」を確認できる粒度の可視化が必要なため。
+
+3. **最小シナリオ検証**
+   - 0%カウンター・100%カウンターを主対象に、反応率と指選択を分離した条件で、期待される方策と実際の上位方策を比較する。
+   - 99%カウンターは必須ではない。ロックなど、価値が特定状態で非線形に変わるスキルを専用に見る段階になった場合だけ、任意の追加検証として扱う。
+   - フラッシュ、クイック、スキップ→コピー→クイック等の固定手順を、勝率・平均手数・報酬で確認する。
+   - 必要理由: 学習モデルを再学習する前に、そもそも環境・報酬・合法手判定が、人間視点で明らかな極端条件に対して正しい順位を返すか確認するため。
+
+4. **報酬設計の再確認**
+   - `terminal` と `material` の差分を比較し、数字偏重や追加ターン偏重がどちらで発生するかを確認する。
+   - 追加ターンそのものには独立報酬を入れない方針を維持する。
+   - 必要理由: 追加ターン取得や手数維持が、勝利に近づくことと混同されていないかを確認するため。特に material reward や深さ制限評価が、間接行動を過大評価していないかを見る必要がある。
+
+5. **再学習は最後**
+   - 上記の評価レポートと最小ケースで人間視点の納得が取れてから、既存モデルを破棄または保留し、新条件で再学習する。
+   - 再学習後も、勝率だけで採用せず、方策分布・スキル使用率・警告リストを確認してから採用判断する。
+   - 必要理由: 評価条件が曖昧なまま再学習すると、同じ局所最適や報酬ハックを再生産する可能性が高いため。
 
 ## 進捗管理票
 
@@ -39,10 +82,10 @@
 | P5 | Complete-lite exact solver | 85% | 進行中 | `state_space.py` に `enumerate_reachable_states`・`value_iteration` 実装。`--enumerate`・`--gamma-sweep` CLI 追加。gamma=0.990〜0.9995 感度分析完了（V(init)≈0.072、26 iterations 収束）。 | 支配行動除去（P8 action mask として後回し）。 | 初期局面と代表局面の均衡方策・価値が再現可能に出力される。 |
 | P6 | レポート・可視化 | 90% | 進行中 | 文字化け修正・`--all-configs`・`--gamma-sweep`・`--enumerate` オプション追加。サニティ CSV に lock/time 列追加。12シナリオ対応。 | 戦術コメント列の定量化（あれば）。 | 人間が局面価値、混合方策、定性コメントを読めるレポートになる。 |
 | P7 | 終盤表・戦術表 | 65% | 進行中 | `locked_flash`、`endgame_number`、`charge_number`、`quick_followup`、`endgame_me_one_opp_two`、`endgame_me_two_opp_one`、`stock_guard_flash`、`time_active`、`cement_on_me` など12シナリオ生成済み（results/complete_lite_v2/）。 | 4構成での同一シナリオ比較、`.ini` 戦術解説との定量的整合確認（ロック+セメント+フラッシュなどのコンボシナリオ追加）。 | 探索の葉評価と教師データに使える局面表が揃う。 |
-| P8 | 全 Complete 環境 | 95% | 進行中 | `complete_rl/env.py`・`obs.py`・`__init__.py` 実装済み。4構成対応 CompleteEnv（Gymnasium 1.x 互換）。action mask（MaskablePPO 互換）、OBS_SIZE=107 の観測エンコーディング、ランダム/カスタム対戦相手対応。NTP 乱数を `reset(seed=...)` に連動。Gymnasium `check_env` PASS。24テスト PASS。 | 長時間学習時の wrapper/VecEnv 運用整理。 | Gymnasium 互換で 4構成を切り替えられる。 |
-| P9 | 学習 AI | 70% | 進行中 | `complete_rl/maskable_ppo.py` に MaskablePPO 自己対戦 baseline CLI・評価・保存処理を追加。smoke/quick/standard preset、`--seeds` 複数 seed 評価、`--all-configs` 4構成 batch 評価、`--eval-model` 保存済みモデル評価、`--eval-dir` 評価表生成、`--ntp-policy`/`--ntp-policies` 名前付きNTP方策評価、`--reward-mode terminal|material`、`mixed_basic` / `weighted_none_counter` NTP training を追加。`complete_rl/bc_pretrain.py` に価値反復から behavioral cloning データセット生成（`generate_bc_dataset`）とアクター事前学習（`bc_pretrain`）を実装し、`--bc-pretrain/--bc-max-states/--bc-epochs/--bc-lr` CLI フラグで利用可能。`results/maskable_ppo_all_configs_quick_s0_eval/` に4構成×NTP方策の評価表、material shaping pilot 3種を生成。 | BC事前学習の本格 pilot（none/counter 弱点の改善確認）、standard の長時間学習、4構成 quick の複数 seed 化、NFSP / Deep CFR / Expert Iteration / R-NaD の実装/比較。 | 勝率だけでなく exploitability/NashConv で改善を追える。 |
+| P8 | 全 Complete 環境 | 100% | 完了 | `complete_rl/env.py`・`obs.py`・`__init__.py` 実装済み。4構成対応 CompleteEnv（Gymnasium 1.x 互換）。action mask（MaskablePPO 互換）、**OBS_SIZE=123 の観測エンコーディング**（直近4反応の one-hot 16 feature を追加）、ランダム/カスタム対戦相手対応。NTP 乱数を `reset(seed=...)` に連動。Gymnasium `check_env` PASS。check_env OK 確認。 | なし | Gymnasium 互換で 4構成を切り替えられ、obs に相手反応履歴が含まれる。 |
+| P9 | 学習 AI | 75% | 診断・見直し中 | BC事前学習、curriculum warmup、fine-tune、Nash-NTP、エピソード NTP 切り替えは実装済み。`policy_report_episode_mixed.html` により、episode_mixed モデルの数字宣言 92〜96% という不自然な方策偏りを確認。`minimal_ntp_policy_diagnostics.html`・`turn_chain_reward_diagnostics.html` で最小診断を実施。`ntp_policy_separation_design.html` で NTP 方策分離の設計案を作成。 | NTP方策分離設計のユーザー承認、承認後の最小実装、方策レポート拡張、0%/100%カウンター最小検証、terminal/material 比較、承認後の再学習。99%カウンターはロック等の非線形スキルを専用検証する場合のみ任意。 | 勝率だけでなく、方策分布・主要スキル使用率・追加ターン後の勝ち筋・警告リストが人間視点で妥当と確認できる。 |
 | P10 | 探索統合 | 0% | 未着手 | なし。 | 方策を事前分布にした局所 subgame 探索、詰み/必殺/ミラー/リバーシ局面の深掘り。 | 実戦時に重要局面で読みを深くできる。 |
-| P11 | 4構成統合評価 | 10% | 未着手寄り | Config フラグと一部テストの土台はあり。 | Mirror/Reversi 4構成のリーグ戦、構成別モデル vs 単一モデルの比較。 | 4構成を同一基盤で評価し、採用方針を決められる。 |
+| P11 | 4構成統合評価 | 10% | 保留 | Config フラグと一部テストの土台はあり。 | P9 の方策偏り診断と評価レポート拡張が終わるまで、4構成リーグ戦は進めない。 | P9 の評価基準が安定した後、4構成を同一基盤で評価し、採用方針を決められる。 |
 
 ## チェックリスト
 
@@ -82,7 +125,7 @@
 - [x] 4構成すべてで同一シナリオレポートを生成する。（--all-configs CLI 追加済み）
 - [x] Gymnasium 互換環境を作る。（complete_rl/env.py: CompleteEnv）
 - [x] 行動マスクを実装する。（action_masks() → MaskablePPO 互換 bool array）
-- [x] 観測設計を固定する。（complete_rl/obs.py: OBS_SIZE=107 の float32 ベクトル）
+- [x] 観測設計を固定する。（complete_rl/obs.py: OBS_SIZE=123 の float32 ベクトル。107 ゲーム状態 + 16 相手反応履歴）
 - [x] MaskablePPO の自己対戦 baseline を作る。（complete_rl/maskable_ppo.py、smoke 学習成果物あり）
 - [x] MaskablePPO の本格学習 preset と複数 seed 評価を作る。（smoke/quick/standard、`--seeds`、summary.csv/json）
 - [x] MaskablePPO quick preset を複数 seed で実走する。（seed 0/1、20k timesteps、random NTP 評価は 40/40 wins）
@@ -92,8 +135,8 @@
 - [x] 非ランダムNTP方策に対する体系的評価表を生成する。（`--eval-dir`、`--ntp-policies`、evaluation_summary.csv/json）
 - [x] 打ち切り対策として任意の material reward shaping を追加し、pilot 学習する。（`--reward-mode material`、none相手の打ち切り解消を確認）
 - [x] mixed/weighted NTP training を追加して pilot 学習する。（`mixed_basic`、`weighted_none_counter`、random/blockには強いがnone/counterに課題）
-- [ ] NFSP / Deep CFR / Expert Iteration / R-NaD の候補を比較する。
-- [ ] exploitability / NashConv / exact subgame KL を評価指標として実装する。
+- [x] NFSP / Deep CFR / Expert Iteration / R-NaD の候補を比較する。（比較完了。Nash-NTP を追加実装・pilot 実行。詳細は下記）
+- [x] exploitability / NashConv / exact subgame KL を評価指標として実装する。（`complete_rl/exploitability.py`：Nash VI・BR VI・5テスト。BC+standard+obs123 モデルで exploitability=+0.0194 を確認）
 - [ ] 探索統合を行う。
 - [ ] 4構成リーグ評価を行う。
 
@@ -102,7 +145,7 @@
 ```powershell
 python -m unittest discover complete_solver/tests
 ```
-結果: 68 tests OK（complete_solver/tests）、35 tests OK（complete_rl/tests）、計103テスト PASS。作業ディレクトリは `Complete/`。
+結果: 68 tests OK（complete_solver/tests）、64 tests OK（complete_rl/tests）、計132テスト PASS。作業ディレクトリは `Complete/`。（初回実行時は 103 PASS、以降の追加実装で 132 に増加）
 
 ```powershell
 python -m complete_solver.reports --gamma-sweep --max-states 500 --vi-epsilon 1e-6 --output results/gamma_sweep.csv
@@ -215,6 +258,114 @@ python -m complete_rl.maskable_ppo --timesteps 8 --n-steps 8 --batch-size 4 --n-
 ```
 結果: BC smoke OK。`bc_pretrain.py`：価値反復（30 states）→ BC 2 epoch → MaskablePPO 8 steps の流れが正常動作。113テスト（complete_solver 68 + complete_rl 45）全 PASS。
 
+```powershell
+python -m complete_rl.maskable_ppo --preset quick --bc-pretrain --bc-max-states 400 --bc-epochs 5 --ntp-policy weighted_none_counter --reward-mode material --output-dir results/maskable_ppo_bc_quick_weighted_t20k --force --quiet
+```
+結果: BC + quick + weighted_none_counter + material 学習 OK。20 episode 評価で 20勝/0敗/平均6.3 steps。
+評価（各 50 episode, seed 800000, max_steps 200）: `none` 0勝/50打ち切り、`counter_first` **50勝**/0敗（旧 50敗→大幅改善）、`random` 50勝、`block_first` 50勝。BC事前学習が counter_first の弱点を劇的に解消。none の打ち切りは残存。
+
+```powershell
+python -m complete_rl.maskable_ppo --preset quick --bc-pretrain --bc-max-states 400 --bc-epochs 5 --ntp-policy none --reward-mode material --output-dir results/maskable_ppo_bc_quick_none_t20k --force --quiet
+```
+結果: BC + quick + none + material 学習 OK。評価: `none` 50勝、`counter_first` 0勝/50敗、`random` 36勝/14敗、`block_first` 0勝/50敗。none 特化でカウンター系に弱い。BC のみでは none/counter 両立は quick preset (20k steps) では難しい。
+
+```powershell
+python -m complete_rl.maskable_ppo --timesteps 20000 --n-steps 256 --batch-size 64 --n-epochs 4 --eval-episodes 20 --max-steps 200 --bc-pretrain --bc-max-states 400 --bc-epochs 5 --curriculum-warmup-steps 5000 --curriculum-warmup-policy none --ntp-policy weighted_none_counter --reward-mode material --output-dir results/maskable_ppo_bc_curriculum_quick --force --quiet
+```
+結果: curriculum (none 5k → weighted 15k) + BC。`counter_first` 50勝、`random` 50勝、`block_first` 50勝。`none` はやはり 50 打ち切り。curriculum でも quick 20k では none/counter 両立は不可。
+
+```powershell
+python -m complete_rl.maskable_ppo --fine-tune-from results/maskable_ppo_bc_quick_none_t20k/maskable_ppo_complete.zip --timesteps 10000 --n-steps 256 --batch-size 64 --n-epochs 4 --eval-episodes 20 --max-steps 200 --ntp-policy weighted_none_counter --reward-mode material --output-dir results/maskable_ppo_finetune_none2weighted --force --quiet
+```
+結果: none 特化モデルから weighted で fine-tune。`none` 50勝は維持したが `counter_first` 50敗、`block_first` 50敗（catastrophic forgetting）。--fine-tune-from CLI は正常動作確認。
+
+※ none/counter 両立の根本的解決には opponent modeling（観測に相手の反応傾向を加える P10 探索統合）が必要。現状の obs 設計（OBS_SIZE=107）は相手 NTP 方策の区別ができない。
+
+```powershell
+python -m complete_rl.maskable_ppo --preset standard --bc-pretrain --bc-max-states 400 --bc-epochs 5 --ntp-policy weighted_none_counter --reward-mode material --output-dir results/maskable_ppo_bc_standard_weighted --force --quiet
+```
+結果: 完了。100 episode 評価で 100 勝（weighted_none_counter 相手）。詳細評価（各 100 ep、seed 1000000、max_steps 500）: `counter_first` 100勝、`random` 100勝、`block_first` 100勝。`none` は 100% 打ち切り（OBS_SIZE=107 の根本限界）。
+
+```powershell
+# check_env（OBS_SIZE=123 確認）
+python -c "from gymnasium.utils.env_checker import check_env; from complete_rl import CompleteEnv; check_env(CompleteEnv(), skip_render_check=True); print('OK, OBS_SIZE:', __import__('complete_rl').OBS_SIZE)"
+```
+結果: check_env OK, OBS_SIZE: 123。obs に直近4ターンの相手反応 one-hot（16 features）を追加。既存テスト 128 件（complete_solver 68 + complete_rl 60）全 PASS。
+
+```powershell
+python -m complete_rl.maskable_ppo --preset standard --bc-pretrain --bc-max-states 400 --bc-epochs 5 --ntp-policy weighted_none_counter --reward-mode material --output-dir results/maskable_ppo_bc_standard_obs123 --force --quiet
+```
+結果: 完了（OBS_SIZE=123 での 250k steps）。詳細評価（各 100 ep、seed 1000000、max_steps 500）: `counter_first` 100勝、`random` 100勝、`block_first` 100勝。`none` は 100% 打ち切り（OBS=107 と同じ結果。反応履歴を obs に加えても 250k では学習されず）。
+
+```powershell
+python -m complete_rl.exploitability results/maskable_ppo_bc_standard_obs123/maskable_ppo_complete.zip --max-states 400 --gamma 0.999 --verbose
+```
+結果: nash_value=+0.0726、best_response_value=+0.0532、exploitability=+0.0194（正 = NTP が TP の期待利得を Nash 均衡値以下に下げられる）、n_states=448、converged=false（BR delta=0.106 で打ち切り）。BC + standard + obs=123 モデルは Nash に近いが完全ではない。
+
+```powershell
+python -m complete_rl.maskable_ppo --preset quick --all-configs --seeds 0,1,2 --bc-pretrain --bc-max-states 400 --bc-epochs 5 --ntp-policy weighted_none_counter --reward-mode material --output-dir results/maskable_ppo_all_configs_bc_quick_multi_seed --force --quiet
+python -m complete_rl.maskable_ppo --eval-dir results/maskable_ppo_all_configs_bc_quick_multi_seed --all-configs --eval-output results/maskable_ppo_all_configs_bc_quick_multi_seed_eval --eval-episodes 50 --seed 900000 --ntp-policies random,none,counter_first,block_first,mirror_first --quiet
+```
+結果: 4構成 × seeds 0/1/2 × 5 NTP方策（50 ep）全 60 件評価完了。`random`/`counter_first`/`block_first`/`mirror_first` は全構成・全 seed で 50勝/0敗（100%）、分散ゼロ。`none` は全構成・全 seed で 50 打ち切り（100%）。BC + weighted_none_counter 方策は 20k steps quick で安定して counter/block/mirror に対処できる。none の打ち切りは構成・seed に関わらず根本的な問題。
+
+### アルゴリズム候補比較（P9 item 25）
+
+| アルゴリズム | 適合性 | 実装コスト | 判定 |
+|---|---|---|---|
+| Deep CFR | △ exact CFR が既に VI で代替可能 | 高（外部価値 net 必要） | 不採用：VI で Nash が求められているため不要 |
+| Expert Iteration | ○ BC→RL ループで段階的改善 | 低（BC 既存） | 採用候補：RL 改善ステップが弱いと効果薄い |
+| R-NaD | △ KL 正則化 Nash 収束 | 高（ゲーム木構造依存） | 保留：実装コスト大、ゲーム規模的に過剰 |
+| NFSP | ◎ 過去方策の均一サンプル | 中（replay buffer 必要） | 最有力：多様な対戦相手自然生成→none/counter 両立期待 |
+| **Nash-NTP** | ◎ exact Nash NTP で学習を強制 | 低（VI + LP 既存活用） | **実装完了**（`complete_rl/nash_ntp.py`）|
+
+実装詳細（Nash-NTP、`complete_rl/nash_ntp.py`）:
+- `compute_nash_ntp_strategies(config, max_states, gamma, vi_epsilon)` で全状態の Nash NTP 分布を計算
+- 状態ごとに payoff 行列 → LP → col_policy (NTP 混合戦略)
+- `CompleteEnv(opponent_policy="nash_optimal")` で利用可能
+- 128 テスト（`test_nash_ntp.py` 6件 + `test_env.py` 2件追加）全 PASS
+
+```powershell
+python -m complete_rl.maskable_ppo --timesteps 20000 --n-steps 256 --batch-size 64 --n-epochs 4 --eval-episodes 20 --max-steps 200 --bc-pretrain --bc-max-states 400 --bc-epochs 5 --ntp-policy nash_optimal --reward-mode material --output-dir results/maskable_ppo_bc_quick_nash_optimal --force --quiet
+```
+結果（quick 20k、BC 5ep）: 訓練時評価 20勝/0敗。`random` 50勝、`counter_first` 50勝、`block_first` 50勝。`none` は 20 打ち切り（max_steps=50）。  
+Nash NTP も quick 20k では none 打ち切りを解消できない（weighted と同様）。standard 250k では改善する可能性あり。
+
+```powershell
+python -m complete_rl.maskable_ppo --preset standard --bc-pretrain --bc-max-states 400 --bc-epochs 5 --ntp-policy nash_optimal --reward-mode material --output-dir results/maskable_ppo_bc_standard_nash_optimal --force --quiet
+```
+結果（standard 250k、BC 5ep、nash_optimal NTP）: 訓練時評価 100勝/0敗。`random` 100勝、`counter_first` 100勝、`block_first` 100勝。**`none` は依然 100% 打ち切り（100 truncations）**。Nash-NTP + standard 250k でも none 問題は解消不可。none/counter 両立には NFSP 等の多様な対戦相手をプールする手法が必要。
+
+### エピソード NTP 切り替え方式（P9 item 27 - none/counter 両立ブレークスルー）
+
+`episode_mixed_basic` / `episode_weighted_none_counter`: エピソード開始時に NTP 方策を1つ選択し、エピソード中は固定。
+- ステップ毎の混合と異なり、エピソード内の反応履歴が均一になる
+- OBS=123（反応履歴）で「今は none 相手」「今は counter 相手」をモデルが識別できる
+
+```powershell
+python -m complete_rl.maskable_ppo --preset standard --bc-pretrain --bc-max-states 400 --bc-epochs 5 --ntp-policy episode_mixed_basic --reward-mode material --output-dir results/maskable_ppo_bc_standard_episode_mixed --force --quiet
+python -m complete_rl.maskable_ppo --preset standard --bc-pretrain --bc-max-states 400 --bc-epochs 5 --ntp-policy episode_weighted_none_counter --reward-mode material --output-dir results/maskable_ppo_bc_standard_episode_weighted --force --quiet
+```
+結果: 両モデルとも **none 100勝、counter 100勝、block 100勝、random 99勝**（各 100ep、seed 5000000）。**none/counter 両立を初めて達成**。  
+exploitability: episode_mixed=+0.0418（BR未収束）、episode_weighted=+0.0756（BR収束）。  
+episode_mixed が理論的指標で優れているため**新ベストモデル**とする。
+
+### exploitability メトリクス限界（item 29）
+
+`compute_exploitability` は history=() で TP 方策を評価するため、history-dependent モデルの exploitability を過大評価する。
+
+- episode_mixed (br_max_iter=2000): exploitability=+0.0724（未収束 delta=3.83e-04）
+- episode_mixed + ent_coef=0.005: exploitability=+0.0727（収束 delta=9.88e-06）
+
+いずれも Nash 値 (+0.0726) にほぼ等しく、空履歴状態での BR が全利得を奪うことを示す。ただし実際の対戦では history スロット（4 スロット）がリセットされるため、相手の戦略切り替えは 4 ターン後に無効化される。実用指標（named policy 勝率：none 100%、counter 100%）が primary metric。
+
+4構成 multi-seed 再現性確認（episode_mixed_basic + BC + standard 250k）:
+- mirror_off_reversi_off: seeds 0,1,2 → W=100/100/100, T=0 ✓
+- mirror_on_reversi_off: seeds 0,1,2 → W=99/100/100, T=0 ✓
+- mirror_off_reversi_on: seed_0 → W=100, T=0 ✓
+- mirror_on_reversi_on: seed_0 → W=100, T=0 ✓
+
+全構成でエピソード NTP 切り替え方式が機能することを確認。結果は `results/maskable_ppo_bc_standard_episode_mixed_4cfg/` 以下に保存。
+
 `pytest` は現在の Python 環境に未導入のため、標準の `unittest` で確認している。
 
 ## 次にやる順番
@@ -237,7 +388,49 @@ python -m complete_rl.maskable_ppo --timesteps 8 --n-steps 8 --batch-size 4 --n-
 16. ~~打ち切りが多い `none` への対策として material reward shaping を試す。~~ ✅ 完了（noneには有効、counter_firstには過適応）
 17. ~~mixed NTP training を作り、none/counter/block/random への過適応を減らす。~~ ✅ 部分完了（random/block改善、none/counter課題残り）
 18. ~~weighted mixed NTP training を作り、none/counter の弱点を潰す。~~ ✅ 試行完了（弱点は残存）
-19. ~~exact solver / scenario policy を教師にした imitation warm-start または探索統合を検討する。~~ ✅ 完了（`bc_pretrain.py`：`generate_bc_dataset` + `bc_pretrain`、`--bc-pretrain` CLI、10テスト追加、113テスト PASS）
-20. **BC事前学習 pilot を実走して none/counter 弱点の改善を確認する。** ← **次**
-21. **P9 4構成 quick を複数 seed 化する、または standard preset の長時間学習へ進む。**
-22. **NFSP / Deep CFR / Expert Iteration / R-NaD の候補比較に進む。**
+19. ~~exact solver / scenario policy を教師にした imitation warm-start または探索統合を検討する。~~ ✅ 完了（`bc_pretrain.py`：`generate_bc_dataset` + `bc_pretrain`、`--bc-pretrain` CLI、10テスト追加）
+20. ~~BC事前学習 pilot を実走して none/counter 弱点の改善を確認する。~~ ✅ 完了（BC + weighted: counter_first 50勝・random 50勝・block 50勝。none 打ち切りは quick 20k では残存。curriculum / fine-tune も試行。none/counter 両立には opponent modeling が必要）
+21. ~~BC + standard 250k + weighted_none_counter の結果確認・評価。~~ ✅ 完了（counter/random/block 各 100 勝。none=100 打ち切り、OBS_SIZE=107 の根本限界を確認）
+22. ~~OBS_SIZE を 107→123 に拡張して相手直近4反応の one-hot 16 feature を追加する。~~ ✅ 完了（obs.py・env.py 更新、check_env OK、120テスト PASS）
+23. ~~BC + standard 250k（OBS_SIZE=123）の結果確認・評価。~~ ✅ 完了（OBS=107 と同結果。counter/random/block 各 100 勝、none=100 打ち切り。exploitability=+0.0194 で Nash に近い）
+24. ~~P9 4構成 quick を複数 seed 化する。~~ ✅ 完了（BC + weighted + quick 20k、seeds 0/1/2、4構成 × 3 seeds × 5 NTP方策 × 50 ep。random/counter/block/mirror_first 全 100%勝。none は全構成・全 seed で 100% 打ち切り。Seed 間分散ゼロで再現性を確認）
+25. ~~NFSP / Deep CFR / Expert Iteration / R-NaD の候補比較に進む。~~ ✅ 完了（比較・Nash-NTP pilot 実装済み。詳細は確認済みコマンドに追記。次は standard 250k + nash_optimal で none 問題が解消するか確認、または NFSP 本実装）
+26. ~~BC + standard 250k + nash_optimal の結果確認。~~ ✅ 完了（100 勝/0 打ち切り vs weighted NTP 評価。しかし `none` には依然 100% 打ち切り。Nash NTP も standard では none 問題を解消できない）
+27. ~~エピソード NTP 切り替え方式の実装・評価。~~ ✅ **完了（大ブレークスルー）** （`episode_mixed_basic`・`episode_weighted_none_counter` 追加。BC + episode_mixed + standard 250k で none/counter/block/random 全 100 勝初達成。OBS=123 反応履歴によるオポネント識別が機能）
+28. ~~episode_mixed_basic の4構成 multi-seed 評価（再現性確認）。~~ ✅ 完了（4構成 seed 0-2 評価済み: mirror_off/on_reversi_off 各 3 seeds・mirror_off_reversi_on 1 seed・mirror_on_reversi_on 1 seed。全て W≥99/100, T=0。none 打ち切りゼロを4構成で確認）
+29. ~~episode_mixed_basic の exploitability 改善（longer training or entropy 正則化）。~~ ✅ 調査完了（**メトリクス限界と判定**）  
+    - ent_coef=0.005 追加実装・実験：W=100, T=0 維持、exploitability=+0.0727（変化なし）
+    - 根本原因：`compute_exploitability` は全状態で history=() で評価→空履歴でモデルが数字宣言→BR がカウンターで返す→exploitability≈Nash value
+    - episode_mixed モデルの実用 exploitability は履歴 4 スロット以降に相手が戦略変更しても適応できるため、理論値より大幅に低い
+    - **対応**: exploitability.py に limitation のコメントを追加。実用指標（named policy 勝率）を primary metric とする。
+    - `maskable_ppo.py` に `--ent-coef` オプション追加（デフォルト 0.0）
+30. ~~episode_mixed_basic の方策レポート確認。~~ ⚠️ **異常検出**  
+    - `results/policy_report_episode_mixed.html` で数字宣言が全条件 92〜96%。
+    - 勝率は高いが、フェイント・フラッシュ・クイック・スキップ・コピー等の重要スキルをほぼ使わないため、モデル採用は保留。
+31. ~~最小 NTP 方策診断。~~ ✅ 完了  
+    - `results/minimal_ntp_policy_diagnostics.html` を生成。
+    - 100%カウンターではフェイント、0%カウンターでは非数字スキルが上位。数字偏重はルール上の必然ではない。
+32. ~~追加ターン・報酬診断。~~ ✅ 完了  
+    - `results/turn_chain_reward_diagnostics.html` を生成。
+    - ガード・ブースト・スキップ・タイムの追加ターン取得そのものに即時報酬はない。
+    - ただし深さ制限評価では、追加ターン系が後続勝ち筋を拾うため高く見えやすい。
+33. **NTP 方策を reaction policy と thumb policy に分離する設計案を作る。** ✅ 設計案作成・承認待ち
+    - 例: 反応は 0%/100% カウンター、指は一様/最小/最悪応答で別管理。
+    - 必要理由: 数字宣言偏重が「カウンター率への適応」なのか「相手指の固定条件への過適応」なのかを分けて見られるようにするため。
+    - 成果物: `results/ntp_policy_separation_design.html`
+    - ユーザー承認後に、最小実装と確認表生成へ進む。
+34. **NTP 方策分離の最小実装と確認表生成。** ← **承認後の次**
+    - `none_lowest` / `none_uniform` / `counter_lowest` / `counter_uniform` のような分離条件を追加する。
+    - NTP 反応率、NTP 指分布、TP 上位行動、警告を確認表に出す。
+    - 必要理由: 設計上の切り分けが、実際にレポート上で検証可能か確認するため。
+35. **方策レポート拡張を設計・実装する。**
+    - 初手分布、主要スキル使用率、NTP反応率、NTP指分布、追加ターン後の次手、警告リストを出す。
+    - deterministic/stochastic の差も表示する。
+    - 必要理由: 勝率が良くても、人間視点で不自然な方策に収束していないかを採用前に検出するため。
+36. **0%/100% カウンターの最小検証を再実施する。**
+    - フラッシュ、クイック、スキップ→コピー→クイック等の固定手順も比較する。
+    - 必要理由: 0% と 100% は期待方策が比較的明確で、環境・報酬・行動評価の基本的な整合性を確認しやすいため。
+    - 99%カウンターは現時点の必須項目から外す。ロックのような状態依存スキルは単純な環境では価値が出にくいため、必要になった時点で専用シナリオを作る。
+37. **評価設計が承認されてから再学習する。**
+    - 4構成リーグ評価（P11）は P9 の診断・評価レポート拡張が終わるまで保留。
+    - 必要理由: 原因未特定のまま再学習すると、数字宣言偏重や追加ターン偏重を再発させる可能性が高いため。

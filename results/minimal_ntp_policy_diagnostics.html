@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>Minimal NTP Policy Diagnostics</title>
+<style>
+body { font-family: "Segoe UI", sans-serif; background: #f7f8fa; color: #222; margin: 0; }
+header { background: #243447; color: white; padding: 22px 32px; }
+main { max-width: 1180px; margin: 24px auto; padding: 0 16px 40px; }
+.card { background: white; border: 1px solid #d8dde6; border-radius: 8px; padding: 18px; margin-bottom: 18px; }
+h1 { font-size: 22px; margin: 0 0 4px; }
+h2 { font-size: 17px; margin: 0 0 12px; }
+h3 { font-size: 14px; margin: 14px 0 8px; }
+.muted { color: #5f6b7a; font-size: 13px; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { border-bottom: 1px solid #e5e8ef; padding: 7px 9px; text-align: left; vertical-align: top; }
+th { background: #eef2f7; font-weight: 650; }
+td:last-child { font-weight: 600; }
+ul { margin: 0; padding-left: 20px; }
+.warn { color: #9a3412; }
+</style>
+</head>
+<body>
+<header>
+  <h1>最小NTP方策診断</h1>
+  <p>深さ 5 / 学習なし / 反応率と指選択を分離</p>
+</header>
+<main>
+  <section class="card">
+    <h2>今回の目的</h2>
+    <p>現在の学習結果が「数字宣言ばかり」になっている原因を、PPOの学習問題に入る前に切り分けるための表です。特に、現行の named NTP policy がカウンター有無だけでなく指選択まで固定している影響を確認します。</p>
+  </section>
+  <section class="card">
+    <h2>既存レポートの行動分布</h2>
+    <p class="muted">対象: results/policy_report_episode_mixed.html</p>
+    <table><thead><tr><th>policy</th><th>数字宣言</th><th>スキル</th><th>対カウンタースキル</th><th>必殺</th><th>オール</th><th>パス</th></tr></thead><tbody><tr><td>none</td><td>94.7%</td><td>0.7%</td><td>0.2%</td><td>4.2%</td><td>0.0%</td><td>0.1%</td></tr><tr><td>counter_first</td><td>92.5%</td><td>0.7%</td><td>0.0%</td><td>6.8%</td><td>0.0%</td><td>0.0%</td></tr><tr><td>block_first</td><td>96.4%</td><td>0.2%</td><td>0.2%</td><td>3.2%</td><td>0.0%</td><td>0.0%</td></tr><tr><td>random</td><td>96.2%</td><td>0.2%</td><td>0.5%</td><td>3.1%</td><td>0.0%</td><td>0.0%</td></tr><tr><td>episode_mixed_basic</td><td>96.0%</td><td>0.6%</td><td>0.2%</td><td>3.2%</td><td>0.0%</td><td>0.0%</td></tr></tbody></table>
+  </section>
+  <section class="card">
+    <h2>総合警告</h2>
+    <ul><li>最小検証の全シナリオで、首位行動は数字宣言ではありません。既存レポートの数字宣言92〜96%は、ルール上の必然ではなく学習・評価側の異常候補です。</li><li>既存レポートでは数字宣言が過剰です: none=94.7%, counter_first=92.5%, block_first=96.4%, random=96.2%, episode_mixed_basic=96.0%</li><li>現行の none/counter_first は、カウンター有無だけでなくNTPの指選択も最小指寄りに固定します。今後の評価では reaction policy と thumb policy を分離してください。</li><li>今回の深さ制限計算では、100%カウンター条件の首位はフェイント、0%カウンター条件の首位は非数字スキルでした。Case A/Bの人間側仮説は大筋で支持されます。</li></ul>
+  </section>
+  <section class="card">
+    <h2>シナリオ要約</h2>
+    <table><thead><tr><th>条件</th><th>確認したいこと</th><th>首位行動</th><th>分類</th><th>値</th><th>警告</th></tr></thead><tbody><tr><td>100%カウンター + 指は一様ランダム</td><td>フェイントなど対カウンター行動が上位に来るか確認</td><td>フェイント, thumb=0</td><td>対カウンター</td><td>1.0</td><td>なし</td></tr><tr><td>100%カウンター + 最小指固定（現行counter_firstに近い）</td><td>数字外しが強く見えるなら、固定指が原因候補</td><td>フェイント, thumb=0</td><td>対カウンター</td><td>1.0</td><td>なし</td></tr><tr><td>0%カウンター + 指は一様ランダム</td><td>フラッシュ、クイック、スキップ等が数字より上位に来るか確認</td><td>ブースト, thumb=0</td><td>必殺スキル</td><td>0.8307</td><td>なし</td></tr><tr><td>0%カウンター + 最小指固定（現行noneに近い）</td><td>数字やフラッシュが過剰に強く見えるなら、固定指が原因候補</td><td>ガード, thumb=0</td><td>通常スキル</td><td>1.0</td><td>なし</td></tr><tr><td>100%カウンター + NTP指はTPに最悪応答</td><td>最悪条件でもフェイントが残るか確認</td><td>フェイント, thumb=0</td><td>対カウンター</td><td>1.0</td><td>なし</td></tr><tr><td>0%カウンター + NTP指はTPに最悪応答</td><td>ランダム指で強かった行動が固定指依存でないか確認</td><td>ブースト, thumb=0</td><td>必殺スキル</td><td>0.52</td><td>なし</td></tr></tbody></table>
+  </section>
+  
+            <section class="card">
+              <h2>100%カウンター + 指は一様ランダム</h2>
+              <p class="muted">フェイントなど対カウンター行動が上位に来るか確認</p>
+              <table><thead><tr><th>順位</th><th>行動</th><th>分類</th><th>スキル</th><th>値</th></tr></thead><tbody><tr><td>1</td><td>フェイント, thumb=0</td><td>対カウンター</td><td>フェイント</td><td>1.0</td></tr><tr><td>2</td><td>フェイント, thumb=1</td><td>対カウンター</td><td>フェイント</td><td>1.0</td></tr><tr><td>3</td><td>フェイント, thumb=2</td><td>対カウンター</td><td>フェイント</td><td>1.0</td></tr><tr><td>4</td><td>ガード, thumb=0</td><td>通常スキル</td><td>ガード</td><td>-1.0</td></tr><tr><td>5</td><td>ガード, thumb=1</td><td>通常スキル</td><td>ガード</td><td>-1.0</td></tr><tr><td>6</td><td>ガード, thumb=2</td><td>通常スキル</td><td>ガード</td><td>-1.0</td></tr><tr><td>7</td><td>クイック, thumb=0</td><td>通常スキル</td><td>クイック</td><td>-1.0</td></tr><tr><td>8</td><td>クイック, thumb=1</td><td>通常スキル</td><td>クイック</td><td>-1.0</td></tr><tr><td>9</td><td>クイック, thumb=2</td><td>通常スキル</td><td>クイック</td><td>-1.0</td></tr><tr><td>10</td><td>スキップ, thumb=0</td><td>通常スキル</td><td>スキップ</td><td>-1.0</td></tr><tr><td>11</td><td>スキップ, thumb=1</td><td>通常スキル</td><td>スキップ</td><td>-1.0</td></tr><tr><td>12</td><td>スキップ, thumb=2</td><td>通常スキル</td><td>スキップ</td><td>-1.0</td></tr></tbody></table>
+              <h3>警告</h3>
+              <p>警告なし</p>
+            </section>
+            
+            <section class="card">
+              <h2>100%カウンター + 最小指固定（現行counter_firstに近い）</h2>
+              <p class="muted">数字外しが強く見えるなら、固定指が原因候補</p>
+              <table><thead><tr><th>順位</th><th>行動</th><th>分類</th><th>スキル</th><th>値</th></tr></thead><tbody><tr><td>1</td><td>フェイント, thumb=0</td><td>対カウンター</td><td>フェイント</td><td>1.0</td></tr><tr><td>2</td><td>フェイント, thumb=1</td><td>対カウンター</td><td>フェイント</td><td>1.0</td></tr><tr><td>3</td><td>フェイント, thumb=2</td><td>対カウンター</td><td>フェイント</td><td>1.0</td></tr><tr><td>4</td><td>ガード, thumb=0</td><td>通常スキル</td><td>ガード</td><td>-1.0</td></tr><tr><td>5</td><td>ガード, thumb=1</td><td>通常スキル</td><td>ガード</td><td>-1.0</td></tr><tr><td>6</td><td>ガード, thumb=2</td><td>通常スキル</td><td>ガード</td><td>-1.0</td></tr><tr><td>7</td><td>クイック, thumb=0</td><td>通常スキル</td><td>クイック</td><td>-1.0</td></tr><tr><td>8</td><td>クイック, thumb=1</td><td>通常スキル</td><td>クイック</td><td>-1.0</td></tr><tr><td>9</td><td>クイック, thumb=2</td><td>通常スキル</td><td>クイック</td><td>-1.0</td></tr><tr><td>10</td><td>スキップ, thumb=0</td><td>通常スキル</td><td>スキップ</td><td>-1.0</td></tr><tr><td>11</td><td>スキップ, thumb=1</td><td>通常スキル</td><td>スキップ</td><td>-1.0</td></tr><tr><td>12</td><td>スキップ, thumb=2</td><td>通常スキル</td><td>スキップ</td><td>-1.0</td></tr></tbody></table>
+              <h3>警告</h3>
+              <p>警告なし</p>
+            </section>
+            
+            <section class="card">
+              <h2>0%カウンター + 指は一様ランダム</h2>
+              <p class="muted">フラッシュ、クイック、スキップ等が数字より上位に来るか確認</p>
+              <table><thead><tr><th>順位</th><th>行動</th><th>分類</th><th>スキル</th><th>値</th></tr></thead><tbody><tr><td>1</td><td>ブースト, thumb=0</td><td>必殺スキル</td><td>ブースト</td><td>0.8307</td></tr><tr><td>2</td><td>ブースト, thumb=1</td><td>必殺スキル</td><td>ブースト</td><td>0.8307</td></tr><tr><td>3</td><td>ブースト, thumb=2</td><td>必殺スキル</td><td>ブースト</td><td>0.8307</td></tr><tr><td>4</td><td>ガード, thumb=0</td><td>通常スキル</td><td>ガード</td><td>0.51</td></tr><tr><td>5</td><td>ガード, thumb=1</td><td>通常スキル</td><td>ガード</td><td>0.51</td></tr><tr><td>6</td><td>ガード, thumb=2</td><td>通常スキル</td><td>ガード</td><td>0.51</td></tr><tr><td>7</td><td>タイム, thumb=0</td><td>必殺スキル</td><td>タイム</td><td>0.3067</td></tr><tr><td>8</td><td>タイム, thumb=1</td><td>必殺スキル</td><td>タイム</td><td>0.3067</td></tr><tr><td>9</td><td>タイム, thumb=2</td><td>必殺スキル</td><td>タイム</td><td>0.3067</td></tr><tr><td>10</td><td>スキップ, thumb=0</td><td>通常スキル</td><td>スキップ</td><td>0.2656</td></tr><tr><td>11</td><td>スキップ, thumb=1</td><td>通常スキル</td><td>スキップ</td><td>0.2656</td></tr><tr><td>12</td><td>スキップ, thumb=2</td><td>通常スキル</td><td>スキップ</td><td>0.2656</td></tr></tbody></table>
+              <h3>警告</h3>
+              <p>警告なし</p>
+            </section>
+            
+            <section class="card">
+              <h2>0%カウンター + 最小指固定（現行noneに近い）</h2>
+              <p class="muted">数字やフラッシュが過剰に強く見えるなら、固定指が原因候補</p>
+              <table><thead><tr><th>順位</th><th>行動</th><th>分類</th><th>スキル</th><th>値</th></tr></thead><tbody><tr><td>1</td><td>ガード, thumb=0</td><td>通常スキル</td><td>ガード</td><td>1.0</td></tr><tr><td>2</td><td>ガード, thumb=1</td><td>通常スキル</td><td>ガード</td><td>1.0</td></tr><tr><td>3</td><td>ガード, thumb=2</td><td>通常スキル</td><td>ガード</td><td>1.0</td></tr><tr><td>4</td><td>スキップ, thumb=0</td><td>通常スキル</td><td>スキップ</td><td>1.0</td></tr><tr><td>5</td><td>スキップ, thumb=1</td><td>通常スキル</td><td>スキップ</td><td>1.0</td></tr><tr><td>6</td><td>スキップ, thumb=2</td><td>通常スキル</td><td>スキップ</td><td>1.0</td></tr><tr><td>7</td><td>タイム, thumb=0</td><td>必殺スキル</td><td>タイム</td><td>1.0</td></tr><tr><td>8</td><td>タイム, thumb=1</td><td>必殺スキル</td><td>タイム</td><td>1.0</td></tr><tr><td>9</td><td>タイム, thumb=2</td><td>必殺スキル</td><td>タイム</td><td>1.0</td></tr><tr><td>10</td><td>ブースト, thumb=0</td><td>必殺スキル</td><td>ブースト</td><td>0.54</td></tr><tr><td>11</td><td>ブースト, thumb=1</td><td>必殺スキル</td><td>ブースト</td><td>0.54</td></tr><tr><td>12</td><td>ブースト, thumb=2</td><td>必殺スキル</td><td>ブースト</td><td>0.54</td></tr></tbody></table>
+              <h3>警告</h3>
+              <p>警告なし</p>
+            </section>
+            
+            <section class="card">
+              <h2>100%カウンター + NTP指はTPに最悪応答</h2>
+              <p class="muted">最悪条件でもフェイントが残るか確認</p>
+              <table><thead><tr><th>順位</th><th>行動</th><th>分類</th><th>スキル</th><th>値</th></tr></thead><tbody><tr><td>1</td><td>フェイント, thumb=0</td><td>対カウンター</td><td>フェイント</td><td>1.0</td></tr><tr><td>2</td><td>フェイント, thumb=1</td><td>対カウンター</td><td>フェイント</td><td>1.0</td></tr><tr><td>3</td><td>フェイント, thumb=2</td><td>対カウンター</td><td>フェイント</td><td>1.0</td></tr><tr><td>4</td><td>ガード, thumb=0</td><td>通常スキル</td><td>ガード</td><td>-1.0</td></tr><tr><td>5</td><td>ガード, thumb=1</td><td>通常スキル</td><td>ガード</td><td>-1.0</td></tr><tr><td>6</td><td>ガード, thumb=2</td><td>通常スキル</td><td>ガード</td><td>-1.0</td></tr><tr><td>7</td><td>クイック, thumb=0</td><td>通常スキル</td><td>クイック</td><td>-1.0</td></tr><tr><td>8</td><td>クイック, thumb=1</td><td>通常スキル</td><td>クイック</td><td>-1.0</td></tr><tr><td>9</td><td>クイック, thumb=2</td><td>通常スキル</td><td>クイック</td><td>-1.0</td></tr><tr><td>10</td><td>スキップ, thumb=0</td><td>通常スキル</td><td>スキップ</td><td>-1.0</td></tr><tr><td>11</td><td>スキップ, thumb=1</td><td>通常スキル</td><td>スキップ</td><td>-1.0</td></tr><tr><td>12</td><td>スキップ, thumb=2</td><td>通常スキル</td><td>スキップ</td><td>-1.0</td></tr></tbody></table>
+              <h3>警告</h3>
+              <p>警告なし</p>
+            </section>
+            
+            <section class="card">
+              <h2>0%カウンター + NTP指はTPに最悪応答</h2>
+              <p class="muted">ランダム指で強かった行動が固定指依存でないか確認</p>
+              <table><thead><tr><th>順位</th><th>行動</th><th>分類</th><th>スキル</th><th>値</th></tr></thead><tbody><tr><td>1</td><td>ブースト, thumb=0</td><td>必殺スキル</td><td>ブースト</td><td>0.52</td></tr><tr><td>2</td><td>ブースト, thumb=1</td><td>必殺スキル</td><td>ブースト</td><td>0.52</td></tr><tr><td>3</td><td>ブースト, thumb=2</td><td>必殺スキル</td><td>ブースト</td><td>0.52</td></tr><tr><td>4</td><td>ガード, thumb=0</td><td>通常スキル</td><td>ガード</td><td>0.51</td></tr><tr><td>5</td><td>ガード, thumb=1</td><td>通常スキル</td><td>ガード</td><td>0.51</td></tr><tr><td>6</td><td>ガード, thumb=2</td><td>通常スキル</td><td>ガード</td><td>0.51</td></tr><tr><td>7</td><td>スキップ, thumb=0</td><td>通常スキル</td><td>スキップ</td><td>0.03</td></tr><tr><td>8</td><td>スキップ, thumb=1</td><td>通常スキル</td><td>スキップ</td><td>0.03</td></tr><tr><td>9</td><td>スキップ, thumb=2</td><td>通常スキル</td><td>スキップ</td><td>0.03</td></tr><tr><td>10</td><td>タイム, thumb=0</td><td>必殺スキル</td><td>タイム</td><td>0.02</td></tr><tr><td>11</td><td>タイム, thumb=1</td><td>必殺スキル</td><td>タイム</td><td>0.02</td></tr><tr><td>12</td><td>タイム, thumb=2</td><td>必殺スキル</td><td>タイム</td><td>0.02</td></tr></tbody></table>
+              <h3>警告</h3>
+              <p>警告なし</p>
+            </section>
+            
+  <section class="card">
+    <h2>次に確認すべきこと</h2>
+    <ul>
+      <li>100%カウンター + 一様指でフェイントが上位に来るか。</li>
+      <li>0%カウンター + 一様指で数字宣言が首位になり続けるか。</li>
+      <li>最小指固定だけで数字宣言が強く見えるなら、現行NTP policyを反応率と指選択に分離する。</li>
+      <li>この表の解釈が人間視点と一致してから、実装修正・再学習に進む。</li>
+    </ul>
+  </section>
+</main>
+</body>
+</html>

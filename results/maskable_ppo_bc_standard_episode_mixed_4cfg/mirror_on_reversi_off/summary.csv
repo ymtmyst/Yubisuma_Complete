@@ -1,0 +1,4 @@
+﻿seed,episodes,wins,losses,truncations,average_reward,average_steps,model_path,metrics_path,reused_existing
+0,100,99,1,0,0.98,4.22,results\maskable_ppo_bc_standard_episode_mixed_4cfg\mirror_on_reversi_off\seed_0\maskable_ppo_complete.zip,results\maskable_ppo_bc_standard_episode_mixed_4cfg\mirror_on_reversi_off\seed_0\metrics.json,False
+1,100,100,0,0,1.0,3.79,results\maskable_ppo_bc_standard_episode_mixed_4cfg\mirror_on_reversi_off\seed_1\maskable_ppo_complete.zip,results\maskable_ppo_bc_standard_episode_mixed_4cfg\mirror_on_reversi_off\seed_1\metrics.json,False
+2,100,100,0,0,1.0,3.63,results\maskable_ppo_bc_standard_episode_mixed_4cfg\mirror_on_reversi_off\seed_2\maskable_ppo_complete.zip,results\maskable_ppo_bc_standard_episode_mixed_4cfg\mirror_on_reversi_off\seed_2\metrics.json,False

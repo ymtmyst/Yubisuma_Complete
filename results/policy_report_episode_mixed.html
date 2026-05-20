@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>方策分析レポート — maskable_ppo_bc_standard_episode_mixed</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; background: #f5f5f5; color: #333; }
+  header { background: #1976D2; color: #fff; padding: 20px 32px; }
+  header h1 { font-size: 1.4em; }
+  header p { font-size: 0.85em; opacity: 0.85; margin-top: 4px; }
+  .container { max-width: 1200px; margin: 24px auto; padding: 0 16px; }
+  .card { background: #fff; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,.12);
+            padding: 20px; margin-bottom: 20px; }
+  h2 { font-size: 1.1em; color: #1976D2; margin-bottom: 14px; border-bottom: 2px solid #E3F2FD;
+        padding-bottom: 6px; }
+  h3 { font-size: 0.95em; color: #555; margin: 14px 0 6px; }
+  .summary-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px,1fr));
+                   gap: 12px; }
+  .summary-cell { border-radius: 6px; padding: 14px; text-align: center; }
+  .summary-cell .label { font-size: 0.75em; color: #777; margin-bottom: 4px; }
+  .summary-cell .big { font-size: 1.6em; font-weight: 700; }
+  .summary-cell .sub { font-size: 0.75em; color: #555; margin-top: 2px; }
+  .chart-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  @media(max-width:700px) { .chart-row { grid-template-columns: 1fr; } }
+  canvas { max-height: 340px; }
+  .tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+  .tab { padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 0.82em;
+           background: #E3F2FD; color: #1976D2; border: none; }
+  .tab.active { background: #1976D2; color: #fff; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.82em; }
+  th, td { padding: 6px 10px; text-align: left; border-bottom: 1px solid #eee; }
+  th { background: #F5F5F5; font-weight: 600; color: #555; }
+  .bar-cell { position: relative; }
+  .bar-inner { height: 14px; border-radius: 3px; background: #4CAF50; display: inline-block; min-width: 2px; }
+  .note { font-size: 0.78em; color: #888; margin-top: 8px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>方策分析レポート</h1>
+  <p>モデル: maskable_ppo_bc_standard_episode_mixed &nbsp;|&nbsp; エピソード数: 300 / NTP方策 &nbsp;|&nbsp;
+     最大ステップ: 300</p>
+</header>
+<div class="container">
+
+<!-- 1. Summary -->
+<div class="card" id="summary-section">
+  <h2>1. 勝敗サマリー</h2>
+  <div id="summary-grid" class="summary-grid"></div>
+</div>
+
+<!-- 2. Broad action distribution -->
+<div class="card">
+  <h2>2. 行動カテゴリ分布（NTP方策別）</h2>
+  <p class="note" style="margin-bottom:10px">各バーは全ステップ中の割合（%）。数字宣言 vs スキル の対比に注目。</p>
+  <canvas id="broadChart"></canvas>
+</div>
+
+<!-- 3. Early vs Late -->
+<div class="card">
+  <h2>3. ゲーム序盤（0-2ステップ）vs 後半（3+ステップ）の行動比較</h2>
+  <p class="note" style="margin-bottom:10px">OBS=123 の反応履歴が蓄積した後、行動パターンがどう変わるかを確認。</p>
+  <div class="tabs" id="el-tabs"></div>
+  <div class="chart-row">
+    <div><h3>序盤（0-2ステップ）</h3><canvas id="earlyChart"></canvas></div>
+    <div><h3>後半（3+ステップ）</h3><canvas id="lateChart"></canvas></div>
+  </div>
+</div>
+
+<!-- 4. Number values -->
+<div class="card">
+  <h2>4. 宣言した数字の分布（0〜4）</h2>
+  <p class="note" style="margin-bottom:10px">数字宣言がある場合、どの数字（0〜4）を選ぶかの割合（全行動に対する%）。</p>
+  <canvas id="numChart"></canvas>
+</div>
+
+<!-- 5. Skill detail table -->
+<div class="card">
+  <h2>5. 使用スキル詳細（上位15件）</h2>
+  <div class="tabs" id="skill-tabs"></div>
+  <div id="skill-table-container"></div>
+</div>
+
+</div><!-- /container -->
+<script>
+const policies = ["none", "counter_first", "block_first", "random", "episode_mixed_basic"];
+const ntpLabels = ["none（反応なし）", "counter（カウンター優先）", "block（ブロック優先）", "random（ランダム）", "episode_mixed（混合）"];
+const broadDatasets = [{"label": "数字宣言", "data": [94.7, 92.5, 96.4, 96.2, 96.0], "backgroundColor": "#4CAF50"}, {"label": "スキル", "data": [0.7, 0.7, 0.2, 0.2, 0.6], "backgroundColor": "#2196F3"}, {"label": "対カウタースキル", "data": [0.2, 0.0, 0.2, 0.5, 0.2], "backgroundColor": "#FF9800"}, {"label": "アルティメット", "data": [4.2, 6.8, 3.2, 3.1, 3.2], "backgroundColor": "#9C27B0"}, {"label": "オール", "data": [0.0, 0.0, 0.0, 0.0, 0.0], "backgroundColor": "#00BCD4"}, {"label": "パス", "data": [0.1, 0.0, 0.0, 0.0, 0.0], "backgroundColor": "#9E9E9E"}];
+const numDatasets = [{"label": "none（反応なし）", "data": [1.9, 75.3, 0.2, 0.1, 17.2], "backgroundColor": "#4CAF50CC", "borderColor": "#4CAF50", "borderWidth": 1}, {"label": "counter（カウンター優先）", "data": [64.3, 0.8, 1.3, 3.9, 22.1], "backgroundColor": "#F44336CC", "borderColor": "#F44336", "borderWidth": 1}, {"label": "block（ブロック優先）", "data": [73.7, 0.6, 0.9, 4.3, 16.9], "backgroundColor": "#2196F3CC", "borderColor": "#2196F3", "borderWidth": 1}, {"label": "random（ランダム）", "data": [71.4, 6.8, 0.7, 6.2, 11.2], "backgroundColor": "#FF9800CC", "borderColor": "#FF9800", "borderWidth": 1}, {"label": "episode_mixed（混合）", "data": [59.5, 15.7, 0.3, 4.1, 16.4], "backgroundColor": "#9C27B0CC", "borderColor": "#9C27B0", "borderWidth": 1}];
+const elData = {"none": {"early": {"数字宣言": 93.4, "スキル": 0.9, "対カウタースキル": 0.0, "アルティメット": 5.7, "オール": 0.0, "パス": 0.0}, "late": {"数字宣言": 98.4, "スキル": 0.3, "対カウタースキル": 1.0, "アルティメット": 0.0, "オール": 0.0, "パス": 0.3}}, "counter_first": {"early": {"数字宣言": 91.9, "スキル": 0.8, "対カウタースキル": 0.0, "アルティメット": 7.3, "オール": 0.0, "パス": 0.0}, "late": {"数字宣言": 100.0, "スキル": 0.0, "対カウタースキル": 0.0, "アルティメット": 0.0, "オール": 0.0, "パス": 0.0}}, "block_first": {"early": {"数字宣言": 94.3, "スキル": 0.3, "対カウタースキル": 0.1, "アルティメット": 5.2, "オール": 0.0, "パス": 0.0}, "late": {"数字宣言": 99.6, "スキル": 0.0, "対カウタースキル": 0.4, "アルティメット": 0.0, "オール": 0.0, "パス": 0.0}}, "random": {"early": {"数字宣言": 92.6, "スキル": 0.2, "対カウタースキル": 0.4, "アルティメット": 6.8, "オール": 0.0, "パス": 0.0}, "late": {"数字宣言": 99.3, "スキル": 0.2, "対カウタースキル": 0.5, "アルティメット": 0.0, "オール": 0.0, "パス": 0.0}}, "episode_mixed_basic": {"early": {"数字宣言": 93.9, "スキル": 0.9, "対カウタースキル": 0.1, "アルティメット": 5.1, "オール": 0.0, "パス": 0.0}, "late": {"数字宣言": 99.6, "スキル": 0.0, "対カウタースキル": 0.4, "アルティメット": 0.0, "オール": 0.0, "パス": 0.0}}};
+const skillTables = {"none": [{"skill": "数字宣言", "count": 1145, "pct": 94.7}, {"skill": "アルティメット/タイム", "count": 51, "pct": 4.2}, {"skill": "通常スキル/セメント", "count": 6, "pct": 0.5}, {"skill": "対カウンター/フェイント", "count": 3, "pct": 0.2}, {"skill": "通常スキル/クイック", "count": 1, "pct": 0.1}, {"skill": "通常スキル/スキップ", "count": 1, "pct": 0.1}, {"skill": "パス", "count": 1, "pct": 0.1}, {"skill": "通常スキル/ガード", "count": 1, "pct": 0.1}], "counter_first": [{"skill": "数字宣言", "count": 895, "pct": 92.5}, {"skill": "アルティメット/タイム", "count": 66, "pct": 6.8}, {"skill": "通常スキル/セメント", "count": 5, "pct": 0.5}, {"skill": "通常スキル/クイック", "count": 2, "pct": 0.2}], "block_first": [{"skill": "数字宣言", "count": 1401, "pct": 96.4}, {"skill": "アルティメット/タイム", "count": 47, "pct": 3.2}, {"skill": "対カウンター/フェイント", "count": 3, "pct": 0.2}, {"skill": "通常スキル/スキップ", "count": 1, "pct": 0.1}, {"skill": "通常スキル/クイック", "count": 1, "pct": 0.1}, {"skill": "通常スキル/セメント", "count": 1, "pct": 0.1}], "random": [{"skill": "数字宣言", "count": 1876, "pct": 96.2}, {"skill": "アルティメット/タイム", "count": 61, "pct": 3.1}, {"skill": "対カウンター/フェイント", "count": 9, "pct": 0.5}, {"skill": "通常スキル/セメント", "count": 2, "pct": 0.1}, {"skill": "参照スキル/コピー", "count": 1, "pct": 0.1}, {"skill": "通常スキル/ガード", "count": 1, "pct": 0.1}], "episode_mixed_basic": [{"skill": "数字宣言", "count": 1373, "pct": 96.0}, {"skill": "アルティメット/タイム", "count": 46, "pct": 3.2}, {"skill": "通常スキル/セメント", "count": 4, "pct": 0.3}, {"skill": "通常スキル/クイック", "count": 3, "pct": 0.2}, {"skill": "対カウンター/フェイント", "count": 3, "pct": 0.2}, {"skill": "通常スキル/ガード", "count": 1, "pct": 0.1}]};
+const summary = {"none": {"wins": 300, "losses": 0, "truncations": 0, "win_rate": 100.0, "avg_steps": 4.0}, "counter_first": {"wins": 300, "losses": 0, "truncations": 0, "win_rate": 100.0, "avg_steps": 3.2}, "block_first": {"wins": 300, "losses": 0, "truncations": 0, "win_rate": 100.0, "avg_steps": 4.8}, "random": {"wins": 297, "losses": 3, "truncations": 0, "win_rate": 99.0, "avg_steps": 6.5}, "episode_mixed_basic": {"wins": 299, "losses": 1, "truncations": 0, "win_rate": 99.7, "avg_steps": 4.8}};
+const broadCats = ["数字宣言", "スキル", "対カウタースキル", "アルティメット", "オール", "パス"];
+const broadColors = ["#4CAF50", "#2196F3", "#FF9800", "#9C27B0", "#00BCD4", "#9E9E9E"];
+
+// ── 1. Summary cards ───────────────────────────────────────────────────────
+const grid = document.getElementById('summary-grid');
+const statusColors = ['#4CAF50','#F44336','#FF9800','#2196F3','#9C27B0'];
+policies.forEach((p, i) => {
+  const s = summary[p];
+  const bg = statusColors[i % statusColors.length] + '18';
+  const fg = statusColors[i % statusColors.length];
+  const cell = document.createElement('div');
+  cell.className = 'summary-cell';
+  cell.style.background = bg;
+  cell.innerHTML = `
+    <div class="label">${ntpLabels[i]}</div>
+    <div class="big" style="color:${fg}">${s.win_rate}%</div>
+    <div class="sub">勝率 | ${s.wins}勝 ${s.losses}敗 ${s.truncations}打切</div>
+    <div class="sub">平均 ${s.avg_steps} ステップ</div>`;
+  grid.appendChild(cell);
+});
+
+// ── 2. Broad stacked bar ───────────────────────────────────────────────────
+new Chart(document.getElementById('broadChart'), {
+  type: 'bar',
+  data: { labels: ntpLabels, datasets: broadDatasets },
+  options: {
+    plugins: { legend: { position: 'right' } },
+    responsive: true,
+    scales: {
+      x: { stacked: true },
+      y: { stacked: true, max: 100, ticks: { callback: v => v+'%' } }
+    }
+  }
+});
+
+// ── 3. Early vs Late pie charts ────────────────────────────────────────────
+let activeElPolicy = policies[0];
+const elTabs = document.getElementById('el-tabs');
+let earlyChart, lateChart;
+
+function makePie(canvasId, vals) {
+  return new Chart(document.getElementById(canvasId), {
+    type: 'doughnut',
+    data: {
+      labels: broadCats,
+      datasets: [{ data: vals, backgroundColor: broadColors, borderWidth: 1 }]
+    },
+    options: {
+      plugins: {
+        legend: { position: 'right', labels: { font: { size: 11 } } },
+        tooltip: { callbacks: { label: ctx => ` ${ctx.label}: ${ctx.raw}%` } }
+      },
+      responsive: true,
+    }
+  });
+}
+
+function updateElCharts(policy) {
+  const d = elData[policy];
+  const earlyVals = broadCats.map(c => d.early[c] || 0);
+  const lateVals  = broadCats.map(c => d.late[c]  || 0);
+  if (earlyChart) earlyChart.destroy();
+  if (lateChart)  lateChart.destroy();
+  earlyChart = makePie('earlyChart', earlyVals);
+  lateChart  = makePie('lateChart',  lateVals);
+}
+
+policies.forEach((p, i) => {
+  const btn = document.createElement('button');
+  btn.className = 'tab' + (i === 0 ? ' active' : '');
+  btn.textContent = ntpLabels[i];
+  btn.onclick = () => {
+    document.querySelectorAll('#el-tabs .tab').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    updateElCharts(p);
+  };
+  elTabs.appendChild(btn);
+});
+updateElCharts(policies[0]);
+
+// ── 4. Number values grouped bar ──────────────────────────────────────────
+new Chart(document.getElementById('numChart'), {
+  type: 'bar',
+  data: { labels: ['0','1','2','3','4'], datasets: numDatasets },
+  options: {
+    plugins: { legend: { position: 'right' } },
+    responsive: true,
+    scales: {
+      y: { ticks: { callback: v => v+'%' }, title: { display: true, text: '全行動中の割合 (%)' } }
+    }
+  }
+});
+
+// ── 5. Skill detail tables ─────────────────────────────────────────────────
+const skillTabsEl = document.getElementById('skill-tabs');
+const skillContainer = document.getElementById('skill-table-container');
+
+function makeSkillTable(policy) {
+  const rows = skillTables[policy];
+  const maxPct = rows.length ? rows[0].pct : 1;
+  let html = '<table><thead><tr><th>スキル</th><th>回数</th><th colspan="2">割合</th></tr></thead><tbody>';
+  rows.forEach(r => {
+    const w = Math.round(r.pct / Math.max(maxPct, 0.1) * 180);
+    html += `<tr>
+      <td>${r.skill}</td>
+      <td>${r.count}</td>
+      <td>${r.pct}%</td>
+      <td class="bar-cell"><span class="bar-inner" style="width:${w}px"></span></td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  return html;
+}
+
+policies.forEach((p, i) => {
+  const btn = document.createElement('button');
+  btn.className = 'tab' + (i === 0 ? ' active' : '');
+  btn.textContent = ntpLabels[i];
+  btn.onclick = () => {
+    document.querySelectorAll('#skill-tabs .tab').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    skillContainer.innerHTML = makeSkillTable(p);
+  };
+  skillTabsEl.appendChild(btn);
+});
+skillContainer.innerHTML = makeSkillTable(policies[0]);
+</script>
+</body>
+</html>

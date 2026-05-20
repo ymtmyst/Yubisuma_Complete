@@ -41,6 +41,16 @@ class TestGenerateBCDataset(unittest.TestCase):
         for _, probs in self.dataset:
             self.assertTrue((probs >= 0).all())
 
+    def test_obs_contains_reaction_history_slots(self) -> None:
+        """BC obs should have the reaction history region (all zeros for no history)."""
+        from complete_rl.obs import N_REACTION_FEATURES, N_REACTION_HISTORY, N_REACTIONS, OBS_SIZE
+        self.assertEqual(OBS_SIZE, 107 + N_REACTION_FEATURES)
+        self.assertEqual(N_REACTION_FEATURES, N_REACTION_HISTORY * N_REACTIONS)
+        # BC dataset encodes states without history, so the history region is all zeros.
+        for obs, _ in self.dataset:
+            history_region = obs[OBS_SIZE - N_REACTION_FEATURES:]
+            self.assertTrue((history_region == 0).all(), "BC history region should be zeros")
+
     def test_mirror_on_config(self) -> None:
         ds = generate_bc_dataset(
             config=RulesConfig(enable_mirror=True), max_states=20, vi_epsilon=1e-2

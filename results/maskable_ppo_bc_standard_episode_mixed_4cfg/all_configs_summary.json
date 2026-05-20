@@ -1,0 +1,246 @@
+{
+  "configs": [
+    {
+      "seeds": [
+        0,
+        1,
+        2
+      ],
+      "runs": [
+        {
+          "seed": 0,
+          "episodes": 100,
+          "wins": 100,
+          "losses": 0,
+          "truncations": 0,
+          "average_reward": 1.0,
+          "average_steps": 4.74,
+          "model_path": "results\\maskable_ppo_bc_standard_episode_mixed_4cfg\\mirror_off_reversi_off\\seed_0\\maskable_ppo_complete.zip",
+          "metrics_path": "results\\maskable_ppo_bc_standard_episode_mixed_4cfg\\mirror_off_reversi_off\\seed_0\\metrics.json",
+          "reused_existing": "False"
+        },
+        {
+          "seed": 1,
+          "episodes": 100,
+          "wins": 100,
+          "losses": 0,
+          "truncations": 0,
+          "average_reward": 1.0,
+          "average_steps": 4.76,
+          "model_path": "results\\maskable_ppo_bc_standard_episode_mixed_4cfg\\mirror_off_reversi_off\\seed_1\\maskable_ppo_complete.zip",
+          "metrics_path": "results\\maskable_ppo_bc_standard_episode_mixed_4cfg\\mirror_off_reversi_off\\seed_1\\metrics.json",
+          "reused_existing": "False"
+        },
+        {
+          "seed": 2,
+          "episodes": 100,
+          "wins": 100,
+          "losses": 0,
+          "truncations": 0,
+          "average_reward": 1.0,
+          "average_steps": 4.76,
+          "model_path": "results\\maskable_ppo_bc_standard_episode_mixed_4cfg\\mirror_off_reversi_off\\seed_2\\maskable_ppo_complete.zip",
+          "metrics_path": "results\\maskable_ppo_bc_standard_episode_mixed_4cfg\\mirror_off_reversi_off\\seed_2\\metrics.json",
+          "reused_existing": "False"
+        }
+      ],
+      "aggregate": {
+        "mean_reward": 1.0,
+        "mean_steps": 4.753333333333333,
+        "total_wins": 300,
+        "total_losses": 0,
+        "total_truncations": 0
+      },
+      "label": "mirror_off_reversi_off",
+      "config": {
+        "enable_mirror": false,
+        "enable_reversi": false
+      }
+    },
+    {
+      "seeds": [
+        0,
+        1,
+        2
+      ],
+      "runs": [
+        {
+          "seed": 0,
+          "episodes": 100,
+          "wins": 100,
+          "losses": 0,
+          "truncations": 0,
+          "average_reward": 1.0,
+          "average_steps": 4.3,
+          "model_path": "results\\maskable_ppo_bc_standard_episode_mixed_4cfg\\mirror_on_reversi_off\\seed_0\\maskable_ppo_complete.zip",
+          "metrics_path": "results\\maskable_ppo_bc_standard_episode_mixed_4cfg\\mirror_on_reversi_off\\seed_0\\metrics.json",
+          "reused_existing": "False"
+        },
+        {
+          "seed": 1,
+          "episodes": 100,
+          "wins": 100,
+          "losses": 0,
+          "truncations": 0,
+          "average_reward": 1.0,
+          "average_steps": 4.23,
+          "model_path": "results\\maskable_ppo_bc_standard_episode_mixed_4cfg\\mirror_on_reversi_off\\seed_1\\maskable_ppo_complete.zip",
+          "metrics_path": "results\\maskable_ppo_bc_standard_episode_mixed_4cfg\\mirror_on_reversi_off\\seed_1\\metrics.json",
+          "reused_existing": "False"
+        },
+        {
+          "seed": 2,
+          "episodes": 100,
+          "wins": 100,
+          "losses": 0,
+          "truncations": 0,
+          "average_reward": 1.0,
+          "average_steps": 4.23,
+          "model_path": "results\\maskable_ppo_bc_standard_episode_mixed_4cfg\\mirror_on_reversi_off\\seed_2\\maskable_ppo_complete.zip",
+          "metrics_path": "results\\maskable_ppo_bc_standard_episode_mixed_4cfg\\mirror_on_reversi_off\\seed_2\\metrics.json",
+          "reused_existing": "False"
+        }
+      ],
+      "aggregate": {
+        "mean_reward": 1.0,
+        "mean_steps": 4.253333333333334,
+        "total_wins": 300,
+        "total_losses": 0,
+        "total_truncations": 0
+      },
+      "label": "mirror_on_reversi_off",
+      "config": {
+        "enable_mirror": true,
+        "enable_reversi": false
+      }
+    },
+    {
+      "seeds": [
+        0,
+        1,
+        2
+      ],
+      "runs": [
+        {
+          "seed": 0,
+          "episodes": 100,
+          "wins": 100,
+          "losses": 0,
+          "truncations": 0,
+          "average_reward": 1.0,
+          "average_steps": 4.93,
+          "model_path": "results\\maskable_ppo_bc_standard_episode_mixed_4cfg\\mirror_off_reversi_on\\seed_0\\maskable_ppo_complete.zip",
+          "metrics_path": "results\\maskable_ppo_bc_standard_episode_mixed_4cfg\\mirror_off_reversi_on\\seed_0\\metrics.json",
+          "reused_existing": "False"
+        },
+        {
+          "seed": 1,
+          "episodes": 100,
+          "wins": 99,
+          "losses": 1,
+          "truncations": 0,
+          "average_reward": 0.98,
+          "average_steps": 5.13,
+          "model_path": "results\\maskable_ppo_bc_standard_episode_mixed_4cfg\\mirror_off_reversi_on\\seed_1\\maskable_ppo_complete.zip",
+          "metrics_path": "results\\maskable_ppo_bc_standard_episode_mixed_4cfg\\mirror_off_reversi_on\\seed_1\\metrics.json",
+          "reused_existing": "False"
+        },
+        {
+          "seed": 2,
+          "episodes": 100,
+          "wins": 100,
+          "losses": 0,
+          "truncations": 0,
+          "average_reward": 1.0,
+          "average_steps": 4.76,
+          "model_path": "results\\maskable_ppo_bc_standard_episode_mixed_4cfg\\mirror_off_reversi_on\\seed_2\\maskable_ppo_complete.zip",
+          "metrics_path": "results\\maskable_ppo_bc_standard_episode_mixed_4cfg\\mirror_off_reversi_on\\seed_2\\metrics.json",
+          "reused_existing": "False"
+        }
+      ],
+      "aggregate": {
+        "mean_reward": 0.9933333333333333,
+        "mean_steps": 4.9399999999999995,
+        "total_wins": 299,
+        "total_losses": 1,
+        "total_truncations": 0
+      },
+      "label": "mirror_off_reversi_on",
+      "config": {
+        "enable_mirror": false,
+        "enable_reversi": true
+      }
+    },
+    {
+      "seeds": [
+        0,
+        1,
+        2
+      ],
+      "runs": [
+        {
+          "seed": 0,
+          "episodes": 100,
+          "wins": 100,
+          "losses": 0,
+          "truncations": 0,
+          "average_reward": 1.0,
+          "average_steps": 4.31,
+          "model_path": "results\\maskable_ppo_bc_standard_episode_mixed_4cfg\\mirror_on_reversi_on\\seed_0\\maskable_ppo_complete.zip",
+          "metrics_path": "results\\maskable_ppo_bc_standard_episode_mixed_4cfg\\mirror_on_reversi_on\\seed_0\\metrics.json",
+          "reused_existing": "False"
+        },
+        {
+          "seed": 1,
+          "episodes": 100,
+          "wins": 100,
+          "losses": 0,
+          "truncations": 0,
+          "average_reward": 1.0,
+          "average_steps": 4.24,
+          "model_path": "results\\maskable_ppo_bc_standard_episode_mixed_4cfg\\mirror_on_reversi_on\\seed_1\\maskable_ppo_complete.zip",
+          "metrics_path": "results\\maskable_ppo_bc_standard_episode_mixed_4cfg\\mirror_on_reversi_on\\seed_1\\metrics.json",
+          "reused_existing": "False"
+        },
+        {
+          "seed": 2,
+          "episodes": 100,
+          "wins": 100,
+          "losses": 0,
+          "truncations": 0,
+          "average_reward": 1.0,
+          "average_steps": 4.58,
+          "model_path": "results\\maskable_ppo_bc_standard_episode_mixed_4cfg\\mirror_on_reversi_on\\seed_2\\maskable_ppo_complete.zip",
+          "metrics_path": "results\\maskable_ppo_bc_standard_episode_mixed_4cfg\\mirror_on_reversi_on\\seed_2\\metrics.json",
+          "reused_existing": "False"
+        }
+      ],
+      "aggregate": {
+        "mean_reward": 1.0,
+        "mean_steps": 4.376666666666667,
+        "total_wins": 300,
+        "total_losses": 0,
+        "total_truncations": 0
+      },
+      "label": "mirror_on_reversi_on",
+      "config": {
+        "enable_mirror": true,
+        "enable_reversi": true
+      }
+    }
+  ],
+  "aggregate": {
+    "mean_reward_by_config": {
+      "mirror_off_reversi_off": 1.0,
+      "mirror_on_reversi_off": 1.0,
+      "mirror_off_reversi_on": 0.9933333333333333,
+      "mirror_on_reversi_on": 1.0
+    },
+    "mean_steps_by_config": {
+      "mirror_off_reversi_off": 4.753333333333333,
+      "mirror_on_reversi_off": 4.253333333333334,
+      "mirror_off_reversi_on": 4.9399999999999995,
+      "mirror_on_reversi_on": 4.376666666666667
+    }
+  }
+}
