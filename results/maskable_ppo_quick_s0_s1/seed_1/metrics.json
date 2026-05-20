@@ -1,0 +1,17 @@
+{
+  "algorithm": "MaskablePPO",
+  "total_timesteps": 20000,
+  "seed": 1,
+  "config": {
+    "enable_mirror": false,
+    "enable_reversi": false
+  },
+  "evaluation": {
+    "episodes": 20,
+    "wins": 20,
+    "losses": 0,
+    "truncations": 0,
+    "average_reward": 1.0,
+    "average_steps": 7.55
+  }
+}

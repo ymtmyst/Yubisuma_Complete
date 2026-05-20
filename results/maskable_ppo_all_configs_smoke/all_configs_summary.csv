@@ -1,0 +1,5 @@
+﻿config_label,enable_mirror,enable_reversi,seed,episodes,wins,losses,truncations,average_reward,average_steps,model_path,metrics_path,reused_existing
+mirror_off_reversi_off,False,False,0,1,0,0,1,0.0,20.0,results\maskable_ppo_all_configs_smoke\mirror_off_reversi_off\seed_0\maskable_ppo_complete.zip,results\maskable_ppo_all_configs_smoke\mirror_off_reversi_off\seed_0\metrics.json,False
+mirror_on_reversi_off,True,False,0,1,1,0,0,1.0,6.0,results\maskable_ppo_all_configs_smoke\mirror_on_reversi_off\seed_0\maskable_ppo_complete.zip,results\maskable_ppo_all_configs_smoke\mirror_on_reversi_off\seed_0\metrics.json,False
+mirror_off_reversi_on,False,True,0,1,0,0,1,0.0,20.0,results\maskable_ppo_all_configs_smoke\mirror_off_reversi_on\seed_0\maskable_ppo_complete.zip,results\maskable_ppo_all_configs_smoke\mirror_off_reversi_on\seed_0\metrics.json,False
+mirror_on_reversi_on,True,True,0,1,0,0,1,0.0,20.0,results\maskable_ppo_all_configs_smoke\mirror_on_reversi_on\seed_0\maskable_ppo_complete.zip,results\maskable_ppo_all_configs_smoke\mirror_on_reversi_on\seed_0\metrics.json,False

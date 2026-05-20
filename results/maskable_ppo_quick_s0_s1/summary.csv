@@ -1,0 +1,3 @@
+﻿seed,episodes,wins,losses,truncations,average_reward,average_steps,model_path,metrics_path,reused_existing
+0,20,20,0,0,1.0,6.35,results\maskable_ppo_quick_s0_s1\seed_0\maskable_ppo_complete.zip,results\maskable_ppo_quick_s0_s1\seed_0\metrics.json,True
+1,20,20,0,0,1.0,7.55,results\maskable_ppo_quick_s0_s1\seed_1\maskable_ppo_complete.zip,results\maskable_ppo_quick_s0_s1\seed_1\metrics.json,True

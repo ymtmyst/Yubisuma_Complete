@@ -1,0 +1,30 @@
+{
+  "seeds": [
+    0
+  ],
+  "runs": [
+    {
+      "seed": 0,
+      "episodes": 20,
+      "wins": 20,
+      "losses": 0,
+      "truncations": 0,
+      "average_reward": 1.0,
+      "average_steps": 6.7,
+      "model_path": "results\\maskable_ppo_all_configs_quick_s0\\mirror_off_reversi_on\\seed_0\\maskable_ppo_complete.zip",
+      "metrics_path": "results\\maskable_ppo_all_configs_quick_s0\\mirror_off_reversi_on\\seed_0\\metrics.json",
+      "reused_existing": "False"
+    }
+  ],
+  "aggregate": {
+    "mean_reward": 1.0,
+    "mean_steps": 6.7,
+    "total_wins": 20,
+    "total_losses": 0,
+    "total_truncations": 0
+  },
+  "config": {
+    "enable_mirror": false,
+    "enable_reversi": true
+  }
+}

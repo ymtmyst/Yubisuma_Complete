@@ -1,0 +1,3 @@
+﻿seed,episodes,wins,losses,truncations,average_reward,average_steps,model_path,metrics_path
+0,1,0,0,1,0.0,20.0,results\maskable_ppo_multiseed_smoke\seed_0\maskable_ppo_complete.zip,results\maskable_ppo_multiseed_smoke\seed_0\metrics.json
+1,1,1,0,0,1.0,12.0,results\maskable_ppo_multiseed_smoke\seed_1\maskable_ppo_complete.zip,results\maskable_ppo_multiseed_smoke\seed_1\metrics.json

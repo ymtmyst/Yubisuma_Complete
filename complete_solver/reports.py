@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import sys
 from dataclasses import dataclass
 from html import escape
 from pathlib import Path
@@ -12,10 +13,11 @@ from typing import Iterable
 import numpy as np
 
 from .actions import RulesConfig
-from .constants import BLOCK, CHARGE, COUNTER, FEINT, FLASH, GUARD, LOCK, NONE, QUICK, SKIP
-from .finite_horizon import FiniteHorizonSolver, StatePolicy
+from .constants import BLOCK, CHARGE, COUNTER, FEINT, FLASH, GUARD, LOCK, NONE, QUICK, SKIP, TIME
+from .finite_horizon import FiniteHorizonSolver, StatePolicy, material_leaf_evaluator
 from .policy import policy_mass_by_skill, reaction_mass
 from .state import PlayerState, State
+from .state_space import enumerate_reachable_states, state_space_stats, value_iteration
 
 
 @dataclass(frozen=True)
@@ -83,6 +85,61 @@ def available_scenarios() -> dict[str, Scenario]:
                 previous_skill=QUICK,
             ),
             description="Turn player can trigger quick by declaring Quick again.",
+        ),
+        # --- P7: Systematic endgame / tactical scenarios (from skill guide) ---
+        "endgame_me_one_opp_two": Scenario(
+            name="endgame_me_one_opp_two",
+            state=State(
+                me=PlayerState(hands=1, has_declared_skill=True),
+                opp=PlayerState(hands=2, has_declared_skill=True),
+            ),
+            description="Asymmetric endgame: turn player has 1 hand, opponent has 2.",
+        ),
+        "endgame_me_two_opp_one": Scenario(
+            name="endgame_me_two_opp_one",
+            state=State(
+                me=PlayerState(hands=2, has_declared_skill=True),
+                opp=PlayerState(hands=1, has_declared_skill=True),
+            ),
+            description="Asymmetric endgame: turn player has 2 hands, opponent has 1.",
+        ),
+        "stock_guard_flash": Scenario(
+            name="stock_guard_flash",
+            state=State(
+                me=PlayerState(
+                    stock=frozenset({GUARD, FLASH}),
+                    has_declared_skill=True,
+                ),
+                opp=PlayerState(has_declared_skill=True),
+                previous_skill=LOCK,
+            ),
+            description=(
+                "Turn player holds Guard and Flash in stock "
+                "(Guard-then-Flash is a core tactical pattern)."
+            ),
+        ),
+        "time_active": Scenario(
+            name="time_active",
+            state=State(
+                me=PlayerState(time_active=True, used_ultimate=True, has_declared_skill=True),
+                opp=PlayerState(has_declared_skill=True),
+                previous_skill=TIME,
+            ),
+            description=(
+                "Turn player has declared Time: tempo-gaining skills "
+                "(Feint, Guard, Skip) are suppressed for the opponent."
+            ),
+        ),
+        "cement_on_me": Scenario(
+            name="cement_on_me",
+            state=State(
+                me=PlayerState(cement=2, has_declared_skill=True),
+                opp=PlayerState(has_declared_skill=True),
+            ),
+            description=(
+                "Turn player is cemented to 2 thumbs: "
+                "opponent can reliably set up Flash or read the number."
+            ),
         ),
     }
 
@@ -266,6 +323,8 @@ def sanity_rows(
                 "skip_mass": _fmt(mass.get(SKIP, 0.0)),
                 "quick_mass": _fmt(mass.get(QUICK, 0.0)),
                 "charge_mass": _fmt(mass.get(CHARGE, 0.0)),
+                "lock_mass": _fmt(mass.get(LOCK, 0.0)),
+                "time_mass": _fmt(mass.get(TIME, 0.0)),
                 "ntp_none_mass": _fmt(reactions.get(NONE, 0.0)),
                 "ntp_counter_mass": _fmt(reactions.get(COUNTER, 0.0)),
                 "ntp_block_mass": _fmt(reactions.get(BLOCK, 0.0)),
@@ -297,6 +356,8 @@ def write_sanity_csv(
         "skip_mass",
         "quick_mass",
         "charge_mass",
+        "lock_mass",
+        "time_mass",
         "ntp_none_mass",
         "ntp_counter_mass",
         "ntp_block_mass",
@@ -334,7 +395,110 @@ def write_index_html(
     output.write_text(html, encoding="utf-8")
 
 
+_ALL_CONFIGS: list[tuple[str, RulesConfig]] = [
+    ("mirror_off_reversi_off", RulesConfig(enable_mirror=False, enable_reversi=False)),
+    ("mirror_on_reversi_off", RulesConfig(enable_mirror=True, enable_reversi=False)),
+    ("mirror_off_reversi_on", RulesConfig(enable_mirror=False, enable_reversi=True)),
+    ("mirror_on_reversi_on", RulesConfig(enable_mirror=True, enable_reversi=True)),
+]
+
+
+_DEFAULT_GAMMA_SWEEP = (0.990, 0.995, 0.997, 0.999, 0.9995)
+
+
+def gamma_sweep_rows(
+    gammas: Iterable[float] = _DEFAULT_GAMMA_SWEEP,
+    config: RulesConfig = RulesConfig(),
+    max_states: int = 1000,
+    epsilon: float = 1e-6,
+    max_iterations: int = 500,
+) -> list[dict[str, str]]:
+    """Run value iteration for each gamma and return one summary row per gamma.
+
+    States are enumerated once and reused for all gamma values.
+    Each row contains: gamma, states, converged, iterations, max_delta,
+    initial_state_value.
+    """
+    from .state import State as _State
+
+    enumerated = enumerate_reachable_states(config=config, max_states=max_states)
+    init = _State()
+    rows: list[dict[str, str]] = []
+
+    for gamma in gammas:
+        result = value_iteration(
+            enumerated,
+            config=config,
+            gamma=gamma,
+            epsilon=epsilon,
+            max_iterations=max_iterations,
+            leaf_evaluator=material_leaf_evaluator,
+        )
+        init_val = result.values.get(init, float("nan"))
+        rows.append(
+            {
+                "gamma": f"{gamma}",
+                "states": str(len(result.values)),
+                "converged": str(result.converged),
+                "iterations": str(result.iterations),
+                "max_delta": f"{result.max_delta:.2e}",
+                "initial_state_value": f"{init_val:.12f}",
+            }
+        )
+
+    return rows
+
+
+def write_gamma_sweep_csv(
+    path: str | Path,
+    gammas: Iterable[float] = _DEFAULT_GAMMA_SWEEP,
+    config: RulesConfig = RulesConfig(),
+    max_states: int = 1000,
+    epsilon: float = 1e-6,
+    max_iterations: int = 500,
+) -> None:
+    """Write a gamma sensitivity sweep to CSV."""
+    output = Path(path)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    rows = gamma_sweep_rows(gammas, config, max_states, epsilon, max_iterations)
+    fieldnames = [
+        "gamma",
+        "states",
+        "converged",
+        "iterations",
+        "max_delta",
+        "initial_state_value",
+    ]
+    with output.open("w", newline="", encoding="utf-8-sig") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(rows)
+
+
+def write_all_configs_report(
+    output_dir: str | Path,
+    depth: int,
+    gamma: float = 1.0,
+    scenario_names: Iterable[str] | None = None,
+) -> dict[str, list[Path]]:
+    """Generate batch reports for all four mirror/reversi configurations.
+
+    Each config is written to a subdirectory of *output_dir* named after the config.
+    Returns a mapping of config label → list of written paths.
+    """
+    output = Path(output_dir)
+    results: dict[str, list[Path]] = {}
+    for label, config in _ALL_CONFIGS:
+        paths = write_batch_report(output / label, depth, config, gamma, scenario_names)
+        results[label] = paths
+    return results
+
+
 def main(argv: Iterable[str] | None = None) -> int:
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    if hasattr(sys.stderr, "reconfigure"):
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
     parser = argparse.ArgumentParser(description="Solve and report a Complete subgame.")
     parser.add_argument(
         "--scenario",
@@ -355,13 +519,129 @@ def main(argv: Iterable[str] | None = None) -> int:
         "--scenarios",
         help="Comma-separated scenario names for batch output.",
     )
+    parser.add_argument(
+        "--all-configs",
+        action="store_true",
+        help=(
+            "Write batch reports for all four mirror/reversi configurations "
+            "(overrides --mirror and --reversi)."
+        ),
+    )
+    parser.add_argument(
+        "--enumerate",
+        action="store_true",
+        help="Enumerate reachable states and run discounted value iteration.",
+    )
+    parser.add_argument(
+        "--max-states",
+        type=int,
+        default=1000,
+        metavar="N",
+        help="State enumeration cap for --enumerate (default: 1000).",
+    )
+    parser.add_argument(
+        "--vi-gamma",
+        type=float,
+        default=0.999,
+        metavar="GAMMA",
+        help="Discount factor for value iteration (default: 0.999).",
+    )
+    parser.add_argument(
+        "--vi-epsilon",
+        type=float,
+        default=1e-6,
+        metavar="EPS",
+        help="Convergence threshold for value iteration (default: 1e-6).",
+    )
+    parser.add_argument(
+        "--vi-max-iter",
+        type=int,
+        default=500,
+        metavar="N",
+        help="Maximum value iteration iterations (default: 500).",
+    )
+    parser.add_argument(
+        "--gamma-sweep",
+        action="store_true",
+        help=(
+            "Run value iteration for multiple gamma values and write a sensitivity CSV. "
+            "Uses --max-states for enumeration and --vi-epsilon/--vi-max-iter for VI."
+        ),
+    )
+    parser.add_argument(
+        "--gamma-sweep-values",
+        default=",".join(str(g) for g in _DEFAULT_GAMMA_SWEEP),
+        metavar="G1,G2,...",
+        help="Comma-separated gamma values for --gamma-sweep.",
+    )
     args = parser.parse_args(list(argv) if argv is not None else None)
 
     config = RulesConfig(enable_mirror=args.mirror, enable_reversi=args.reversi)
+    names = _parse_scenario_names(args.scenarios)
+
+    if args.gamma_sweep:
+        gammas = tuple(float(g) for g in args.gamma_sweep_values.split(",") if g.strip())
+        output_path = args.output or Path("results") / "gamma_sweep.csv"
+        print(
+            f"Running gamma sweep: gammas={gammas}, "
+            f"max_states={args.max_states}, eps={args.vi_epsilon}"
+        )
+        rows = gamma_sweep_rows(
+            gammas,
+            config=config,
+            max_states=args.max_states,
+            epsilon=args.vi_epsilon,
+            max_iterations=args.vi_max_iter,
+        )
+        _print_gamma_sweep_table(rows)
+        write_gamma_sweep_csv(
+            output_path,
+            gammas,
+            config=config,
+            max_states=args.max_states,
+            epsilon=args.vi_epsilon,
+            max_iterations=args.vi_max_iter,
+        )
+        print(f"Wrote {output_path}")
+        return 0
+
+    if args.all_configs:
+        output_dir = args.output or Path("results") / "all_configs"
+        config_paths = write_all_configs_report(output_dir, args.depth, args.gamma, names)
+        for label, paths in config_paths.items():
+            for path in paths:
+                print(f"[{label}] Wrote {path}")
+        return 0
+
+    if args.enumerate:
+        print(f"Enumerating states (max={args.max_states}) ...")
+        enumerated = enumerate_reachable_states(config=config, max_states=args.max_states)
+        stats = state_space_stats(enumerated, config)
+        print(f"State space: {stats}")
+        print(
+            f"Running value iteration (gamma={args.vi_gamma}, "
+            f"eps={args.vi_epsilon}, max_iter={args.vi_max_iter}) ..."
+        )
+        vi_result = value_iteration(
+            enumerated,
+            config=config,
+            gamma=args.vi_gamma,
+            epsilon=args.vi_epsilon,
+            max_iterations=args.vi_max_iter,
+            leaf_evaluator=material_leaf_evaluator,
+        )
+        print(vi_result)
+        from .state import State as _State
+        init = _State()
+        if init in vi_result.values:
+            print(f"Initial state value: {vi_result.values[init]:.8f}")
+        if args.output:
+            _write_vi_csv(vi_result, args.output, config)
+            print(f"Wrote {args.output}")
+        return 0
 
     if args.all_scenarios:
         output_dir = args.output or Path("results") / "complete_lite"
-        names = _parse_scenario_names(args.scenarios)
         paths = write_batch_report(output_dir, args.depth, config, args.gamma, names)
         for path in paths:
             print(f"Wrote {path}")
@@ -394,6 +674,29 @@ def _top_action(actions, probabilities) -> str:
     return actions[idx].key()
 
 
+def _print_gamma_sweep_table(rows: list[dict[str, str]]) -> None:
+    header = f"{'gamma':>8}  {'states':>7}  {'conv':>5}  {'iter':>5}  {'max_δ':>8}  {'V(init)':>12}"
+    print(header)
+    print("-" * len(header))
+    for row in rows:
+        print(
+            f"{row['gamma']:>8}  {row['states']:>7}  {row['converged']:>5}  "
+            f"{row['iterations']:>5}  {row['max_delta']:>8}  {row['initial_state_value']:>12}"
+        )
+
+
+def _write_vi_csv(vi_result, path: Path, config: RulesConfig) -> None:
+    """Write value iteration results as a simple CSV."""
+    from .state_space import ValueIterationResult
+    output = Path(path)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    with output.open("w", newline="", encoding="utf-8-sig") as f:
+        writer = csv.writer(f)
+        writer.writerow(["state_hash", "value", "me_hands", "opp_hands"])
+        for state, val in sorted(vi_result.values.items(), key=lambda x: -abs(x[1])):
+            writer.writerow([hash(state), f"{val:.12f}", state.me.hands, state.opp.hands])
+
+
 def _parse_scenario_names(value: str | None) -> list[str] | None:
     if not value:
         return None
@@ -417,6 +720,8 @@ def _render_index_html(
         f"<td class=\"num\">{escape(_fmt_html(row['feint_mass']))}</td>"
         f"<td class=\"num\">{escape(_fmt_html(row['skip_mass']))}</td>"
         f"<td class=\"num\">{escape(_fmt_html(row['quick_mass']))}</td>"
+        f"<td class=\"num\">{escape(_fmt_html(row['lock_mass']))}</td>"
+        f"<td class=\"num\">{escape(_fmt_html(row['time_mass']))}</td>"
         f"<td class=\"num\">{escape(_fmt_html(row['ntp_counter_mass']))}</td>"
         f"<td class=\"num\">{escape(_fmt_html(row['ntp_block_mass']))}</td>"
         f"<td>{escape(row['top_tp_action'])}</td>"
@@ -548,7 +853,7 @@ def _render_index_html(
         <thead>
           <tr>
             <th>scenario</th><th>description</th><th>value</th>
-            <th>number</th><th>flash</th><th>feint</th><th>skip</th><th>quick</th>
+            <th>number</th><th>flash</th><th>feint</th><th>skip</th><th>quick</th><th>lock</th><th>time</th>
             <th>NTP counter</th><th>NTP block</th>
             <th>top TP</th><th>top NTP</th>
           </tr>

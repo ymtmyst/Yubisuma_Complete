@@ -1,0 +1,2 @@
+﻿seed,episodes,wins,losses,truncations,average_reward,average_steps,model_path,metrics_path,reused_existing
+0,1,0,0,1,0.0,20.0,results\maskable_ppo_all_configs_smoke\mirror_off_reversi_off\seed_0\maskable_ppo_complete.zip,results\maskable_ppo_all_configs_smoke\mirror_off_reversi_off\seed_0\metrics.json,False
