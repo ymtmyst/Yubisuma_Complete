@@ -5,12 +5,15 @@ from complete_rl.env import (
     MIXED_NTP_POLICIES,
     NAMED_NTP_POLICIES,
     REWARD_MODES,
+    SEPARATED_NTP_POLICIES,
     block_first_ntp_policy,
     build_canonical_tp_actions,
     counter_first_ntp_policy,
+    make_separated_ntp_policy,
     mirror_first_ntp_policy,
     none_ntp_policy,
     random_ntp_policy,
+    separated_ntp_policy,
 )
 from complete_rl.obs import OBS_SIZE, encode_state
 
@@ -20,11 +23,14 @@ __all__ = [
     "NAMED_NTP_POLICIES",
     "OBS_SIZE",
     "REWARD_MODES",
+    "SEPARATED_NTP_POLICIES",
     "block_first_ntp_policy",
     "build_canonical_tp_actions",
     "counter_first_ntp_policy",
     "encode_state",
+    "make_separated_ntp_policy",
     "mirror_first_ntp_policy",
     "none_ntp_policy",
     "random_ntp_policy",
+    "separated_ntp_policy",
 ]

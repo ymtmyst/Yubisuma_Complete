@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <title>BC教師生成 修正案</title>
+  <style>
+    body { margin: 0; background: #f7f7f4; color: #202124; font-family: "Segoe UI", "Yu Gothic", "Meiryo", sans-serif; line-height: 1.7; }
+    main { max-width: 1180px; margin: 0 auto; padding: 28px 20px 56px; }
+    h1 { margin: 0 0 8px; font-size: 28px; letter-spacing: 0; }
+    h2 { margin: 0 0 12px; font-size: 20px; letter-spacing: 0; }
+    h3 { margin: 14px 0 8px; font-size: 16px; letter-spacing: 0; }
+    .lead { color: #5f6368; margin-bottom: 18px; }
+    .section { background: #fff; border: 1px solid #d8d7d0; border-radius: 8px; padding: 18px; margin: 16px 0; }
+    .note { border-left: 4px solid #0b6b6f; background: #edf7f7; padding: 10px 12px; margin: 12px 0; }
+    .warn { border-left: 4px solid #9b1c1c; background: #fff0f0; padding: 10px 12px; margin: 12px 0; }
+    .ok { border-left: 4px solid #246b32; background: #eff8f0; padding: 10px 12px; margin: 12px 0; }
+    table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 14px; }
+    th, td { border: 1px solid #d8d7d0; padding: 8px 10px; vertical-align: top; }
+    th { background: #eef1ef; text-align: left; }
+    code { padding: 1px 5px; background: #eef1ef; border: 1px solid #dde3df; border-radius: 4px; font-family: Consolas, "Courier New", monospace; }
+    ul, ol { margin: 8px 0 8px 22px; padding: 0; }
+    .rank { font-weight: 700; color: #0b6b6f; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>BC教師生成 修正案</h1>
+  <p class="lead">作成日: 2026-05-21 / 対象: Complete AI P9 数字宣言偏重の修正方針</p>
+
+  <section class="section">
+    <h2>結論</h2>
+    <div class="warn">
+      現行の <code>generate_bc_dataset</code> は、<code>value_iteration</code> を default leaf=0 で実行している。
+      診断では、この教師が初期局面・代表局面で <code>数字0</code> 100% に寄ることを確認した。
+      そのため、現行BC教師をそのまま使った再学習は避ける。
+    </div>
+    <div class="ok">
+      推奨方針:
+      まず <strong>material leaf を使うVI教師</strong> を標準候補にし、同時に
+      <strong>教師分布診断HTML</strong> を必須化する。
+      その後、必要に応じて有限深さ教師・シナリオ教師とのハイブリッドへ進む。
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>外し数字の扱い</h2>
+    <p>
+      外し数字は完全禁止しない。ただし、通常局面でフェイントや明確な勝ち筋を大きく上回って常用される場合は警告対象にする。
+    </p>
+    <table>
+      <thead>
+        <tr><th>扱い</th><th>例</th><th>教師生成での方針</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>許容</td>
+          <td>フェイントがドロップで封印されている。</td>
+          <td>数字が上位に来ても即NGにしない。</td>
+        </tr>
+        <tr>
+          <td>許容</td>
+          <td>参照スキル対策。数字はストック等で参照できない。</td>
+          <td>相手ストックや参照メタがある局面では数字価値を許容する。</td>
+        </tr>
+        <tr>
+          <td>許容</td>
+          <td>カウンター率が半々で、当たりも外しも含めて期待値を取る。</td>
+          <td>50%条件では数字を完全排除しない。</td>
+        </tr>
+        <tr>
+          <td>警告</td>
+          <td>初期局面や100%カウンター局面で、フェイントより外し数字を常用する。</td>
+          <td>教師分布診断で警告。BC採用前に人間確認を必須にする。</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="section">
+    <h2>修正候補</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>案</th>
+          <th>内容</th>
+          <th>利点</th>
+          <th>リスク</th>
+          <th>判定</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>A. BCを無効化</td>
+          <td>BC warm-start を使わず、PPOだけで学習する。</td>
+          <td>BC由来の数字偏重は消える。</td>
+          <td>探索が不安定。none/counter両立の学習が遅くなる可能性。</td>
+          <td>比較用ベースラインとしてのみ有用。</td>
+        </tr>
+        <tr>
+          <td>B. material leaf VI教師</td>
+          <td><code>value_iteration(..., leaf_evaluator=material_leaf_evaluator)</code> をBC教師に使う。</td>
+          <td>診断上、数字100%が崩れ、ロック・フェイント・フラッシュ等が混ざる。実装コストが低い。</td>
+          <td>material評価の癖、追加ターン系の過大評価が残る可能性。</td>
+          <td><span class="rank">第一候補</span></td>
+        </tr>
+        <tr>
+          <td>C. finite horizon教師</td>
+          <td>代表局面で深さ制限solverの方策を教師にする。</td>
+          <td>初期局面でフェイントやフラッシュが混ざり、人間視点に近い。</td>
+          <td>全状態に適用すると重い。深さ依存の癖が出る。</td>
+          <td>補助教師として有力。</td>
+        </tr>
+        <tr>
+          <td>D. ハイブリッド教師</td>
+          <td>material leaf VIを基本にし、初期局面・極端条件・人間指定局面だけfinite horizon/シナリオ教師で上書きする。</td>
+          <td>実用性と人間視点の安全性のバランスがよい。</td>
+          <td>設計がやや複雑。上書き条件の管理が必要。</td>
+          <td><span class="rank">最終候補</span></td>
+        </tr>
+        <tr>
+          <td>E. 数字ペナルティ</td>
+          <td>外し数字に直接ペナルティを入れる。</td>
+          <td>数字偏重を強く抑えられる。</td>
+          <td>参照スキル対策やフェイント封印時の正当な外し数字まで壊す。</td>
+          <td>非推奨。警告・採用基準で扱う。</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="section">
+    <h2>推奨する実装順</h2>
+    <ol>
+      <li>
+        <strong>BC教師生成に leaf mode を追加する。</strong>
+        <br>
+        <code>--bc-leaf-mode zero|material</code> のように切り替え可能にする。
+        既存互換のため default は一旦 <code>zero</code> でもよいが、今後の学習では <code>material</code> を使う。
+      </li>
+      <li>
+        <strong>BC教師分布レポートを必須化する。</strong>
+        <br>
+        初期局面、フェイント封印局面、相手ストック局面、0/50/100%カウンター想定局面で、教師分布をHTMLに出す。
+      </li>
+      <li>
+        <strong>採用警告を入れる。</strong>
+        <br>
+        通常局面で数字宣言が80%以上、または100%カウンターでフェイント/ロック等を大きく下回る場合は警告。
+      </li>
+      <li>
+        <strong>material leaf BCのsmoke学習だけを行う。</strong>
+        <br>
+        まず短時間学習で方策分布を確認し、数字偏重が改善しなければ再学習本番に進まない。
+      </li>
+      <li>
+        <strong>必要ならハイブリッド教師へ進む。</strong>
+        <br>
+        material leaf でも数字偏重・追加ターン偏重が残る場合、初期局面や極端条件をfinite horizon/シナリオ教師で補正する。
+      </li>
+    </ol>
+  </section>
+
+  <section class="section">
+    <h2>次工程の確認HTML案</h2>
+    <table>
+      <thead>
+        <tr><th>成果物</th><th>内容</th><th>見るべきポイント</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>bc_teacher_distribution_check.html</code></td>
+          <td>zero leaf と material leaf の教師分布を代表局面で比較。</td>
+          <td>初期局面で数字100%が消えるか。フェイント/フラッシュ/ロック等が妥当に混ざるか。</td>
+        </tr>
+        <tr>
+          <td><code>bc_material_smoke_policy_report.html</code></td>
+          <td>material leaf BCで短時間学習したモデルの分離条件レポート。</td>
+          <td>deterministicで数字100%が再発しないか。</td>
+        </tr>
+        <tr>
+          <td><code>bc_teacher_warning_list.html</code></td>
+          <td>外し数字常用、追加ターン偏重、対カウンター不足の警告一覧。</td>
+          <td>人間が許容する外し数字と、単なる局所解を分けられるか。</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="section">
+    <h2>AI側の見解</h2>
+    <p>
+      現時点で、数字偏重を直接ペナルティで潰すのは危険です。
+      外し数字には正当な局面があり、特にフェイント封印・参照スキル対策・50%カウンター読みでは戦略として残すべきです。
+    </p>
+    <p>
+      ただし、現行のBC教師は「正当な外し数字」ではなく、default leaf=0 の境界条件により
+      数字0や外し数字を安易な均衡解として選んでいるように見えます。
+      したがって、最初に直すべきは報酬ペナルティではなく、BC教師生成のleaf評価と採用前診断です。
+    </p>
+    <div class="note">
+      承認待ち:
+      次に進む場合は、<code>bc_pretrain.py</code> と <code>maskable_ppo.py</code> に
+      BC leaf mode を追加し、まず material leaf 教師の分布確認HTMLを生成する。
+      再学習本番にはまだ進まない。
+    </div>
+  </section>
+</main>
+</body>
+</html>

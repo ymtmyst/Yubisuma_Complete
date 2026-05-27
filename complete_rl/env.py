@@ -76,8 +76,25 @@ MIXED_NTP_POLICIES: tuple[str, ...] = (
     "mixed_basic",
     "weighted_none_counter",
     "episode_mixed_basic",
+    "episode_separated_basic",
     "episode_weighted_none_counter",
 )
+SEPARATED_NTP_POLICIES: tuple[str, ...] = (
+    "none_lowest",
+    "none_uniform",
+    "counter50_lowest",
+    "counter50_uniform",
+    "counter_lowest",
+    "counter_uniform",
+)
+_SEPARATED_NTP_SPECS: dict[str, tuple[float, str]] = {
+    "none_lowest": (0.0, "lowest"),
+    "none_uniform": (0.0, "uniform"),
+    "counter50_lowest": (0.5, "lowest"),
+    "counter50_uniform": (0.5, "uniform"),
+    "counter_lowest": (1.0, "lowest"),
+    "counter_uniform": (1.0, "uniform"),
+}
 
 # Module-level cache so Nash strategies are computed at most once per config.
 _NASH_NTP_STRATEGY_CACHE: dict[RulesConfig, dict] = {}
@@ -117,11 +134,61 @@ def mirror_first_ntp_policy(state: State, config: RulesConfig) -> NTPAction:
     return _first_legal_reaction(state, config, (MIRROR_MAIN, COUNTER, BLOCK, NONE))
 
 
+def separated_ntp_policy(
+    state: State,
+    config: RulesConfig,
+    counter_prob: float,
+    thumb_policy: str,
+    rng: random.Random | None = None,
+) -> NTPAction:
+    """Choose NTP reaction probability and thumb policy independently."""
+    chooser = rng or random
+    legal = legal_ntp_actions(state, config)
+    by_reaction: dict[str, list[NTPAction]] = {NONE: [], COUNTER: []}
+    for action in legal:
+        if action.reaction in by_reaction:
+            by_reaction[action.reaction].append(action)
+
+    if counter_prob <= 0.0:
+        reaction = NONE
+    elif counter_prob >= 1.0:
+        reaction = COUNTER
+    else:
+        reaction = COUNTER if chooser.random() < counter_prob else NONE
+
+    actions = by_reaction.get(reaction, [])
+    if not actions:
+        fallback_reaction = NONE if reaction == COUNTER else COUNTER
+        actions = by_reaction.get(fallback_reaction, [])
+    if not actions:
+        actions = list(legal)
+
+    actions = sorted(actions, key=lambda item: item.thumb)
+    if thumb_policy == "lowest":
+        return actions[0]
+    if thumb_policy == "highest":
+        return actions[-1]
+    if thumb_policy == "uniform":
+        return chooser.choice(actions)
+    raise ValueError(f"unknown thumb_policy: {thumb_policy!r}")
+
+
+def make_separated_ntp_policy(counter_prob: float, thumb_policy: str) -> OpponentPolicy:
+    """Build an unseeded separated NTP policy for direct function use."""
+    def policy(state: State, config: RulesConfig) -> NTPAction:
+        return separated_ntp_policy(state, config, counter_prob, thumb_policy)
+    return policy
+
+
 NAMED_NTP_POLICIES: dict[str, OpponentPolicy] = {
     "none": none_ntp_policy,
     "counter_first": counter_first_ntp_policy,
     "block_first": block_first_ntp_policy,
     "mirror_first": mirror_first_ntp_policy,
+    **{
+        name: make_separated_ntp_policy(counter_prob, thumb_policy)
+        for name, (counter_prob, thumb_policy) in _SEPARATED_NTP_SPECS.items()
+    },
 }
 
 
@@ -244,7 +311,8 @@ class CompleteEnv(gym.Env):
         Callable ``(state, config) -> NTPAction`` used to sample NTP
         reactions, or one of the named strings: ``"random"``, ``"none"``,
         ``"counter_first"``, ``"block_first"``, ``"mirror_first"``,
-        ``"mixed_basic"``, ``"weighted_none_counter"``.
+        ``"mixed_basic"``, ``"weighted_none_counter"``, or one of the
+        ``"episode_*"`` mixtures.
     max_steps:
         Episode truncation limit (prevents infinite loops in degenerate play).
     reward_mode:
@@ -270,6 +338,7 @@ class CompleteEnv(gym.Env):
         self.reward_mode = reward_mode
 
         self._episode_ntp_pool: list[str] | None = None
+        self._separated_ntp_policy_name: str | None = None
 
         if opponent_policy == "random":
             self._ntp_policy: OpponentPolicy = self._seeded_random_ntp_policy
@@ -283,6 +352,15 @@ class CompleteEnv(gym.Env):
                 pool.append("mirror_first")
             self._episode_ntp_pool = pool
             self._ntp_policy = self._seeded_random_ntp_policy  # replaced each reset
+        elif opponent_policy == "episode_separated_basic":
+            self._episode_ntp_pool = [
+                "none_uniform",
+                "counter50_uniform",
+                "counter_uniform",
+                "block_first",
+                "random",
+            ]
+            self._ntp_policy = self._seeded_random_ntp_policy  # replaced each reset
         elif opponent_policy == "episode_weighted_none_counter":
             self._episode_ntp_pool = [
                 "none", "none",
@@ -294,6 +372,9 @@ class CompleteEnv(gym.Env):
         elif opponent_policy == "nash_optimal":
             self._ntp_policy = self._seeded_nash_optimal_ntp_policy
             self._nash_strategies = _get_nash_ntp_strategies(config)
+        elif isinstance(opponent_policy, str) and opponent_policy in SEPARATED_NTP_POLICIES:
+            self._separated_ntp_policy_name = opponent_policy
+            self._ntp_policy = self._seeded_separated_ntp_policy
         elif isinstance(opponent_policy, str) and opponent_policy in NAMED_NTP_POLICIES:
             self._ntp_policy = NAMED_NTP_POLICIES[opponent_policy]
         elif callable(opponent_policy):
@@ -335,8 +416,13 @@ class CompleteEnv(gym.Env):
         if self._episode_ntp_pool is not None:
             chosen = self._rng.choice(self._episode_ntp_pool)
             if chosen == "random":
+                self._separated_ntp_policy_name = None
                 self._ntp_policy = self._seeded_random_ntp_policy
+            elif chosen in SEPARATED_NTP_POLICIES:
+                self._separated_ntp_policy_name = chosen
+                self._ntp_policy = self._seeded_separated_ntp_policy
             else:
+                self._separated_ntp_policy_name = None
                 self._ntp_policy = NAMED_NTP_POLICIES[chosen]
         return encode_state(self._state), {}
 
@@ -362,6 +448,9 @@ class CompleteEnv(gym.Env):
             obs = encode_state(self._state, history)
             return obs, float(result.terminal_reward), True, truncated, {
                 "events": result.events,
+                "ntp_reaction": ntp_action.reaction,
+                "ntp_thumb": ntp_action.thumb,
+                "tp_action": tp_action.key(),
                 "reward_mode": self.reward_mode,
             }
 
@@ -376,6 +465,9 @@ class CompleteEnv(gym.Env):
         return obs, shaped_reward, False, truncated, {
             "same_turn_player": result.same_turn_player,
             "events": result.events,
+            "ntp_reaction": ntp_action.reaction,
+            "ntp_thumb": ntp_action.thumb,
+            "tp_action": tp_action.key(),
             "reward_mode": self.reward_mode,
         }
 
@@ -390,6 +482,12 @@ class CompleteEnv(gym.Env):
     def _seeded_random_ntp_policy(self, state: State, config: RulesConfig) -> NTPAction:
         """Uniform random NTP reaction tied to Gymnasium reset(seed=...)."""
         return self._rng.choice(legal_ntp_actions(state, config))
+
+    def _seeded_separated_ntp_policy(self, state: State, config: RulesConfig) -> NTPAction:
+        """Separated reaction/thumb NTP policy tied to Gymnasium reset(seed=...)."""
+        assert self._separated_ntp_policy_name is not None
+        counter_prob, thumb_policy = _SEPARATED_NTP_SPECS[self._separated_ntp_policy_name]
+        return separated_ntp_policy(state, config, counter_prob, thumb_policy, self._rng)
 
     def _seeded_mixed_basic_ntp_policy(self, state: State, config: RulesConfig) -> NTPAction:
         """Randomly choose among simple deterministic NTP policies each reaction."""

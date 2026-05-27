@@ -365,6 +365,36 @@
             <td>追加ターン取得そのものに即時報酬はない。ただし深さ制限評価では、追加ターン系が後続勝ち筋を拾って高く出やすい。</td>
             <td><code>results/turn_chain_reward_diagnostics.html</code></td>
           </tr>
+          <tr>
+            <td>NTP 方策分離チェック</td>
+            <td>0%/50%/100%カウンター × 最小指/一様指を確認。100%ではフェイントが首位。0%/50%ではガード/ブーストが首位で、追加ターン系の評価懸念は継続。</td>
+            <td><code>results/ntp_policy_separation_check.html</code></td>
+          </tr>
+          <tr>
+            <td>分離条件 方策レポート</td>
+            <td>episode_mixed モデルを分離条件で確認。deterministic は全条件で数字宣言 100%、stochastic でも 90〜97% 程度。指条件を分けても数字偏重は残る。</td>
+            <td><code>results/separated_policy_report_episode_mixed.html</code></td>
+          </tr>
+          <tr>
+            <td>数字偏重 追加診断</td>
+            <td>BC教師生成で初期局面が数字100%になる赤信号、カウンター時の外し数字価値、視点切替とPPO目的の不一致疑いを整理。</td>
+            <td><code>results/number_bias_diagnostic_note.html</code></td>
+          </tr>
+          <tr>
+            <td>BC教師・PPO目的診断</td>
+            <td>外し数字の許容方針を反映。VI教師 default leaf は代表局面で数字0 100%に寄る一方、finite horizon / material leaf では対カウンターや勝利直結寄りスキルが混ざる。</td>
+            <td><code>results/bc_objective_diagnostics.html</code></td>
+          </tr>
+          <tr>
+            <td>BC教師生成 修正案</td>
+            <td>数字ペナルティではなく、BC leaf mode を追加して material leaf VI教師を第一候補にする方針。教師分布HTMLで採用前確認する。</td>
+            <td><code>results/bc_teacher_fix_proposal.html</code></td>
+          </tr>
+          <tr>
+            <td>BC leaf mode 実装</td>
+            <td><code>zero</code> / <code>material</code> を切替可能にし、教師分布HTMLを生成。zero leaf は全代表局面で数字100%警告、material leaf は数字100%集中が崩れる。</td>
+            <td><code>results/bc_teacher_distribution_check.html</code></td>
+          </tr>
         </tbody>
       </table>
       <h3>次に取り組む順番</h3>
@@ -377,24 +407,46 @@
           <code>results/ntp_policy_separation_design.html</code>。この設計案はユーザー承認待ち。
         </li>
         <li>
-          承認後、NTP 方策分離の最小実装と確認表生成を行う。
+          NTP 方策分離の最小実装と確認表生成を確認する。
           <br><strong>必要理由:</strong>
           設計上の切り分けが、実際に NTP 反応率・NTP 指分布・TP 上位行動の表として検証可能か確認するため。
+          <br><strong>成果物:</strong>
+          <code>results/ntp_policy_separation_check.html</code>。0%/50%/100%カウンターを含む確認表を生成済み。
         </li>
         <li>
           方策レポートに、初手分布、主要スキル使用率、NTP 指分布、追加ターン後の次手、警告リストを追加する。
           <br><strong>必要理由:</strong>
           勝率だけでは、数字宣言連打や追加ターン維持のような不自然な勝ち方を見逃すため、採用前に人間が方策の中身を確認できる指標が必要。
+          <br><strong>成果物:</strong>
+          <code>results/separated_policy_report_episode_mixed.html</code>。deterministic / stochastic の両方で、分離条件ごとの方策分布を確認済み。
         </li>
         <li>
-          0%/100% カウンターの最小検証を、分離した条件で再実施する。
+          BC教師分布と視点切替/PPO目的を検証する。
           <br><strong>必要理由:</strong>
-          0% と 100% は期待方策が比較的明確で、環境・報酬・合法手判定の基本整合性を確認しやすい。99% カウンターは必須ではなく、ロックなどの非線形スキルを専用検証する段階で任意に扱う。
+          分離条件でも数字偏重が残り、BC教師生成でも初期局面に数字100%が入る兆候があるため、再学習より先に教師データとRL目的関数を確認する。
+          <br><strong>成果物:</strong>
+          <code>results/bc_objective_diagnostics.html</code>。VI教師 default leaf が数字偏重の入口になっている疑いを確認。
         </li>
         <li>
-          terminal 報酬と material 報酬を比較し、数字偏重や追加ターン偏重がどちらで出るか確認する。
+          BC教師生成の修正案を作る。
           <br><strong>必要理由:</strong>
-          追加ターンを得ることと勝利へ近づくことが混同されていないかを確認し、報酬 shaping や深さ制限評価による副作用を分離するため。
+          数字偏重が学習済みモデルだけでなく教師生成段階から入っている可能性が高いため、再学習前に教師の作り方を見直す。
+          <br><strong>成果物:</strong>
+          <code>results/bc_teacher_fix_proposal.html</code>。推奨は BC leaf mode 追加と material leaf 教師の採用前確認。
+        </li>
+        <li>
+          承認後、BC leaf mode を実装し、material leaf 教師分布HTMLを生成する。
+          <br><strong>必要理由:</strong>
+          再学習前に、数字100%を作っていた教師生成条件を安全に切り替えられるか確認する。
+          <br><strong>成果物:</strong>
+          <code>results/bc_teacher_distribution_check.html</code>。zero leaf は数字100%警告、material leaf は数字100%集中が崩れることを確認済み。
+        </li>
+        <li>
+          material leaf BC smoke学習の可否を判断する。
+          <br><strong>必要理由:</strong>
+          教師分布の改善が、実際のモデル方策で数字100%解消につながるかを最小確認するため。
+          <br><strong>補足:</strong>
+          進める場合も、まず短時間 smoke 学習と方策レポート生成までで止める。
         </li>
         <li>
           上記の確認結果をユーザーが承認してから、再学習または既存モデル破棄の判断に進む。

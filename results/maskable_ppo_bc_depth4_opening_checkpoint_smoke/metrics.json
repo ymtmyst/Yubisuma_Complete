@@ -1,0 +1,44 @@
+{
+  "algorithm": "MaskablePPO",
+  "total_timesteps": 8,
+  "seed": 0,
+  "ntp_policy": "episode_mixed_basic",
+  "reward_mode": "material",
+  "bc_leaf_mode": "zero",
+  "bc_depth": 4,
+  "bc_checkpoint_path": "results\\maskable_ppo_bc_depth4_opening_checkpoint_smoke\\maskable_ppo_after_bc.zip",
+  "hyperparameters": {
+    "learning_rate": 0.0003,
+    "n_steps": 8,
+    "batch_size": 4,
+    "n_epochs": 1,
+    "gamma": 0.99,
+    "ent_coef": 0.01,
+    "max_steps": 20,
+    "eval_episodes": 1,
+    "device": "auto",
+    "tensorboard_log": null,
+    "use_bc_pretrain": true,
+    "bc_max_states": 1,
+    "bc_epochs": 5,
+    "bc_lr": 0.001,
+    "bc_leaf_mode": "zero",
+    "bc_depth": 4,
+    "save_bc_checkpoint": true,
+    "curriculum_warmup_steps": 0,
+    "curriculum_warmup_policy": null,
+    "source_model_path": null
+  },
+  "config": {
+    "enable_mirror": false,
+    "enable_reversi": false
+  },
+  "evaluation": {
+    "episodes": 1,
+    "wins": 0,
+    "losses": 0,
+    "truncations": 1,
+    "average_reward": 0.0,
+    "average_steps": 20.0
+  }
+}

@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <title>NTP 方策分離チェック</title>
+  <style>
+    body {
+      margin: 0;
+      background: #f7f7f4;
+      color: #202124;
+      font-family: "Segoe UI", "Yu Gothic", "Meiryo", sans-serif;
+      line-height: 1.7;
+    }
+    main { max-width: 1180px; margin: 0 auto; padding: 28px 20px 56px; }
+    h1 { margin: 0 0 6px; font-size: 28px; letter-spacing: 0; }
+    h2 { margin: 0 0 12px; font-size: 20px; letter-spacing: 0; }
+    .lead { color: #5f6368; margin-bottom: 18px; }
+    .section {
+      background: #fff;
+      border: 1px solid #d8d7d0;
+      border-radius: 8px;
+      padding: 18px;
+      margin: 16px 0;
+    }
+    table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 14px; }
+    th, td { border: 1px solid #d8d7d0; padding: 8px 10px; vertical-align: top; }
+    th { background: #eef1ef; text-align: left; }
+    code {
+      padding: 1px 5px;
+      background: #eef1ef;
+      border: 1px solid #dde3df;
+      border-radius: 4px;
+      font-family: Consolas, "Courier New", monospace;
+    }
+    .note {
+      border-left: 4px solid #0b6b6f;
+      background: #edf7f7;
+      padding: 10px 12px;
+      margin: 12px 0;
+    }
+    .warnbox {
+      border-left: 4px solid #8a5300;
+      background: #fff6e5;
+      padding: 10px 12px;
+      margin: 12px 0;
+    }
+    .ok { color: #246b32; margin: 4px 0; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>NTP 方策分離チェック</h1>
+  <p class="lead">深さ制限評価 depth=4 / 学習モデル未使用 / 0・50・100%カウンター × 最小指・一様指</p>
+  <section class="section">
+    <h2>この表の読み方</h2>
+    <p>
+      NTP の反応率と指選択を分けた条件で、初期局面における TP 側の上位行動を比較しています。
+      これは学習済みモデルの方策ではなく、ルールエンジンと深さ制限評価による診断です。
+    </p>
+    <div class="note">
+      目的は、数字宣言偏重がルール上の必然なのか、相手指固定や評価条件による副作用なのかを切り分けることです。
+      50%カウンターは、人間が中間条件の自然さを判断しやすくするために追加しています。
+    </div>
+  </section>
+  
+            <section class="section">
+              <h2>0%カウンター + 最小指固定</h2>
+              <p><strong>policy:</strong> <code>none_lowest</code></p>
+              <p><strong>NTP反応分布:</strong> なし: 100.0%</p>
+              <p><strong>NTP指分布:</strong> 0: 100.0%</p>
+              <p><strong>期待確認:</strong> 現行 none に近い条件。固定指への数字過適応が出るか確認する。</p>
+              <table>
+                <thead>
+                  <tr><th>#</th><th>TP行動</th><th>分類</th><th>評価値</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td>1</td><td>ガード, thumb=0</td><td>追加ターン/維持</td><td>1.0000</td></tr>
+<tr><td>2</td><td>ガード, thumb=1</td><td>追加ターン/維持</td><td>1.0000</td></tr>
+<tr><td>3</td><td>ガード, thumb=2</td><td>追加ターン/維持</td><td>1.0000</td></tr>
+<tr><td>4</td><td>タイム, thumb=0</td><td>スキル</td><td>1.0000</td></tr>
+<tr><td>5</td><td>タイム, thumb=1</td><td>スキル</td><td>1.0000</td></tr>
+<tr><td>6</td><td>タイム, thumb=2</td><td>スキル</td><td>1.0000</td></tr>
+<tr><td>7</td><td>スキップ, thumb=0</td><td>追加ターン/維持</td><td>0.5300</td></tr>
+<tr><td>8</td><td>スキップ, thumb=1</td><td>追加ターン/維持</td><td>0.5300</td></tr>
+                </tbody>
+              </table>
+              <div class="warnbox">
+                <strong>警告:</strong>
+                <p class="ok">警告なし</p>
+              </div>
+            </section>
+            
+            <section class="section">
+              <h2>0%カウンター + 指一様ランダム</h2>
+              <p><strong>policy:</strong> <code>none_uniform</code></p>
+              <p><strong>NTP反応分布:</strong> なし: 100.0%</p>
+              <p><strong>NTP指分布:</strong> 0: 33.3%, 1: 33.3%, 2: 33.3%</p>
+              <p><strong>期待確認:</strong> 相手指が揺れても、勝ち筋に直結する行動が上位に来るか確認する。</p>
+              <table>
+                <thead>
+                  <tr><th>#</th><th>TP行動</th><th>分類</th><th>評価値</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td>1</td><td>ブースト, thumb=0</td><td>スキル</td><td>0.4900</td></tr>
+<tr><td>2</td><td>ブースト, thumb=1</td><td>スキル</td><td>0.4900</td></tr>
+<tr><td>3</td><td>ブースト, thumb=2</td><td>スキル</td><td>0.4900</td></tr>
+<tr><td>4</td><td>ガード, thumb=0</td><td>追加ターン/維持</td><td>0.2956</td></tr>
+<tr><td>5</td><td>ガード, thumb=1</td><td>追加ターン/維持</td><td>0.2956</td></tr>
+<tr><td>6</td><td>ガード, thumb=2</td><td>追加ターン/維持</td><td>0.2956</td></tr>
+<tr><td>7</td><td>スキップ, thumb=0</td><td>追加ターン/維持</td><td>0.1967</td></tr>
+<tr><td>8</td><td>スキップ, thumb=1</td><td>追加ターン/維持</td><td>0.1967</td></tr>
+                </tbody>
+              </table>
+              <div class="warnbox">
+                <strong>警告:</strong>
+                <p class="ok">警告なし</p>
+              </div>
+            </section>
+            
+            <section class="section">
+              <h2>50%カウンター + 最小指固定</h2>
+              <p><strong>policy:</strong> <code>counter50_lowest</code></p>
+              <p><strong>NTP反応分布:</strong> なし: 50.0%, カウンター: 50.0%</p>
+              <p><strong>NTP指分布:</strong> 0: 100.0%</p>
+              <p><strong>期待確認:</strong> 中間条件で、数字・フェイント・追加ターン行動の評価バランスを見る。</p>
+              <table>
+                <thead>
+                  <tr><th>#</th><th>TP行動</th><th>分類</th><th>評価値</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td>1</td><td>ブースト, thumb=0</td><td>スキル</td><td>0.0150</td></tr>
+<tr><td>2</td><td>ブースト, thumb=1</td><td>スキル</td><td>0.0150</td></tr>
+<tr><td>3</td><td>ブースト, thumb=2</td><td>スキル</td><td>0.0150</td></tr>
+<tr><td>4</td><td>ガード, thumb=0</td><td>追加ターン/維持</td><td>0.0075</td></tr>
+<tr><td>5</td><td>ガード, thumb=1</td><td>追加ターン/維持</td><td>0.0075</td></tr>
+<tr><td>6</td><td>ガード, thumb=2</td><td>追加ターン/維持</td><td>0.0075</td></tr>
+<tr><td>7</td><td>タイム, thumb=0</td><td>スキル</td><td>-0.1300</td></tr>
+<tr><td>8</td><td>タイム, thumb=1</td><td>スキル</td><td>-0.1300</td></tr>
+                </tbody>
+              </table>
+              <div class="warnbox">
+                <strong>警告:</strong>
+                <p class="ok">警告なし</p>
+              </div>
+            </section>
+            
+            <section class="section">
+              <h2>50%カウンター + 指一様ランダム</h2>
+              <p><strong>policy:</strong> <code>counter50_uniform</code></p>
+              <p><strong>NTP反応分布:</strong> なし: 50.0%, カウンター: 50.0%</p>
+              <p><strong>NTP指分布:</strong> 0: 33.3%, 1: 33.3%, 2: 33.3%</p>
+              <p><strong>期待確認:</strong> 人間判断用の中間条件。指固定の副作用が薄まるか確認する。</p>
+              <table>
+                <thead>
+                  <tr><th>#</th><th>TP行動</th><th>分類</th><th>評価値</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td>1</td><td>ブースト, thumb=0</td><td>スキル</td><td>-0.0381</td></tr>
+<tr><td>2</td><td>ブースト, thumb=1</td><td>スキル</td><td>-0.0381</td></tr>
+<tr><td>3</td><td>ブースト, thumb=2</td><td>スキル</td><td>-0.0381</td></tr>
+<tr><td>4</td><td>ガード, thumb=0</td><td>追加ターン/維持</td><td>-0.1568</td></tr>
+<tr><td>5</td><td>ガード, thumb=1</td><td>追加ターン/維持</td><td>-0.1568</td></tr>
+<tr><td>6</td><td>ガード, thumb=2</td><td>追加ターン/維持</td><td>-0.1568</td></tr>
+<tr><td>7</td><td>タイム, thumb=0</td><td>スキル</td><td>-0.1663</td></tr>
+<tr><td>8</td><td>タイム, thumb=1</td><td>スキル</td><td>-0.1663</td></tr>
+                </tbody>
+              </table>
+              <div class="warnbox">
+                <strong>警告:</strong>
+                <p class="ok">警告なし</p>
+              </div>
+            </section>
+            
+            <section class="section">
+              <h2>100%カウンター + 最小指固定</h2>
+              <p><strong>policy:</strong> <code>counter_lowest</code></p>
+              <p><strong>NTP反応分布:</strong> カウンター: 100.0%</p>
+              <p><strong>NTP指分布:</strong> 0: 100.0%</p>
+              <p><strong>期待確認:</strong> 現行 counter_first に近い条件。フェイントが上位に来るか確認する。</p>
+              <table>
+                <thead>
+                  <tr><th>#</th><th>TP行動</th><th>分類</th><th>評価値</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td>1</td><td>フェイント, thumb=0</td><td>スキル</td><td>1.0000</td></tr>
+<tr><td>2</td><td>フェイント, thumb=1</td><td>スキル</td><td>1.0000</td></tr>
+<tr><td>3</td><td>フェイント, thumb=2</td><td>スキル</td><td>1.0000</td></tr>
+<tr><td>4</td><td>ガード, thumb=0</td><td>追加ターン/維持</td><td>-1.0000</td></tr>
+<tr><td>5</td><td>ガード, thumb=1</td><td>追加ターン/維持</td><td>-1.0000</td></tr>
+<tr><td>6</td><td>ガード, thumb=2</td><td>追加ターン/維持</td><td>-1.0000</td></tr>
+<tr><td>7</td><td>クイック, thumb=0</td><td>勝利直結寄り</td><td>-1.0000</td></tr>
+<tr><td>8</td><td>クイック, thumb=1</td><td>勝利直結寄り</td><td>-1.0000</td></tr>
+                </tbody>
+              </table>
+              <div class="warnbox">
+                <strong>警告:</strong>
+                <p class="ok">警告なし</p>
+              </div>
+            </section>
+            
+            <section class="section">
+              <h2>100%カウンター + 指一様ランダム</h2>
+              <p><strong>policy:</strong> <code>counter_uniform</code></p>
+              <p><strong>NTP反応分布:</strong> カウンター: 100.0%</p>
+              <p><strong>NTP指分布:</strong> 0: 33.3%, 1: 33.3%, 2: 33.3%</p>
+              <p><strong>期待確認:</strong> 相手指が揺れても、フェイントの優位が安定するか確認する。</p>
+              <table>
+                <thead>
+                  <tr><th>#</th><th>TP行動</th><th>分類</th><th>評価値</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td>1</td><td>フェイント, thumb=0</td><td>スキル</td><td>1.0000</td></tr>
+<tr><td>2</td><td>フェイント, thumb=1</td><td>スキル</td><td>1.0000</td></tr>
+<tr><td>3</td><td>フェイント, thumb=2</td><td>スキル</td><td>1.0000</td></tr>
+<tr><td>4</td><td>ガード, thumb=0</td><td>追加ターン/維持</td><td>-1.0000</td></tr>
+<tr><td>5</td><td>ガード, thumb=1</td><td>追加ターン/維持</td><td>-1.0000</td></tr>
+<tr><td>6</td><td>ガード, thumb=2</td><td>追加ターン/維持</td><td>-1.0000</td></tr>
+<tr><td>7</td><td>クイック, thumb=0</td><td>勝利直結寄り</td><td>-1.0000</td></tr>
+<tr><td>8</td><td>クイック, thumb=1</td><td>勝利直結寄り</td><td>-1.0000</td></tr>
+                </tbody>
+              </table>
+              <div class="warnbox">
+                <strong>警告:</strong>
+                <p class="ok">警告なし</p>
+              </div>
+            </section>
+            
+  <section class="section">
+    <h2>AI側の解釈</h2>
+    <p>
+      0% と 100% は基本整合性を見るための端点、50% は人間判断を補助する中間点です。
+      この結果が自然に見える場合、次は学習済みモデルの方策レポートを同じ分離条件で拡張します。
+      不自然な警告が残る場合は、再学習より先に報酬・葉評価・合法手条件へ戻るべきです。
+    </p>
+  </section>
+</main>
+</body>
+</html>

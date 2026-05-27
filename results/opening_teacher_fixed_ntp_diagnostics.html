@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <title>開幕教師 vs 固定NTP 診断</title>
+  <style>
+    body { margin: 0; background: #f6f6f2; color: #202124; font-family: "Segoe UI", "Yu Gothic", "Meiryo", sans-serif; line-height: 1.68; }
+    main { max-width: 1320px; margin: 0 auto; padding: 28px 20px 56px; }
+    h1 { font-size: 28px; letter-spacing: 0; margin: 0 0 6px; }
+    h2 { font-size: 20px; letter-spacing: 0; margin: 0 0 10px; }
+    h3 { font-size: 15px; letter-spacing: 0; margin: 12px 0 7px; }
+    .lead, .meta { color: #5f6368; }
+    .section { background: #fff; border: 1px solid #d7d6cf; border-radius: 8px; margin: 15px 0; padding: 18px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 14px; }
+    .note { background: #edf6f5; border-left: 4px solid #0a6b6f; margin: 10px 0; padding: 10px 12px; }
+    .read { background: #fff5e2; border-left: 4px solid #8a5300; margin: 10px 0; padding: 10px 12px; }
+    table { border-collapse: collapse; font-size: 13px; width: 100%; }
+    th, td { border: 1px solid #d7d6cf; padding: 6px 8px; text-align: left; vertical-align: top; }
+    th { background: #eef1ef; }
+    code { background: #eef1ef; border: 1px solid #dce3dd; border-radius: 4px; font-family: Consolas, "Courier New", monospace; padding: 1px 5px; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>開幕教師 vs 固定NTP 診断</h1>
+  <p class="lead">初期局面のみ / depth=4 / 勝率ではなく、教師分布と固定相手に対する初手の意味を比較</p>
+  <section class="section">
+    <h2>確認意図</h2>
+    <p>
+      現在の BC depth=4 教師は、NTPも最悪応答を選ぶゼロ和の有限地平線教師です。
+      一方、固定NTP評価は「相手がカウンターしない」「相手が必ずカウンターする」を分けた
+      exploit確認です。この2つを混同せず、どの段階で開幕方策が固定されるかを切る前準備にします。
+    </p>
+    <div class="note">
+      固定NTP表の「一次イベント」と「一手後の形」は初手だけを見ます。
+      評価値は参考で、定性分析では `feint_no_counter`、`feint_success`、
+      追加ターン、最初の手番交代を優先して読みます。
+    </div>
+  </section>
+  <section class="section">
+    <h2>BC finite-horizon 教師</h2>
+    <p class="meta">初期局面 / value=+0.0484 / depth=4</p>
+    <div class="grid">
+      <section>
+        <h3>教師の行動分布</h3>
+        <table><thead><tr><th>行動</th><th>分類</th><th>確率</th><th>メモ</th></tr></thead><tbody><tr><td>ガード, 指=2</td><td>ターン/防御/準備</td><td>72.8%</td><td></td></tr>
+<tr><td>フェイント, 指=2</td><td>フェイント/ロック</td><td>22.6%</td><td></td></tr>
+<tr><td>スキップ, 指=2</td><td>ターン/防御/準備</td><td>4.6%</td><td></td></tr></tbody></table>
+      </section>
+      <section>
+        <h3>教師のスキル群</h3>
+        <table><thead><tr><th>群</th><th>確率</th></tr></thead><tbody><tr><td>ターン/防御/準備</td><td>77.4%</td></tr>
+<tr><td>フェイント/ロック</td><td>22.6%</td></tr>
+<tr><td>数字宣言</td><td>0.0%</td></tr>
+<tr><td>勝利直結寄り</td><td>0.0%</td></tr>
+<tr><td>その他スキル</td><td>0.0%</td></tr></tbody></table>
+      </section>
+    </div>
+  </section>
+  
+    <section class="section">
+      <h2>カウンター0%・指一様</h2>
+      <p class="meta">内部表記: <code>none_uniform</code> / fixed-NTP depth=4</p>
+      <p>0%カウンターでは、フェイントが何も進めず手番を渡す形を警戒する。</p>
+      <table>
+        <thead>
+          <tr><th>#</th><th>TP初手</th><th>分類</th><th>固定NTP評価</th><th>一次イベント</th><th>一手後の形</th></tr>
+        </thead>
+        <tbody><tr><td>1</td><td>ブースト, 指=0</td><td>ターン/防御/準備</td><td>+0.4900</td><td>boost 100.0%</td><td>開始側が追加ターン 100.0%</td></tr>
+<tr><td>2</td><td>ブースト, 指=1</td><td>ターン/防御/準備</td><td>+0.4900</td><td>boost 100.0%</td><td>開始側が追加ターン 100.0%</td></tr>
+<tr><td>3</td><td>ブースト, 指=2</td><td>ターン/防御/準備</td><td>+0.4900</td><td>boost 100.0%</td><td>開始側が追加ターン 100.0%</td></tr>
+<tr><td>4</td><td>ガード, 指=0</td><td>ターン/防御/準備</td><td>+0.2956</td><td>guard_extra_turn 100.0%</td><td>開始側が追加ターン 100.0%</td></tr>
+<tr><td>5</td><td>ガード, 指=1</td><td>ターン/防御/準備</td><td>+0.2956</td><td>guard_extra_turn 100.0%</td><td>開始側が追加ターン 100.0%</td></tr>
+<tr><td>6</td><td>ガード, 指=2</td><td>ターン/防御/準備</td><td>+0.2956</td><td>guard_extra_turn 100.0%</td><td>開始側が追加ターン 100.0%</td></tr>
+<tr><td>7</td><td>スキップ, 指=0</td><td>ターン/防御/準備</td><td>+0.1967</td><td>skip_applied 100.0%</td><td>最初の手番交代 100.0%</td></tr>
+<tr><td>8</td><td>スキップ, 指=1</td><td>ターン/防御/準備</td><td>+0.1967</td><td>skip_applied 100.0%</td><td>最初の手番交代 100.0%</td></tr>
+<tr><td>9</td><td>スキップ, 指=2</td><td>ターン/防御/準備</td><td>+0.1967</td><td>skip_applied 100.0%</td><td>最初の手番交代 100.0%</td></tr>
+<tr><td>10</td><td>タイム, 指=0</td><td>ターン/防御/準備</td><td>+0.1955</td><td>time_set 100.0%</td><td>開始側が追加ターン 100.0%</td></tr>
+<tr><td>23</td><td>フェイント, 指=1</td><td>フェイント/ロック</td><td>-1.0000</td><td>feint_no_counter 100.0%</td><td>最初の手番交代 100.0%</td></tr></tbody>
+      </table>
+    </section>
+    
+    <section class="section">
+      <h2>カウンター100%・指一様</h2>
+      <p class="meta">内部表記: <code>counter_uniform</code> / fixed-NTP depth=4</p>
+      <p>100%カウンターでは、対カウンター行動が追加ターンへ変わる形を確認する。</p>
+      <table>
+        <thead>
+          <tr><th>#</th><th>TP初手</th><th>分類</th><th>固定NTP評価</th><th>一次イベント</th><th>一手後の形</th></tr>
+        </thead>
+        <tbody><tr><td>1</td><td>フェイント, 指=0</td><td>フェイント/ロック</td><td>+1.0000</td><td>feint_success 100.0%</td><td>開始側が追加ターン 100.0%</td></tr>
+<tr><td>2</td><td>フェイント, 指=1</td><td>フェイント/ロック</td><td>+1.0000</td><td>feint_success 100.0%</td><td>開始側が追加ターン 100.0%</td></tr>
+<tr><td>3</td><td>フェイント, 指=2</td><td>フェイント/ロック</td><td>+1.0000</td><td>feint_success 100.0%</td><td>開始側が追加ターン 100.0%</td></tr>
+<tr><td>4</td><td>ガード, 指=0</td><td>ターン/防御/準備</td><td>-1.0000</td><td>counter_no_effect 100.0%</td><td>最初の手番交代 100.0%</td></tr>
+<tr><td>5</td><td>ガード, 指=1</td><td>ターン/防御/準備</td><td>-1.0000</td><td>counter_no_effect 100.0%</td><td>最初の手番交代 100.0%</td></tr>
+<tr><td>6</td><td>ガード, 指=2</td><td>ターン/防御/準備</td><td>-1.0000</td><td>counter_no_effect 100.0%</td><td>最初の手番交代 100.0%</td></tr>
+<tr><td>7</td><td>クイック, 指=0</td><td>勝利直結寄り</td><td>-1.0000</td><td>counter_no_effect 100.0%</td><td>最初の手番交代 100.0%</td></tr>
+<tr><td>8</td><td>クイック, 指=1</td><td>勝利直結寄り</td><td>-1.0000</td><td>counter_no_effect 100.0%</td><td>最初の手番交代 100.0%</td></tr>
+<tr><td>9</td><td>クイック, 指=2</td><td>勝利直結寄り</td><td>-1.0000</td><td>counter_no_effect 100.0%</td><td>最初の手番交代 100.0%</td></tr>
+<tr><td>10</td><td>スキップ, 指=0</td><td>ターン/防御/準備</td><td>-1.0000</td><td>counter_no_effect 100.0%</td><td>最初の手番交代 100.0%</td></tr></tbody>
+      </table>
+    </section>
+    
+  <section class="section">
+    <h2>定性読み</h2>
+    <div class="read"><ul><li>BC depth=4 教師は初期局面でターン/防御/準備 77.4%、フェイント/ロック 22.6% を置く。固定NTP専用の最適応答ではなく、相手反応も手を選ぶゼロ和教師である。</li><li>カウンター0%・指一様の固定評価では先頭が ブースト, 指=0。フェイント/ロック順位は 23 で、この条件では空振りイベントと手番交代を直接確認する。</li><li>カウンター100%・指一様の固定評価ではフェイント/ロック順位が 1, 2, 3。対カウンター開幕が質的に正しいかは、`feint_success` と追加ターンが並ぶかで読む。</li></ul></div>
+    <p>
+      次の確認では BC直後モデルと PPO後モデルの開始側手順を同じ診断で比較し、
+      教師分布の混合読みがそのままモデル開幕に残るのか、PPOでさらに固定されるのかを切る。
+    </p>
+  </section>
+</main>
+</body>
+</html>

@@ -1,0 +1,1467 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <title>分離NTP 方策レポート</title>
+  <style>
+    body { margin: 0; background: #f7f7f4; color: #202124; font-family: "Segoe UI", "Yu Gothic", "Meiryo", sans-serif; line-height: 1.7; }
+    main { max-width: 1240px; margin: 0 auto; padding: 28px 20px 56px; }
+    h1 { margin: 0 0 6px; font-size: 28px; letter-spacing: 0; }
+    h2 { margin: 0 0 12px; font-size: 20px; letter-spacing: 0; }
+    h3 { margin: 12px 0 8px; font-size: 15px; letter-spacing: 0; }
+    .lead { color: #5f6368; margin-bottom: 18px; }
+    .section { background: #fff; border: 1px solid #d8d7d0; border-radius: 8px; padding: 18px; margin: 16px 0; }
+    details.section > summary { align-items: baseline; cursor: pointer; display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; list-style-position: outside; }
+    details.section > summary strong { font-size: 20px; }
+    details.section > summary span { color: #5f6368; font-size: 14px; }
+    details.section[open] > summary { border-bottom: 1px solid #d8d7d0; margin-bottom: 12px; padding-bottom: 12px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); gap: 14px; }
+    .summary { display: flex; flex-wrap: wrap; gap: 10px; margin: 0 0 12px; }
+    .summary span { background: #eef1ef; border: 1px solid #dde3df; border-radius: 999px; padding: 3px 10px; font-size: 13px; }
+    .internal-name { color: #5f6368; font-size: 13px; margin: 0 0 10px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { border: 1px solid #d8d7d0; padding: 6px 8px; vertical-align: top; }
+    th { background: #eef1ef; text-align: left; }
+    .trace { display: block; overflow-x: auto; white-space: nowrap; }
+    .trace td { white-space: normal; min-width: 84px; }
+    .trace td:nth-child(3), .trace td:nth-child(7) { min-width: 180px; }
+    .note { border-left: 4px solid #0b6b6f; background: #edf7f7; padding: 10px 12px; margin: 12px 0; }
+    .warn { border-left: 4px solid #8a5300; background: #fff6e5; padding: 10px 12px; margin: 12px 0 0; }
+    .ok { color: #246b32; margin: 4px 0; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>分離NTP 方策レポート</h1>
+  <p class="lead">モデル: results\maskable_ppo_bc_depth4_standard_proper\maskable_ppo_complete.zip / 各条件 80 episodes / 決定論評価と確率サンプル評価を比較</p>
+  <section class="section">
+    <h2>確認意図</h2>
+    <p>
+      0%/50%/100%カウンターと、最小指/一様指を分離した条件で、学習済みモデルの実際の行動分布を確認します。
+      勝率だけでなく、初手、スキル別使用率、行動明細、追加ターン後の次手、NTP反応・指分布、警告を並べています。
+    </p>
+    <div class="note">
+      この環境では手番が交代すると同じ方策が次のTP側も操作します。したがって全体のスキル使用率は開始側と手番交代後側の合算です。
+      成績は「開始側成績」を主表示し、旧来の符号確認用に終端TP報酬も併記します。代表トレースでコピー対象と手番側を確認してください。
+      警告は採用判断の補助です。
+    </div>
+  </section>
+  <section class="section">
+    <h2>内部表記の対応表</h2>
+    <p>NTP は相手側の反応です。ここでは「反応なし」と「カウンター」を分離し、指選択も別条件として確認しています。</p>
+    <h3>評価モード</h3>
+    <table><thead><tr><th>内部表記</th><th>日本語表示</th><th>意味</th></tr></thead><tbody><tr><td>deterministic</td><td>決定論評価</td><td>方策が最も高い確率を付けた合法手を毎手選ぶ。固定開幕や局所解の確認向け。</td></tr><tr><td>stochastic</td><td>確率サンプル評価</td><td>方策分布から合法手をサンプルする。学習済み分布に残った選択幅の確認向け。</td></tr></tbody></table>
+    <h3>相手NTP条件</h3>
+    <table><thead><tr><th>内部表記</th><th>日本語表示</th><th>意味</th></tr></thead><tbody><tr><td>none_lowest</td><td>カウンター0%・指最小</td><td>相手NTP反応は常に「なし」。合法な指のうち最小の指を選ぶ。</td></tr><tr><td>none_uniform</td><td>カウンター0%・指一様</td><td>相手NTP反応は常に「なし」。合法な指を一様ランダムに選ぶ。</td></tr><tr><td>counter50_lowest</td><td>カウンター50%・指最小</td><td>相手NTP反応は「なし」と「カウンター」を50%ずつ選び、指は最小にする。</td></tr><tr><td>counter50_uniform</td><td>カウンター50%・指一様</td><td>相手NTP反応は「なし」と「カウンター」を50%ずつ選び、指は一様にする。</td></tr><tr><td>counter_lowest</td><td>カウンター100%・指最小</td><td>相手NTP反応は常に「カウンター」。合法な指のうち最小の指を選ぶ。</td></tr><tr><td>counter_uniform</td><td>カウンター100%・指一様</td><td>相手NTP反応は常に「カウンター」。合法な指を一様ランダムに選ぶ。</td></tr></tbody></table>
+  </section>
+  
+                <details class="section condition">
+                  <summary>
+                    <strong>決定論評価 / カウンター0%・指最小</strong>
+                    <span>開始側 0勝 80敗 0打切 / 平均2.0手</span>
+                  </summary>
+                  <p class="internal-name">内部表記: deterministic / none_lowest</p>
+                  <div class="summary">
+                    <span>開始側成績: 0勝 80敗 0打切</span>
+                    <span>終端TP報酬: + 80 / - 0 / 0 0</span>
+                    <span>平均手数: 2.0</span>
+                    <span>総TP行動: 160</span>
+                  </div>
+                  <div class="grid">
+                    <div>
+                      <h3>スキル別使用率</h3>
+                      <table><thead><tr><th>スキル</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>フェイント</td><td>80</td><td>50.0%</td></tr>
+<tr><td>コピー</td><td>80</td><td>50.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>開始側スキル別使用率</h3>
+                      <table><thead><tr><th>スキル</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>フェイント</td><td>80</td><td>100.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>手番交代後側スキル別使用率</h3>
+                      <table><thead><tr><th>スキル</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>コピー</td><td>80</td><td>100.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>行動明細</h3>
+                      <table><thead><tr><th>行動</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>フェイント, 指=1</td><td>80</td><td>50.0%</td></tr>
+<tr><td>コピー, 指=0</td><td>80</td><td>50.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>カテゴリ集計（参考）</h3>
+                      <table><thead><tr><th>分類</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>対カウンター</td><td>80</td><td>50.0%</td></tr>
+<tr><td>参照スキル</td><td>80</td><td>50.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>初手分布</h3>
+                      <table><thead><tr><th>行動</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>フェイント, 指=1</td><td>80</td><td>100.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>追加ターン後の次手</h3>
+                      <table><thead><tr><th>行動</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td colspan="3">なし</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>NTP反応分布</h3>
+                      <table><thead><tr><th>反応</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>なし</td><td>160</td><td>100.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>NTP指分布</h3>
+                      <table><thead><tr><th>指</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>0</td><td>160</td><td>100.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                  </div>
+                  <h3>代表トレース（最初の1エピソード）</h3>
+                  <table class="trace"><thead><tr><th>手</th><th>TP側</th><th>直前状態</th><th>TP行動</th><th>NTP反応</th><th>コピー対象</th><th>イベント</th><th>結果</th></tr></thead><tbody>
+                    <tr><td>1</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=-</td><td>フェイント, 指=1</td><td>なし, 指=0</td><td>-</td><td>feint_no_counter</td><td>手番交代</td></tr>
+<tr><td>2</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=フェイント</td><td>コピー, 指=0</td><td>なし, 指=0</td><td>フェイント</td><td>copy_used</td><td>終端報酬=+1.0</td></tr>
+                  </tbody></table>
+                  <div class="warn"><strong>警告:</strong><ul><li>勝利なし: 0.0%</li><li>初手が単一行動に集中: フェイント, 指=1 100.0%</li></ul></div>
+                </details>
+                
+                <details class="section condition">
+                  <summary>
+                    <strong>決定論評価 / カウンター0%・指一様</strong>
+                    <span>開始側 0勝 80敗 0打切 / 平均2.0手</span>
+                  </summary>
+                  <p class="internal-name">内部表記: deterministic / none_uniform</p>
+                  <div class="summary">
+                    <span>開始側成績: 0勝 80敗 0打切</span>
+                    <span>終端TP報酬: + 80 / - 0 / 0 0</span>
+                    <span>平均手数: 2.0</span>
+                    <span>総TP行動: 160</span>
+                  </div>
+                  <div class="grid">
+                    <div>
+                      <h3>スキル別使用率</h3>
+                      <table><thead><tr><th>スキル</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>フェイント</td><td>80</td><td>50.0%</td></tr>
+<tr><td>コピー</td><td>80</td><td>50.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>開始側スキル別使用率</h3>
+                      <table><thead><tr><th>スキル</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>フェイント</td><td>80</td><td>100.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>手番交代後側スキル別使用率</h3>
+                      <table><thead><tr><th>スキル</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>コピー</td><td>80</td><td>100.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>行動明細</h3>
+                      <table><thead><tr><th>行動</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>フェイント, 指=1</td><td>80</td><td>50.0%</td></tr>
+<tr><td>コピー, 指=0</td><td>80</td><td>50.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>カテゴリ集計（参考）</h3>
+                      <table><thead><tr><th>分類</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>対カウンター</td><td>80</td><td>50.0%</td></tr>
+<tr><td>参照スキル</td><td>80</td><td>50.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>初手分布</h3>
+                      <table><thead><tr><th>行動</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>フェイント, 指=1</td><td>80</td><td>100.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>追加ターン後の次手</h3>
+                      <table><thead><tr><th>行動</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td colspan="3">なし</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>NTP反応分布</h3>
+                      <table><thead><tr><th>反応</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>なし</td><td>160</td><td>100.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>NTP指分布</h3>
+                      <table><thead><tr><th>指</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>0</td><td>74</td><td>46.2%</td></tr>
+<tr><td>2</td><td>51</td><td>31.9%</td></tr>
+<tr><td>1</td><td>35</td><td>21.9%</td></tr>
+                      </tbody></table>
+                    </div>
+                  </div>
+                  <h3>代表トレース（最初の1エピソード）</h3>
+                  <table class="trace"><thead><tr><th>手</th><th>TP側</th><th>直前状態</th><th>TP行動</th><th>NTP反応</th><th>コピー対象</th><th>イベント</th><th>結果</th></tr></thead><tbody>
+                    <tr><td>1</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=-</td><td>フェイント, 指=1</td><td>なし, 指=2</td><td>-</td><td>feint_no_counter</td><td>手番交代</td></tr>
+<tr><td>2</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=フェイント</td><td>コピー, 指=0</td><td>なし, 指=0</td><td>フェイント</td><td>copy_used</td><td>終端報酬=+1.0</td></tr>
+                  </tbody></table>
+                  <div class="warn"><strong>警告:</strong><ul><li>勝利なし: 0.0%</li><li>初手が単一行動に集中: フェイント, 指=1 100.0%</li></ul></div>
+                </details>
+                
+                <details class="section condition">
+                  <summary>
+                    <strong>決定論評価 / カウンター50%・指最小</strong>
+                    <span>開始側 23勝 57敗 0打切 / 平均3.7手</span>
+                  </summary>
+                  <p class="internal-name">内部表記: deterministic / counter50_lowest</p>
+                  <div class="summary">
+                    <span>開始側成績: 23勝 57敗 0打切</span>
+                    <span>終端TP報酬: + 57 / - 23 / 0 0</span>
+                    <span>平均手数: 3.7</span>
+                    <span>総TP行動: 296</span>
+                  </div>
+                  <div class="grid">
+                    <div>
+                      <h3>スキル別使用率</h3>
+                      <table><thead><tr><th>スキル</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>コピー</td><td>81</td><td>27.4%</td></tr>
+<tr><td>フェイント</td><td>80</td><td>27.0%</td></tr>
+<tr><td>セメント</td><td>78</td><td>26.4%</td></tr>
+<tr><td>フラッシュ</td><td>35</td><td>11.8%</td></tr>
+<tr><td>ブースト</td><td>16</td><td>5.4%</td></tr>
+<tr><td>数字0</td><td>5</td><td>1.7%</td></tr>
+<tr><td>ガード</td><td>1</td><td>0.3%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>開始側スキル別使用率</h3>
+                      <table><thead><tr><th>スキル</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>フェイント</td><td>80</td><td>37.0%</td></tr>
+<tr><td>セメント</td><td>78</td><td>36.1%</td></tr>
+<tr><td>コピー</td><td>39</td><td>18.1%</td></tr>
+<tr><td>ブースト</td><td>16</td><td>7.4%</td></tr>
+<tr><td>フラッシュ</td><td>2</td><td>0.9%</td></tr>
+<tr><td>ガード</td><td>1</td><td>0.5%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>手番交代後側スキル別使用率</h3>
+                      <table><thead><tr><th>スキル</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>コピー</td><td>42</td><td>52.5%</td></tr>
+<tr><td>フラッシュ</td><td>33</td><td>41.2%</td></tr>
+<tr><td>数字0</td><td>5</td><td>6.2%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>行動明細</h3>
+                      <table><thead><tr><th>行動</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>コピー, 指=0</td><td>81</td><td>27.4%</td></tr>
+<tr><td>フェイント, 指=1</td><td>80</td><td>27.0%</td></tr>
+<tr><td>セメント, 指=0</td><td>78</td><td>26.4%</td></tr>
+<tr><td>フラッシュ, 指=0</td><td>35</td><td>11.8%</td></tr>
+<tr><td>ブースト, 指=0</td><td>16</td><td>5.4%</td></tr>
+<tr><td>数字宣言 合計=0, 指=1</td><td>5</td><td>1.7%</td></tr>
+<tr><td>ガード, 指=0</td><td>1</td><td>0.3%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>カテゴリ集計（参考）</h3>
+                      <table><thead><tr><th>分類</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>通常スキル</td><td>114</td><td>38.5%</td></tr>
+<tr><td>参照スキル</td><td>81</td><td>27.4%</td></tr>
+<tr><td>対カウンター</td><td>80</td><td>27.0%</td></tr>
+<tr><td>アルティメット</td><td>16</td><td>5.4%</td></tr>
+<tr><td>数字宣言</td><td>5</td><td>1.7%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>初手分布</h3>
+                      <table><thead><tr><th>行動</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>フェイント, 指=1</td><td>80</td><td>100.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>追加ターン後の次手</h3>
+                      <table><thead><tr><th>行動</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>セメント, 指=0</td><td>78</td><td>57.4%</td></tr>
+<tr><td>コピー, 指=0</td><td>39</td><td>28.7%</td></tr>
+<tr><td>ブースト, 指=0</td><td>16</td><td>11.8%</td></tr>
+<tr><td>フラッシュ, 指=0</td><td>2</td><td>1.5%</td></tr>
+<tr><td>ガード, 指=0</td><td>1</td><td>0.7%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>NTP反応分布</h3>
+                      <table><thead><tr><th>反応</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>なし</td><td>154</td><td>52.0%</td></tr>
+<tr><td>カウンター</td><td>142</td><td>48.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>NTP指分布</h3>
+                      <table><thead><tr><th>指</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>0</td><td>296</td><td>100.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                  </div>
+                  <h3>代表トレース（最初の1エピソード）</h3>
+                  <table class="trace"><thead><tr><th>手</th><th>TP側</th><th>直前状態</th><th>TP行動</th><th>NTP反応</th><th>コピー対象</th><th>イベント</th><th>結果</th></tr></thead><tbody>
+                    <tr><td>1</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=-</td><td>フェイント, 指=1</td><td>なし, 指=0</td><td>-</td><td>feint_no_counter</td><td>手番交代</td></tr>
+<tr><td>2</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=フェイント</td><td>コピー, 指=0</td><td>カウンター, 指=0</td><td>フェイント</td><td>copy_counter_used</td><td>終端報酬=+1.0</td></tr>
+                  </tbody></table>
+                  <div class="warn"><strong>警告:</strong><ul><li>勝率が低い: 28.8%</li><li>初手が単一行動に集中: フェイント, 指=1 100.0%</li></ul></div>
+                </details>
+                
+                <details class="section condition">
+                  <summary>
+                    <strong>決定論評価 / カウンター50%・指一様</strong>
+                    <span>開始側 34勝 46敗 0打切 / 平均4.0手</span>
+                  </summary>
+                  <p class="internal-name">内部表記: deterministic / counter50_uniform</p>
+                  <div class="summary">
+                    <span>開始側成績: 34勝 46敗 0打切</span>
+                    <span>終端TP報酬: + 46 / - 34 / 0 0</span>
+                    <span>平均手数: 4.0</span>
+                    <span>総TP行動: 318</span>
+                  </div>
+                  <div class="grid">
+                    <div>
+                      <h3>スキル別使用率</h3>
+                      <table><thead><tr><th>スキル</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>セメント</td><td>88</td><td>27.7%</td></tr>
+<tr><td>フェイント</td><td>81</td><td>25.5%</td></tr>
+<tr><td>コピー</td><td>81</td><td>25.5%</td></tr>
+<tr><td>ブースト</td><td>38</td><td>11.9%</td></tr>
+<tr><td>数字0</td><td>12</td><td>3.8%</td></tr>
+<tr><td>フラッシュ</td><td>11</td><td>3.5%</td></tr>
+<tr><td>ガード</td><td>5</td><td>1.6%</td></tr>
+<tr><td>数字2</td><td>2</td><td>0.6%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>開始側スキル別使用率</h3>
+                      <table><thead><tr><th>スキル</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>セメント</td><td>88</td><td>37.0%</td></tr>
+<tr><td>フェイント</td><td>80</td><td>33.6%</td></tr>
+<tr><td>コピー</td><td>39</td><td>16.4%</td></tr>
+<tr><td>ブースト</td><td>24</td><td>10.1%</td></tr>
+<tr><td>ガード</td><td>5</td><td>2.1%</td></tr>
+<tr><td>フラッシュ</td><td>2</td><td>0.8%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>手番交代後側スキル別使用率</h3>
+                      <table><thead><tr><th>スキル</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>コピー</td><td>42</td><td>52.5%</td></tr>
+<tr><td>ブースト</td><td>14</td><td>17.5%</td></tr>
+<tr><td>数字0</td><td>12</td><td>15.0%</td></tr>
+<tr><td>フラッシュ</td><td>9</td><td>11.2%</td></tr>
+<tr><td>数字2</td><td>2</td><td>2.5%</td></tr>
+<tr><td>フェイント</td><td>1</td><td>1.2%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>行動明細</h3>
+                      <table><thead><tr><th>行動</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>セメント, 指=0</td><td>88</td><td>27.7%</td></tr>
+<tr><td>フェイント, 指=1</td><td>81</td><td>25.5%</td></tr>
+<tr><td>コピー, 指=0</td><td>80</td><td>25.2%</td></tr>
+<tr><td>ブースト, 指=0</td><td>24</td><td>7.5%</td></tr>
+<tr><td>ブースト, 指=2</td><td>14</td><td>4.4%</td></tr>
+<tr><td>フラッシュ, 指=0</td><td>11</td><td>3.5%</td></tr>
+<tr><td>数字宣言 合計=0, 指=1</td><td>7</td><td>2.2%</td></tr>
+<tr><td>数字宣言 合計=0, 指=2</td><td>5</td><td>1.6%</td></tr>
+<tr><td>ガード, 指=0</td><td>5</td><td>1.6%</td></tr>
+<tr><td>数字宣言 合計=2, 指=2</td><td>2</td><td>0.6%</td></tr>
+<tr><td>コピー, 指=1</td><td>1</td><td>0.3%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>カテゴリ集計（参考）</h3>
+                      <table><thead><tr><th>分類</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>通常スキル</td><td>104</td><td>32.7%</td></tr>
+<tr><td>対カウンター</td><td>81</td><td>25.5%</td></tr>
+<tr><td>参照スキル</td><td>81</td><td>25.5%</td></tr>
+<tr><td>アルティメット</td><td>38</td><td>11.9%</td></tr>
+<tr><td>数字宣言</td><td>14</td><td>4.4%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>初手分布</h3>
+                      <table><thead><tr><th>行動</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>フェイント, 指=1</td><td>80</td><td>100.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>追加ターン後の次手</h3>
+                      <table><thead><tr><th>行動</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>セメント, 指=0</td><td>88</td><td>55.7%</td></tr>
+<tr><td>コピー, 指=0</td><td>39</td><td>24.7%</td></tr>
+<tr><td>ブースト, 指=0</td><td>24</td><td>15.2%</td></tr>
+<tr><td>ガード, 指=0</td><td>5</td><td>3.2%</td></tr>
+<tr><td>フラッシュ, 指=0</td><td>2</td><td>1.3%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>NTP反応分布</h3>
+                      <table><thead><tr><th>反応</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>なし</td><td>165</td><td>51.9%</td></tr>
+<tr><td>カウンター</td><td>153</td><td>48.1%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>NTP指分布</h3>
+                      <table><thead><tr><th>指</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>0</td><td>124</td><td>39.0%</td></tr>
+<tr><td>2</td><td>117</td><td>36.8%</td></tr>
+<tr><td>1</td><td>77</td><td>24.2%</td></tr>
+                      </tbody></table>
+                    </div>
+                  </div>
+                  <h3>代表トレース（最初の1エピソード）</h3>
+                  <table class="trace"><thead><tr><th>手</th><th>TP側</th><th>直前状態</th><th>TP行動</th><th>NTP反応</th><th>コピー対象</th><th>イベント</th><th>結果</th></tr></thead><tbody>
+                    <tr><td>1</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=-</td><td>フェイント, 指=1</td><td>なし, 指=1</td><td>-</td><td>feint_no_counter</td><td>手番交代</td></tr>
+<tr><td>2</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=フェイント</td><td>コピー, 指=0</td><td>なし, 指=0</td><td>フェイント</td><td>copy_used</td><td>終端報酬=+1.0</td></tr>
+                  </tbody></table>
+                  <div class="warn"><strong>警告:</strong><ul><li>勝率が低い: 42.5%</li><li>初手が単一行動に集中: フェイント, 指=1 100.0%</li></ul></div>
+                </details>
+                
+                <details class="section condition">
+                  <summary>
+                    <strong>決定論評価 / カウンター100%・指最小</strong>
+                    <span>開始側 80勝 0敗 0打切 / 平均5.0手</span>
+                  </summary>
+                  <p class="internal-name">内部表記: deterministic / counter_lowest</p>
+                  <div class="summary">
+                    <span>開始側成績: 80勝 0敗 0打切</span>
+                    <span>終端TP報酬: + 0 / - 80 / 0 0</span>
+                    <span>平均手数: 5.0</span>
+                    <span>総TP行動: 400</span>
+                  </div>
+                  <div class="grid">
+                    <div>
+                      <h3>スキル別使用率</h3>
+                      <table><thead><tr><th>スキル</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>フェイント</td><td>80</td><td>20.0%</td></tr>
+<tr><td>コピー</td><td>80</td><td>20.0%</td></tr>
+<tr><td>ブースト</td><td>80</td><td>20.0%</td></tr>
+<tr><td>セメント</td><td>80</td><td>20.0%</td></tr>
+<tr><td>数字0</td><td>80</td><td>20.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>開始側スキル別使用率</h3>
+                      <table><thead><tr><th>スキル</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>フェイント</td><td>80</td><td>25.0%</td></tr>
+<tr><td>コピー</td><td>80</td><td>25.0%</td></tr>
+<tr><td>ブースト</td><td>80</td><td>25.0%</td></tr>
+<tr><td>セメント</td><td>80</td><td>25.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>手番交代後側スキル別使用率</h3>
+                      <table><thead><tr><th>スキル</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>数字0</td><td>80</td><td>100.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>行動明細</h3>
+                      <table><thead><tr><th>行動</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>フェイント, 指=1</td><td>80</td><td>20.0%</td></tr>
+<tr><td>コピー, 指=0</td><td>80</td><td>20.0%</td></tr>
+<tr><td>ブースト, 指=0</td><td>80</td><td>20.0%</td></tr>
+<tr><td>セメント, 指=0</td><td>80</td><td>20.0%</td></tr>
+<tr><td>数字宣言 合計=0, 指=1</td><td>80</td><td>20.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>カテゴリ集計（参考）</h3>
+                      <table><thead><tr><th>分類</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>対カウンター</td><td>80</td><td>20.0%</td></tr>
+<tr><td>参照スキル</td><td>80</td><td>20.0%</td></tr>
+<tr><td>アルティメット</td><td>80</td><td>20.0%</td></tr>
+<tr><td>通常スキル</td><td>80</td><td>20.0%</td></tr>
+<tr><td>数字宣言</td><td>80</td><td>20.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>初手分布</h3>
+                      <table><thead><tr><th>行動</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>フェイント, 指=1</td><td>80</td><td>100.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>追加ターン後の次手</h3>
+                      <table><thead><tr><th>行動</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>コピー, 指=0</td><td>80</td><td>33.3%</td></tr>
+<tr><td>ブースト, 指=0</td><td>80</td><td>33.3%</td></tr>
+<tr><td>セメント, 指=0</td><td>80</td><td>33.3%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>NTP反応分布</h3>
+                      <table><thead><tr><th>反応</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>カウンター</td><td>400</td><td>100.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>NTP指分布</h3>
+                      <table><thead><tr><th>指</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>0</td><td>400</td><td>100.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                  </div>
+                  <h3>代表トレース（最初の1エピソード）</h3>
+                  <table class="trace"><thead><tr><th>手</th><th>TP側</th><th>直前状態</th><th>TP行動</th><th>NTP反応</th><th>コピー対象</th><th>イベント</th><th>結果</th></tr></thead><tbody>
+                    <tr><td>1</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=-</td><td>フェイント, 指=1</td><td>カウンター, 指=0</td><td>-</td><td>feint_success</td><td>追加ターン</td></tr>
+<tr><td>2</td><td>開始側</td><td>TP手=1, NTP手=2, 直前=フェイント</td><td>コピー, 指=0</td><td>カウンター, 指=0</td><td>フェイント</td><td>copy_counter_used</td><td>追加ターン</td></tr>
+<tr><td>3</td><td>開始側</td><td>TP手=0, NTP手=2, 直前=コピー</td><td>ブースト, 指=0</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>追加ターン</td></tr>
+<tr><td>4</td><td>開始側</td><td>TP手=0, NTP手=2, 直前=ブースト</td><td>セメント, 指=0</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>5</td><td>手番交代後側</td><td>TP手=2, NTP手=0, 直前=セメント</td><td>数字宣言 合計=0, 指=1</td><td>カウンター, 指=0</td><td>-</td><td>counter_number_miss_me_scores</td><td>終端報酬=-1.0</td></tr>
+                  </tbody></table>
+                  <div class="warn"><strong>警告:</strong><ul><li>初手が単一行動に集中: フェイント, 指=1 100.0%</li></ul></div>
+                </details>
+                
+                <details class="section condition">
+                  <summary>
+                    <strong>決定論評価 / カウンター100%・指一様</strong>
+                    <span>開始側 80勝 0敗 0打切 / 平均5.0手</span>
+                  </summary>
+                  <p class="internal-name">内部表記: deterministic / counter_uniform</p>
+                  <div class="summary">
+                    <span>開始側成績: 80勝 0敗 0打切</span>
+                    <span>終端TP報酬: + 0 / - 80 / 0 0</span>
+                    <span>平均手数: 5.0</span>
+                    <span>総TP行動: 400</span>
+                  </div>
+                  <div class="grid">
+                    <div>
+                      <h3>スキル別使用率</h3>
+                      <table><thead><tr><th>スキル</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>フェイント</td><td>80</td><td>20.0%</td></tr>
+<tr><td>コピー</td><td>80</td><td>20.0%</td></tr>
+<tr><td>ブースト</td><td>80</td><td>20.0%</td></tr>
+<tr><td>セメント</td><td>80</td><td>20.0%</td></tr>
+<tr><td>数字0</td><td>80</td><td>20.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>開始側スキル別使用率</h3>
+                      <table><thead><tr><th>スキル</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>フェイント</td><td>80</td><td>25.0%</td></tr>
+<tr><td>コピー</td><td>80</td><td>25.0%</td></tr>
+<tr><td>ブースト</td><td>80</td><td>25.0%</td></tr>
+<tr><td>セメント</td><td>80</td><td>25.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>手番交代後側スキル別使用率</h3>
+                      <table><thead><tr><th>スキル</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>数字0</td><td>80</td><td>100.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>行動明細</h3>
+                      <table><thead><tr><th>行動</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>フェイント, 指=1</td><td>80</td><td>20.0%</td></tr>
+<tr><td>コピー, 指=0</td><td>80</td><td>20.0%</td></tr>
+<tr><td>ブースト, 指=0</td><td>80</td><td>20.0%</td></tr>
+<tr><td>セメント, 指=0</td><td>80</td><td>20.0%</td></tr>
+<tr><td>数字宣言 合計=0, 指=1</td><td>80</td><td>20.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>カテゴリ集計（参考）</h3>
+                      <table><thead><tr><th>分類</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>対カウンター</td><td>80</td><td>20.0%</td></tr>
+<tr><td>参照スキル</td><td>80</td><td>20.0%</td></tr>
+<tr><td>アルティメット</td><td>80</td><td>20.0%</td></tr>
+<tr><td>通常スキル</td><td>80</td><td>20.0%</td></tr>
+<tr><td>数字宣言</td><td>80</td><td>20.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>初手分布</h3>
+                      <table><thead><tr><th>行動</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>フェイント, 指=1</td><td>80</td><td>100.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>追加ターン後の次手</h3>
+                      <table><thead><tr><th>行動</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>コピー, 指=0</td><td>80</td><td>33.3%</td></tr>
+<tr><td>ブースト, 指=0</td><td>80</td><td>33.3%</td></tr>
+<tr><td>セメント, 指=0</td><td>80</td><td>33.3%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>NTP反応分布</h3>
+                      <table><thead><tr><th>反応</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>カウンター</td><td>400</td><td>100.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>NTP指分布</h3>
+                      <table><thead><tr><th>指</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>0</td><td>201</td><td>50.2%</td></tr>
+<tr><td>2</td><td>114</td><td>28.5%</td></tr>
+<tr><td>1</td><td>85</td><td>21.2%</td></tr>
+                      </tbody></table>
+                    </div>
+                  </div>
+                  <h3>代表トレース（最初の1エピソード）</h3>
+                  <table class="trace"><thead><tr><th>手</th><th>TP側</th><th>直前状態</th><th>TP行動</th><th>NTP反応</th><th>コピー対象</th><th>イベント</th><th>結果</th></tr></thead><tbody>
+                    <tr><td>1</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=-</td><td>フェイント, 指=1</td><td>カウンター, 指=2</td><td>-</td><td>feint_success</td><td>追加ターン</td></tr>
+<tr><td>2</td><td>開始側</td><td>TP手=1, NTP手=2, 直前=フェイント</td><td>コピー, 指=0</td><td>カウンター, 指=0</td><td>フェイント</td><td>copy_counter_used</td><td>追加ターン</td></tr>
+<tr><td>3</td><td>開始側</td><td>TP手=0, NTP手=2, 直前=コピー</td><td>ブースト, 指=0</td><td>カウンター, 指=1</td><td>-</td><td>counter_no_effect</td><td>追加ターン</td></tr>
+<tr><td>4</td><td>開始側</td><td>TP手=0, NTP手=2, 直前=ブースト</td><td>セメント, 指=0</td><td>カウンター, 指=2</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>5</td><td>手番交代後側</td><td>TP手=2, NTP手=0, 直前=セメント</td><td>数字宣言 合計=0, 指=1</td><td>カウンター, 指=0</td><td>-</td><td>counter_number_miss_me_scores</td><td>終端報酬=-1.0</td></tr>
+                  </tbody></table>
+                  <div class="warn"><strong>警告:</strong><ul><li>初手が単一行動に集中: フェイント, 指=1 100.0%</li></ul></div>
+                </details>
+                
+                <details class="section condition">
+                  <summary>
+                    <strong>確率サンプル評価 / カウンター0%・指最小</strong>
+                    <span>開始側 0勝 80敗 0打切 / 平均2.0手</span>
+                  </summary>
+                  <p class="internal-name">内部表記: stochastic / none_lowest</p>
+                  <div class="summary">
+                    <span>開始側成績: 0勝 80敗 0打切</span>
+                    <span>終端TP報酬: + 80 / - 0 / 0 0</span>
+                    <span>平均手数: 2.0</span>
+                    <span>総TP行動: 160</span>
+                  </div>
+                  <div class="grid">
+                    <div>
+                      <h3>スキル別使用率</h3>
+                      <table><thead><tr><th>スキル</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>フェイント</td><td>80</td><td>50.0%</td></tr>
+<tr><td>コピー</td><td>80</td><td>50.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>開始側スキル別使用率</h3>
+                      <table><thead><tr><th>スキル</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>フェイント</td><td>80</td><td>100.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>手番交代後側スキル別使用率</h3>
+                      <table><thead><tr><th>スキル</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>コピー</td><td>80</td><td>100.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>行動明細</h3>
+                      <table><thead><tr><th>行動</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>コピー, 指=0</td><td>80</td><td>50.0%</td></tr>
+<tr><td>フェイント, 指=1</td><td>70</td><td>43.8%</td></tr>
+<tr><td>フェイント, 指=0</td><td>8</td><td>5.0%</td></tr>
+<tr><td>フェイント, 指=2</td><td>2</td><td>1.2%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>カテゴリ集計（参考）</h3>
+                      <table><thead><tr><th>分類</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>対カウンター</td><td>80</td><td>50.0%</td></tr>
+<tr><td>参照スキル</td><td>80</td><td>50.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>初手分布</h3>
+                      <table><thead><tr><th>行動</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>フェイント, 指=1</td><td>70</td><td>87.5%</td></tr>
+<tr><td>フェイント, 指=0</td><td>8</td><td>10.0%</td></tr>
+<tr><td>フェイント, 指=2</td><td>2</td><td>2.5%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>追加ターン後の次手</h3>
+                      <table><thead><tr><th>行動</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td colspan="3">なし</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>NTP反応分布</h3>
+                      <table><thead><tr><th>反応</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>なし</td><td>160</td><td>100.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>NTP指分布</h3>
+                      <table><thead><tr><th>指</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>0</td><td>160</td><td>100.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                  </div>
+                  <h3>代表トレース（最初の1エピソード）</h3>
+                  <table class="trace"><thead><tr><th>手</th><th>TP側</th><th>直前状態</th><th>TP行動</th><th>NTP反応</th><th>コピー対象</th><th>イベント</th><th>結果</th></tr></thead><tbody>
+                    <tr><td>1</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=-</td><td>フェイント, 指=1</td><td>なし, 指=0</td><td>-</td><td>feint_no_counter</td><td>手番交代</td></tr>
+<tr><td>2</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=フェイント</td><td>コピー, 指=0</td><td>なし, 指=0</td><td>フェイント</td><td>copy_used</td><td>終端報酬=+1.0</td></tr>
+                  </tbody></table>
+                  <div class="warn"><strong>警告:</strong><ul><li>勝利なし: 0.0%</li></ul></div>
+                </details>
+                
+                <details class="section condition">
+                  <summary>
+                    <strong>確率サンプル評価 / カウンター0%・指一様</strong>
+                    <span>開始側 0勝 80敗 0打切 / 平均2.0手</span>
+                  </summary>
+                  <p class="internal-name">内部表記: stochastic / none_uniform</p>
+                  <div class="summary">
+                    <span>開始側成績: 0勝 80敗 0打切</span>
+                    <span>終端TP報酬: + 80 / - 0 / 0 0</span>
+                    <span>平均手数: 2.0</span>
+                    <span>総TP行動: 160</span>
+                  </div>
+                  <div class="grid">
+                    <div>
+                      <h3>スキル別使用率</h3>
+                      <table><thead><tr><th>スキル</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>フェイント</td><td>80</td><td>50.0%</td></tr>
+<tr><td>コピー</td><td>80</td><td>50.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>開始側スキル別使用率</h3>
+                      <table><thead><tr><th>スキル</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>フェイント</td><td>80</td><td>100.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>手番交代後側スキル別使用率</h3>
+                      <table><thead><tr><th>スキル</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>コピー</td><td>80</td><td>100.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>行動明細</h3>
+                      <table><thead><tr><th>行動</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>コピー, 指=0</td><td>77</td><td>48.1%</td></tr>
+<tr><td>フェイント, 指=1</td><td>71</td><td>44.4%</td></tr>
+<tr><td>フェイント, 指=0</td><td>8</td><td>5.0%</td></tr>
+<tr><td>コピー, 指=1</td><td>2</td><td>1.2%</td></tr>
+<tr><td>フェイント, 指=2</td><td>1</td><td>0.6%</td></tr>
+<tr><td>コピー, 指=2</td><td>1</td><td>0.6%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>カテゴリ集計（参考）</h3>
+                      <table><thead><tr><th>分類</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>対カウンター</td><td>80</td><td>50.0%</td></tr>
+<tr><td>参照スキル</td><td>80</td><td>50.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>初手分布</h3>
+                      <table><thead><tr><th>行動</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>フェイント, 指=1</td><td>71</td><td>88.8%</td></tr>
+<tr><td>フェイント, 指=0</td><td>8</td><td>10.0%</td></tr>
+<tr><td>フェイント, 指=2</td><td>1</td><td>1.2%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>追加ターン後の次手</h3>
+                      <table><thead><tr><th>行動</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td colspan="3">なし</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>NTP反応分布</h3>
+                      <table><thead><tr><th>反応</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>なし</td><td>160</td><td>100.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>NTP指分布</h3>
+                      <table><thead><tr><th>指</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>0</td><td>74</td><td>46.2%</td></tr>
+<tr><td>2</td><td>51</td><td>31.9%</td></tr>
+<tr><td>1</td><td>35</td><td>21.9%</td></tr>
+                      </tbody></table>
+                    </div>
+                  </div>
+                  <h3>代表トレース（最初の1エピソード）</h3>
+                  <table class="trace"><thead><tr><th>手</th><th>TP側</th><th>直前状態</th><th>TP行動</th><th>NTP反応</th><th>コピー対象</th><th>イベント</th><th>結果</th></tr></thead><tbody>
+                    <tr><td>1</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=-</td><td>フェイント, 指=1</td><td>なし, 指=2</td><td>-</td><td>feint_no_counter</td><td>手番交代</td></tr>
+<tr><td>2</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=フェイント</td><td>コピー, 指=0</td><td>なし, 指=0</td><td>フェイント</td><td>copy_used</td><td>終端報酬=+1.0</td></tr>
+                  </tbody></table>
+                  <div class="warn"><strong>警告:</strong><ul><li>勝利なし: 0.0%</li></ul></div>
+                </details>
+                
+                <details class="section condition">
+                  <summary>
+                    <strong>確率サンプル評価 / カウンター50%・指最小</strong>
+                    <span>開始側 27勝 53敗 0打切 / 平均4.0手</span>
+                  </summary>
+                  <p class="internal-name">内部表記: stochastic / counter50_lowest</p>
+                  <div class="summary">
+                    <span>開始側成績: 27勝 53敗 0打切</span>
+                    <span>終端TP報酬: + 53 / - 27 / 0 0</span>
+                    <span>平均手数: 4.0</span>
+                    <span>総TP行動: 319</span>
+                  </div>
+                  <div class="grid">
+                    <div>
+                      <h3>スキル別使用率</h3>
+                      <table><thead><tr><th>スキル</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>コピー</td><td>86</td><td>27.0%</td></tr>
+<tr><td>フェイント</td><td>83</td><td>26.0%</td></tr>
+<tr><td>セメント</td><td>42</td><td>13.2%</td></tr>
+<tr><td>フラッシュ</td><td>31</td><td>9.7%</td></tr>
+<tr><td>ガード</td><td>18</td><td>5.6%</td></tr>
+<tr><td>ロック</td><td>15</td><td>4.7%</td></tr>
+<tr><td>ブースト</td><td>11</td><td>3.4%</td></tr>
+<tr><td>クイック</td><td>11</td><td>3.4%</td></tr>
+<tr><td>スキップ</td><td>7</td><td>2.2%</td></tr>
+<tr><td>パス</td><td>5</td><td>1.6%</td></tr>
+<tr><td>チャージ</td><td>5</td><td>1.6%</td></tr>
+<tr><td>数字2</td><td>3</td><td>0.9%</td></tr>
+<tr><td>タイム</td><td>1</td><td>0.3%</td></tr>
+<tr><td>数字1</td><td>1</td><td>0.3%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>開始側スキル別使用率</h3>
+                      <table><thead><tr><th>スキル</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>フェイント</td><td>82</td><td>35.0%</td></tr>
+<tr><td>セメント</td><td>41</td><td>17.5%</td></tr>
+<tr><td>コピー</td><td>39</td><td>16.7%</td></tr>
+<tr><td>ガード</td><td>18</td><td>7.7%</td></tr>
+<tr><td>ロック</td><td>15</td><td>6.4%</td></tr>
+<tr><td>ブースト</td><td>11</td><td>4.7%</td></tr>
+<tr><td>クイック</td><td>10</td><td>4.3%</td></tr>
+<tr><td>スキップ</td><td>7</td><td>3.0%</td></tr>
+<tr><td>フラッシュ</td><td>4</td><td>1.7%</td></tr>
+<tr><td>チャージ</td><td>4</td><td>1.7%</td></tr>
+<tr><td>数字2</td><td>2</td><td>0.9%</td></tr>
+<tr><td>タイム</td><td>1</td><td>0.4%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>手番交代後側スキル別使用率</h3>
+                      <table><thead><tr><th>スキル</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>コピー</td><td>47</td><td>55.3%</td></tr>
+<tr><td>フラッシュ</td><td>27</td><td>31.8%</td></tr>
+<tr><td>パス</td><td>5</td><td>5.9%</td></tr>
+<tr><td>フェイント</td><td>1</td><td>1.2%</td></tr>
+<tr><td>クイック</td><td>1</td><td>1.2%</td></tr>
+<tr><td>セメント</td><td>1</td><td>1.2%</td></tr>
+<tr><td>数字1</td><td>1</td><td>1.2%</td></tr>
+<tr><td>チャージ</td><td>1</td><td>1.2%</td></tr>
+<tr><td>数字2</td><td>1</td><td>1.2%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>行動明細</h3>
+                      <table><thead><tr><th>行動</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>コピー, 指=0</td><td>71</td><td>22.3%</td></tr>
+<tr><td>フェイント, 指=1</td><td>63</td><td>19.7%</td></tr>
+<tr><td>セメント, 指=0</td><td>41</td><td>12.9%</td></tr>
+<tr><td>フラッシュ, 指=0</td><td>31</td><td>9.7%</td></tr>
+<tr><td>ガード, 指=0</td><td>18</td><td>5.6%</td></tr>
+<tr><td>フェイント, 指=0</td><td>16</td><td>5.0%</td></tr>
+<tr><td>ロック, 指=0</td><td>15</td><td>4.7%</td></tr>
+<tr><td>コピー, 指=1</td><td>15</td><td>4.7%</td></tr>
+<tr><td>ブースト, 指=0</td><td>11</td><td>3.4%</td></tr>
+<tr><td>クイック, 指=0</td><td>10</td><td>3.1%</td></tr>
+<tr><td>スキップ, 指=0</td><td>7</td><td>2.2%</td></tr>
+<tr><td>パス, 指=0</td><td>5</td><td>1.6%</td></tr>
+<tr><td>チャージ, 指=0</td><td>5</td><td>1.6%</td></tr>
+<tr><td>フェイント, 指=2</td><td>4</td><td>1.3%</td></tr>
+<tr><td>数字宣言 合計=2, 指=0</td><td>2</td><td>0.6%</td></tr>
+<tr><td>クイック, 指=1</td><td>1</td><td>0.3%</td></tr>
+<tr><td>タイム, 指=0</td><td>1</td><td>0.3%</td></tr>
+<tr><td>セメント, 指=1</td><td>1</td><td>0.3%</td></tr>
+<tr><td>数字宣言 合計=1, 指=2</td><td>1</td><td>0.3%</td></tr>
+<tr><td>数字宣言 合計=2, 指=2</td><td>1</td><td>0.3%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>カテゴリ集計（参考）</h3>
+                      <table><thead><tr><th>分類</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>通常スキル</td><td>114</td><td>35.7%</td></tr>
+<tr><td>対カウンター</td><td>98</td><td>30.7%</td></tr>
+<tr><td>参照スキル</td><td>86</td><td>27.0%</td></tr>
+<tr><td>アルティメット</td><td>12</td><td>3.8%</td></tr>
+<tr><td>パス</td><td>5</td><td>1.6%</td></tr>
+<tr><td>数字宣言</td><td>4</td><td>1.3%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>初手分布</h3>
+                      <table><thead><tr><th>行動</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>フェイント, 指=1</td><td>61</td><td>76.2%</td></tr>
+<tr><td>フェイント, 指=0</td><td>15</td><td>18.8%</td></tr>
+<tr><td>フェイント, 指=2</td><td>4</td><td>5.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>追加ターン後の次手</h3>
+                      <table><thead><tr><th>行動</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>セメント, 指=0</td><td>41</td><td>27.5%</td></tr>
+<tr><td>コピー, 指=0</td><td>24</td><td>16.1%</td></tr>
+<tr><td>ガード, 指=0</td><td>17</td><td>11.4%</td></tr>
+<tr><td>コピー, 指=1</td><td>14</td><td>9.4%</td></tr>
+<tr><td>ロック, 指=0</td><td>14</td><td>9.4%</td></tr>
+<tr><td>ブースト, 指=0</td><td>10</td><td>6.7%</td></tr>
+<tr><td>クイック, 指=0</td><td>9</td><td>6.0%</td></tr>
+<tr><td>スキップ, 指=0</td><td>7</td><td>4.7%</td></tr>
+<tr><td>フラッシュ, 指=0</td><td>4</td><td>2.7%</td></tr>
+<tr><td>チャージ, 指=0</td><td>4</td><td>2.7%</td></tr>
+<tr><td>数字宣言 合計=2, 指=0</td><td>2</td><td>1.3%</td></tr>
+<tr><td>フェイント, 指=1</td><td>1</td><td>0.7%</td></tr>
+<tr><td>タイム, 指=0</td><td>1</td><td>0.7%</td></tr>
+<tr><td>フェイント, 指=0</td><td>1</td><td>0.7%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>NTP反応分布</h3>
+                      <table><thead><tr><th>反応</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>なし</td><td>166</td><td>52.0%</td></tr>
+<tr><td>カウンター</td><td>153</td><td>48.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>NTP指分布</h3>
+                      <table><thead><tr><th>指</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>0</td><td>319</td><td>100.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                  </div>
+                  <h3>代表トレース（最初の1エピソード）</h3>
+                  <table class="trace"><thead><tr><th>手</th><th>TP側</th><th>直前状態</th><th>TP行動</th><th>NTP反応</th><th>コピー対象</th><th>イベント</th><th>結果</th></tr></thead><tbody>
+                    <tr><td>1</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=-</td><td>フェイント, 指=0</td><td>なし, 指=0</td><td>-</td><td>feint_no_counter</td><td>手番交代</td></tr>
+<tr><td>2</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=フェイント</td><td>コピー, 指=0</td><td>カウンター, 指=0</td><td>フェイント</td><td>copy_counter_used</td><td>終端報酬=+1.0</td></tr>
+                  </tbody></table>
+                  <div class="warn"><strong>警告:</strong><ul><li>勝率が低い: 33.8%</li></ul></div>
+                </details>
+                
+                <details class="section condition">
+                  <summary>
+                    <strong>確率サンプル評価 / カウンター50%・指一様</strong>
+                    <span>開始側 30勝 50敗 0打切 / 平均3.9手</span>
+                  </summary>
+                  <p class="internal-name">内部表記: stochastic / counter50_uniform</p>
+                  <div class="summary">
+                    <span>開始側成績: 30勝 50敗 0打切</span>
+                    <span>終端TP報酬: + 50 / - 30 / 0 0</span>
+                    <span>平均手数: 3.9</span>
+                    <span>総TP行動: 314</span>
+                  </div>
+                  <div class="grid">
+                    <div>
+                      <h3>スキル別使用率</h3>
+                      <table><thead><tr><th>スキル</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>コピー</td><td>86</td><td>27.4%</td></tr>
+<tr><td>フェイント</td><td>82</td><td>26.1%</td></tr>
+<tr><td>セメント</td><td>42</td><td>13.4%</td></tr>
+<tr><td>フラッシュ</td><td>24</td><td>7.6%</td></tr>
+<tr><td>ガード</td><td>21</td><td>6.7%</td></tr>
+<tr><td>ブースト</td><td>17</td><td>5.4%</td></tr>
+<tr><td>ロック</td><td>10</td><td>3.2%</td></tr>
+<tr><td>チャージ</td><td>8</td><td>2.5%</td></tr>
+<tr><td>タイム</td><td>7</td><td>2.2%</td></tr>
+<tr><td>スキップ</td><td>5</td><td>1.6%</td></tr>
+<tr><td>クイック</td><td>5</td><td>1.6%</td></tr>
+<tr><td>ストック</td><td>3</td><td>1.0%</td></tr>
+<tr><td>数字0</td><td>2</td><td>0.6%</td></tr>
+<tr><td>数字1</td><td>1</td><td>0.3%</td></tr>
+<tr><td>パス</td><td>1</td><td>0.3%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>開始側スキル別使用率</h3>
+                      <table><thead><tr><th>スキル</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>フェイント</td><td>81</td><td>34.8%</td></tr>
+<tr><td>コピー</td><td>41</td><td>17.6%</td></tr>
+<tr><td>セメント</td><td>39</td><td>16.7%</td></tr>
+<tr><td>ガード</td><td>20</td><td>8.6%</td></tr>
+<tr><td>ブースト</td><td>13</td><td>5.6%</td></tr>
+<tr><td>ロック</td><td>9</td><td>3.9%</td></tr>
+<tr><td>フラッシュ</td><td>6</td><td>2.6%</td></tr>
+<tr><td>タイム</td><td>5</td><td>2.1%</td></tr>
+<tr><td>スキップ</td><td>5</td><td>2.1%</td></tr>
+<tr><td>チャージ</td><td>5</td><td>2.1%</td></tr>
+<tr><td>クイック</td><td>4</td><td>1.7%</td></tr>
+<tr><td>ストック</td><td>3</td><td>1.3%</td></tr>
+<tr><td>数字0</td><td>1</td><td>0.4%</td></tr>
+<tr><td>数字1</td><td>1</td><td>0.4%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>手番交代後側スキル別使用率</h3>
+                      <table><thead><tr><th>スキル</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>コピー</td><td>45</td><td>55.6%</td></tr>
+<tr><td>フラッシュ</td><td>18</td><td>22.2%</td></tr>
+<tr><td>ブースト</td><td>4</td><td>4.9%</td></tr>
+<tr><td>セメント</td><td>3</td><td>3.7%</td></tr>
+<tr><td>チャージ</td><td>3</td><td>3.7%</td></tr>
+<tr><td>タイム</td><td>2</td><td>2.5%</td></tr>
+<tr><td>クイック</td><td>1</td><td>1.2%</td></tr>
+<tr><td>数字0</td><td>1</td><td>1.2%</td></tr>
+<tr><td>フェイント</td><td>1</td><td>1.2%</td></tr>
+<tr><td>ガード</td><td>1</td><td>1.2%</td></tr>
+<tr><td>パス</td><td>1</td><td>1.2%</td></tr>
+<tr><td>ロック</td><td>1</td><td>1.2%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>行動明細</h3>
+                      <table><thead><tr><th>行動</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>フェイント, 指=1</td><td>73</td><td>23.2%</td></tr>
+<tr><td>コピー, 指=0</td><td>67</td><td>21.3%</td></tr>
+<tr><td>セメント, 指=0</td><td>41</td><td>13.1%</td></tr>
+<tr><td>フラッシュ, 指=0</td><td>23</td><td>7.3%</td></tr>
+<tr><td>ガード, 指=0</td><td>20</td><td>6.4%</td></tr>
+<tr><td>コピー, 指=1</td><td>18</td><td>5.7%</td></tr>
+<tr><td>ブースト, 指=0</td><td>13</td><td>4.1%</td></tr>
+<tr><td>ロック, 指=0</td><td>9</td><td>2.9%</td></tr>
+<tr><td>フェイント, 指=0</td><td>8</td><td>2.5%</td></tr>
+<tr><td>タイム, 指=0</td><td>6</td><td>1.9%</td></tr>
+<tr><td>チャージ, 指=0</td><td>6</td><td>1.9%</td></tr>
+<tr><td>スキップ, 指=0</td><td>5</td><td>1.6%</td></tr>
+<tr><td>ブースト, 指=2</td><td>4</td><td>1.3%</td></tr>
+<tr><td>クイック, 指=0</td><td>4</td><td>1.3%</td></tr>
+<tr><td>ストック, 指=0</td><td>3</td><td>1.0%</td></tr>
+<tr><td>フラッシュ, 指=2</td><td>1</td><td>0.3%</td></tr>
+<tr><td>クイック, 指=2</td><td>1</td><td>0.3%</td></tr>
+<tr><td>数字宣言 合計=0, 指=0</td><td>1</td><td>0.3%</td></tr>
+<tr><td>チャージ, 指=1</td><td>1</td><td>0.3%</td></tr>
+<tr><td>数字宣言 合計=0, 指=2</td><td>1</td><td>0.3%</td></tr>
+<tr><td>タイム, 指=2</td><td>1</td><td>0.3%</td></tr>
+<tr><td>ガード, 指=2</td><td>1</td><td>0.3%</td></tr>
+<tr><td>チャージ, 指=2</td><td>1</td><td>0.3%</td></tr>
+<tr><td>コピー, 指=2</td><td>1</td><td>0.3%</td></tr>
+<tr><td>数字宣言 合計=1, 指=0</td><td>1</td><td>0.3%</td></tr>
+<tr><td>パス, 指=0</td><td>1</td><td>0.3%</td></tr>
+<tr><td>セメント, 指=2</td><td>1</td><td>0.3%</td></tr>
+<tr><td>ロック, 指=1</td><td>1</td><td>0.3%</td></tr>
+<tr><td>フェイント, 指=2</td><td>1</td><td>0.3%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>カテゴリ集計（参考）</h3>
+                      <table><thead><tr><th>分類</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>通常スキル</td><td>105</td><td>33.4%</td></tr>
+<tr><td>対カウンター</td><td>92</td><td>29.3%</td></tr>
+<tr><td>参照スキル</td><td>89</td><td>28.3%</td></tr>
+<tr><td>アルティメット</td><td>24</td><td>7.6%</td></tr>
+<tr><td>数字宣言</td><td>3</td><td>1.0%</td></tr>
+<tr><td>パス</td><td>1</td><td>0.3%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>初手分布</h3>
+                      <table><thead><tr><th>行動</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>フェイント, 指=1</td><td>72</td><td>90.0%</td></tr>
+<tr><td>フェイント, 指=0</td><td>7</td><td>8.8%</td></tr>
+<tr><td>フェイント, 指=2</td><td>1</td><td>1.2%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>追加ターン後の次手</h3>
+                      <table><thead><tr><th>行動</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>セメント, 指=0</td><td>39</td><td>25.7%</td></tr>
+<tr><td>コピー, 指=0</td><td>23</td><td>15.1%</td></tr>
+<tr><td>ガード, 指=0</td><td>20</td><td>13.2%</td></tr>
+<tr><td>コピー, 指=1</td><td>18</td><td>11.8%</td></tr>
+<tr><td>ブースト, 指=0</td><td>13</td><td>8.6%</td></tr>
+<tr><td>ロック, 指=0</td><td>9</td><td>5.9%</td></tr>
+<tr><td>フラッシュ, 指=0</td><td>6</td><td>3.9%</td></tr>
+<tr><td>タイム, 指=0</td><td>5</td><td>3.3%</td></tr>
+<tr><td>チャージ, 指=0</td><td>5</td><td>3.3%</td></tr>
+<tr><td>スキップ, 指=0</td><td>4</td><td>2.6%</td></tr>
+<tr><td>クイック, 指=0</td><td>4</td><td>2.6%</td></tr>
+<tr><td>ストック, 指=0</td><td>3</td><td>2.0%</td></tr>
+<tr><td>数字宣言 合計=0, 指=0</td><td>1</td><td>0.7%</td></tr>
+<tr><td>フェイント, 指=0</td><td>1</td><td>0.7%</td></tr>
+<tr><td>数字宣言 合計=1, 指=0</td><td>1</td><td>0.7%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>NTP反応分布</h3>
+                      <table><thead><tr><th>反応</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>なし</td><td>166</td><td>52.9%</td></tr>
+<tr><td>カウンター</td><td>148</td><td>47.1%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>NTP指分布</h3>
+                      <table><thead><tr><th>指</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>0</td><td>130</td><td>41.4%</td></tr>
+<tr><td>2</td><td>110</td><td>35.0%</td></tr>
+<tr><td>1</td><td>74</td><td>23.6%</td></tr>
+                      </tbody></table>
+                    </div>
+                  </div>
+                  <h3>代表トレース（最初の1エピソード）</h3>
+                  <table class="trace"><thead><tr><th>手</th><th>TP側</th><th>直前状態</th><th>TP行動</th><th>NTP反応</th><th>コピー対象</th><th>イベント</th><th>結果</th></tr></thead><tbody>
+                    <tr><td>1</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=-</td><td>フェイント, 指=1</td><td>なし, 指=1</td><td>-</td><td>feint_no_counter</td><td>手番交代</td></tr>
+<tr><td>2</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=フェイント</td><td>コピー, 指=0</td><td>なし, 指=0</td><td>フェイント</td><td>copy_used</td><td>終端報酬=+1.0</td></tr>
+                  </tbody></table>
+                  <div class="warn"><strong>警告:</strong><ul><li>勝率が低い: 37.5%</li><li>初手が単一行動に集中: フェイント, 指=1 90.0%</li></ul></div>
+                </details>
+                
+                <details class="section condition">
+                  <summary>
+                    <strong>確率サンプル評価 / カウンター100%・指最小</strong>
+                    <span>開始側 77勝 3敗 0打切 / 平均5.0手</span>
+                  </summary>
+                  <p class="internal-name">内部表記: stochastic / counter_lowest</p>
+                  <div class="summary">
+                    <span>開始側成績: 77勝 3敗 0打切</span>
+                    <span>終端TP報酬: + 3 / - 77 / 0 0</span>
+                    <span>平均手数: 5.0</span>
+                    <span>総TP行動: 397</span>
+                  </div>
+                  <div class="grid">
+                    <div>
+                      <h3>スキル別使用率</h3>
+                      <table><thead><tr><th>スキル</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>フェイント</td><td>85</td><td>21.4%</td></tr>
+<tr><td>コピー</td><td>81</td><td>20.4%</td></tr>
+<tr><td>セメント</td><td>59</td><td>14.9%</td></tr>
+<tr><td>ブースト</td><td>38</td><td>9.6%</td></tr>
+<tr><td>クイック</td><td>23</td><td>5.8%</td></tr>
+<tr><td>スキップ</td><td>19</td><td>4.8%</td></tr>
+<tr><td>ロック</td><td>14</td><td>3.5%</td></tr>
+<tr><td>タイム</td><td>13</td><td>3.3%</td></tr>
+<tr><td>ガード</td><td>13</td><td>3.3%</td></tr>
+<tr><td>チャージ</td><td>12</td><td>3.0%</td></tr>
+<tr><td>フラッシュ</td><td>11</td><td>2.8%</td></tr>
+<tr><td>ストック</td><td>11</td><td>2.8%</td></tr>
+<tr><td>数字0</td><td>8</td><td>2.0%</td></tr>
+<tr><td>数字1</td><td>6</td><td>1.5%</td></tr>
+<tr><td>数字2</td><td>3</td><td>0.8%</td></tr>
+<tr><td>数字4</td><td>1</td><td>0.3%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>開始側スキル別使用率</h3>
+                      <table><thead><tr><th>スキル</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>フェイント</td><td>80</td><td>25.5%</td></tr>
+<tr><td>コピー</td><td>77</td><td>24.5%</td></tr>
+<tr><td>セメント</td><td>53</td><td>16.9%</td></tr>
+<tr><td>ブースト</td><td>32</td><td>10.2%</td></tr>
+<tr><td>スキップ</td><td>16</td><td>5.1%</td></tr>
+<tr><td>クイック</td><td>14</td><td>4.5%</td></tr>
+<tr><td>ガード</td><td>13</td><td>4.1%</td></tr>
+<tr><td>タイム</td><td>11</td><td>3.5%</td></tr>
+<tr><td>ロック</td><td>8</td><td>2.5%</td></tr>
+<tr><td>チャージ</td><td>6</td><td>1.9%</td></tr>
+<tr><td>ストック</td><td>3</td><td>1.0%</td></tr>
+<tr><td>数字4</td><td>1</td><td>0.3%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>手番交代後側スキル別使用率</h3>
+                      <table><thead><tr><th>スキル</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>フラッシュ</td><td>11</td><td>13.3%</td></tr>
+<tr><td>クイック</td><td>9</td><td>10.8%</td></tr>
+<tr><td>数字0</td><td>8</td><td>9.6%</td></tr>
+<tr><td>ストック</td><td>8</td><td>9.6%</td></tr>
+<tr><td>数字1</td><td>6</td><td>7.2%</td></tr>
+<tr><td>ブースト</td><td>6</td><td>7.2%</td></tr>
+<tr><td>ロック</td><td>6</td><td>7.2%</td></tr>
+<tr><td>チャージ</td><td>6</td><td>7.2%</td></tr>
+<tr><td>セメント</td><td>6</td><td>7.2%</td></tr>
+<tr><td>フェイント</td><td>5</td><td>6.0%</td></tr>
+<tr><td>コピー</td><td>4</td><td>4.8%</td></tr>
+<tr><td>数字2</td><td>3</td><td>3.6%</td></tr>
+<tr><td>スキップ</td><td>3</td><td>3.6%</td></tr>
+<tr><td>タイム</td><td>2</td><td>2.4%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>行動明細</h3>
+                      <table><thead><tr><th>行動</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>フェイント, 指=1</td><td>71</td><td>17.9%</td></tr>
+<tr><td>セメント, 指=0</td><td>56</td><td>14.1%</td></tr>
+<tr><td>コピー, 指=1</td><td>41</td><td>10.3%</td></tr>
+<tr><td>コピー, 指=0</td><td>39</td><td>9.8%</td></tr>
+<tr><td>ブースト, 指=0</td><td>36</td><td>9.1%</td></tr>
+<tr><td>スキップ, 指=0</td><td>17</td><td>4.3%</td></tr>
+<tr><td>クイック, 指=0</td><td>15</td><td>3.8%</td></tr>
+<tr><td>ガード, 指=0</td><td>12</td><td>3.0%</td></tr>
+<tr><td>フェイント, 指=0</td><td>12</td><td>3.0%</td></tr>
+<tr><td>タイム, 指=0</td><td>11</td><td>2.8%</td></tr>
+<tr><td>ロック, 指=0</td><td>10</td><td>2.5%</td></tr>
+<tr><td>チャージ, 指=0</td><td>8</td><td>2.0%</td></tr>
+<tr><td>フラッシュ, 指=0</td><td>7</td><td>1.8%</td></tr>
+<tr><td>数字宣言 合計=0, 指=1</td><td>7</td><td>1.8%</td></tr>
+<tr><td>ストック, 指=1</td><td>6</td><td>1.5%</td></tr>
+<tr><td>フラッシュ, 指=2</td><td>4</td><td>1.0%</td></tr>
+<tr><td>クイック, 指=1</td><td>4</td><td>1.0%</td></tr>
+<tr><td>クイック, 指=2</td><td>4</td><td>1.0%</td></tr>
+<tr><td>ストック, 指=0</td><td>4</td><td>1.0%</td></tr>
+<tr><td>ロック, 指=2</td><td>3</td><td>0.8%</td></tr>
+<tr><td>チャージ, 指=1</td><td>3</td><td>0.8%</td></tr>
+<tr><td>数字宣言 合計=1, 指=2</td><td>2</td><td>0.5%</td></tr>
+<tr><td>数字宣言 合計=2, 指=1</td><td>2</td><td>0.5%</td></tr>
+<tr><td>数字宣言 合計=1, 指=1</td><td>2</td><td>0.5%</td></tr>
+<tr><td>数字宣言 合計=1, 指=0</td><td>2</td><td>0.5%</td></tr>
+<tr><td>セメント, 指=2</td><td>2</td><td>0.5%</td></tr>
+<tr><td>タイム, 指=1</td><td>2</td><td>0.5%</td></tr>
+<tr><td>フェイント, 指=2</td><td>2</td><td>0.5%</td></tr>
+<tr><td>ブースト, 指=1</td><td>2</td><td>0.5%</td></tr>
+<tr><td>スキップ, 指=2</td><td>2</td><td>0.5%</td></tr>
+<tr><td>数字宣言 合計=0, 指=2</td><td>1</td><td>0.3%</td></tr>
+<tr><td>ストック, 指=2</td><td>1</td><td>0.3%</td></tr>
+<tr><td>数字宣言 合計=4, 指=2</td><td>1</td><td>0.3%</td></tr>
+<tr><td>数字宣言 合計=2, 指=2</td><td>1</td><td>0.3%</td></tr>
+<tr><td>ロック, 指=1</td><td>1</td><td>0.3%</td></tr>
+<tr><td>セメント, 指=1</td><td>1</td><td>0.3%</td></tr>
+<tr><td>ガード, 指=1</td><td>1</td><td>0.3%</td></tr>
+<tr><td>チャージ, 指=2</td><td>1</td><td>0.3%</td></tr>
+<tr><td>コピー, 指=2</td><td>1</td><td>0.3%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>カテゴリ集計（参考）</h3>
+                      <table><thead><tr><th>分類</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>通常スキル</td><td>137</td><td>34.5%</td></tr>
+<tr><td>対カウンター</td><td>99</td><td>24.9%</td></tr>
+<tr><td>参照スキル</td><td>92</td><td>23.2%</td></tr>
+<tr><td>アルティメット</td><td>51</td><td>12.8%</td></tr>
+<tr><td>数字宣言</td><td>18</td><td>4.5%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>初手分布</h3>
+                      <table><thead><tr><th>行動</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>フェイント, 指=1</td><td>69</td><td>86.2%</td></tr>
+<tr><td>フェイント, 指=0</td><td>7</td><td>8.8%</td></tr>
+<tr><td>フェイント, 指=2</td><td>2</td><td>2.5%</td></tr>
+<tr><td>スキップ, 指=0</td><td>1</td><td>1.2%</td></tr>
+<tr><td>数字宣言 合計=4, 指=2</td><td>1</td><td>1.2%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>追加ターン後の次手</h3>
+                      <table><thead><tr><th>行動</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>セメント, 指=0</td><td>53</td><td>22.4%</td></tr>
+<tr><td>コピー, 指=1</td><td>41</td><td>17.3%</td></tr>
+<tr><td>コピー, 指=0</td><td>39</td><td>16.5%</td></tr>
+<tr><td>ブースト, 指=0</td><td>32</td><td>13.5%</td></tr>
+<tr><td>スキップ, 指=0</td><td>15</td><td>6.3%</td></tr>
+<tr><td>クイック, 指=0</td><td>14</td><td>5.9%</td></tr>
+<tr><td>ガード, 指=0</td><td>12</td><td>5.1%</td></tr>
+<tr><td>タイム, 指=0</td><td>11</td><td>4.6%</td></tr>
+<tr><td>ロック, 指=0</td><td>8</td><td>3.4%</td></tr>
+<tr><td>チャージ, 指=0</td><td>6</td><td>2.5%</td></tr>
+<tr><td>ストック, 指=0</td><td>3</td><td>1.3%</td></tr>
+<tr><td>フェイント, 指=0</td><td>2</td><td>0.8%</td></tr>
+<tr><td>ガード, 指=1</td><td>1</td><td>0.4%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>NTP反応分布</h3>
+                      <table><thead><tr><th>反応</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>カウンター</td><td>395</td><td>99.5%</td></tr>
+<tr><td>なし</td><td>2</td><td>0.5%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>NTP指分布</h3>
+                      <table><thead><tr><th>指</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>0</td><td>397</td><td>100.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                  </div>
+                  <h3>代表トレース（最初の1エピソード）</h3>
+                  <table class="trace"><thead><tr><th>手</th><th>TP側</th><th>直前状態</th><th>TP行動</th><th>NTP反応</th><th>コピー対象</th><th>イベント</th><th>結果</th></tr></thead><tbody>
+                    <tr><td>1</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=-</td><td>フェイント, 指=1</td><td>カウンター, 指=0</td><td>-</td><td>feint_success</td><td>追加ターン</td></tr>
+<tr><td>2</td><td>開始側</td><td>TP手=1, NTP手=2, 直前=フェイント</td><td>コピー, 指=0</td><td>カウンター, 指=0</td><td>フェイント</td><td>copy_counter_used</td><td>追加ターン</td></tr>
+<tr><td>3</td><td>開始側</td><td>TP手=0, NTP手=2, 直前=コピー</td><td>クイック, 指=0</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>追加ターン</td></tr>
+<tr><td>4</td><td>開始側</td><td>TP手=0, NTP手=2, 直前=クイック</td><td>セメント, 指=0</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>5</td><td>手番交代後側</td><td>TP手=2, NTP手=0, 直前=セメント</td><td>フラッシュ, 指=0</td><td>カウンター, 指=0</td><td>-</td><td>counter_flash_one_hand</td><td>終端報酬=-1.0</td></tr>
+                  </tbody></table>
+                  <div class="warn"><strong>警告:</strong><p class="ok">警告なし</p></div>
+                </details>
+                
+                <details class="section condition">
+                  <summary>
+                    <strong>確率サンプル評価 / カウンター100%・指一様</strong>
+                    <span>開始側 80勝 0敗 0打切 / 平均5.0手</span>
+                  </summary>
+                  <p class="internal-name">内部表記: stochastic / counter_uniform</p>
+                  <div class="summary">
+                    <span>開始側成績: 80勝 0敗 0打切</span>
+                    <span>終端TP報酬: + 0 / - 80 / 0 0</span>
+                    <span>平均手数: 5.0</span>
+                    <span>総TP行動: 399</span>
+                  </div>
+                  <div class="grid">
+                    <div>
+                      <h3>スキル別使用率</h3>
+                      <table><thead><tr><th>スキル</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>フェイント</td><td>88</td><td>22.1%</td></tr>
+<tr><td>コピー</td><td>80</td><td>20.1%</td></tr>
+<tr><td>セメント</td><td>63</td><td>15.8%</td></tr>
+<tr><td>ブースト</td><td>41</td><td>10.3%</td></tr>
+<tr><td>ロック</td><td>26</td><td>6.5%</td></tr>
+<tr><td>クイック</td><td>21</td><td>5.3%</td></tr>
+<tr><td>タイム</td><td>14</td><td>3.5%</td></tr>
+<tr><td>ガード</td><td>11</td><td>2.8%</td></tr>
+<tr><td>チャージ</td><td>11</td><td>2.8%</td></tr>
+<tr><td>フラッシュ</td><td>10</td><td>2.5%</td></tr>
+<tr><td>スキップ</td><td>9</td><td>2.3%</td></tr>
+<tr><td>数字2</td><td>8</td><td>2.0%</td></tr>
+<tr><td>ストック</td><td>8</td><td>2.0%</td></tr>
+<tr><td>数字0</td><td>5</td><td>1.3%</td></tr>
+<tr><td>数字1</td><td>4</td><td>1.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>開始側スキル別使用率</h3>
+                      <table><thead><tr><th>スキル</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>フェイント</td><td>81</td><td>25.4%</td></tr>
+<tr><td>コピー</td><td>79</td><td>24.8%</td></tr>
+<tr><td>セメント</td><td>59</td><td>18.5%</td></tr>
+<tr><td>ブースト</td><td>34</td><td>10.7%</td></tr>
+<tr><td>ロック</td><td>17</td><td>5.3%</td></tr>
+<tr><td>クイック</td><td>14</td><td>4.4%</td></tr>
+<tr><td>タイム</td><td>9</td><td>2.8%</td></tr>
+<tr><td>ガード</td><td>8</td><td>2.5%</td></tr>
+<tr><td>チャージ</td><td>8</td><td>2.5%</td></tr>
+<tr><td>スキップ</td><td>6</td><td>1.9%</td></tr>
+<tr><td>ストック</td><td>4</td><td>1.3%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>手番交代後側スキル別使用率</h3>
+                      <table><thead><tr><th>スキル</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>フラッシュ</td><td>10</td><td>12.5%</td></tr>
+<tr><td>ロック</td><td>9</td><td>11.2%</td></tr>
+<tr><td>数字2</td><td>8</td><td>10.0%</td></tr>
+<tr><td>ブースト</td><td>7</td><td>8.8%</td></tr>
+<tr><td>クイック</td><td>7</td><td>8.8%</td></tr>
+<tr><td>フェイント</td><td>7</td><td>8.8%</td></tr>
+<tr><td>数字0</td><td>5</td><td>6.2%</td></tr>
+<tr><td>タイム</td><td>5</td><td>6.2%</td></tr>
+<tr><td>数字1</td><td>4</td><td>5.0%</td></tr>
+<tr><td>ストック</td><td>4</td><td>5.0%</td></tr>
+<tr><td>セメント</td><td>4</td><td>5.0%</td></tr>
+<tr><td>スキップ</td><td>3</td><td>3.8%</td></tr>
+<tr><td>チャージ</td><td>3</td><td>3.8%</td></tr>
+<tr><td>ガード</td><td>3</td><td>3.8%</td></tr>
+<tr><td>コピー</td><td>1</td><td>1.2%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>行動明細</h3>
+                      <table><thead><tr><th>行動</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>フェイント, 指=1</td><td>73</td><td>18.3%</td></tr>
+<tr><td>セメント, 指=0</td><td>61</td><td>15.3%</td></tr>
+<tr><td>コピー, 指=0</td><td>42</td><td>10.5%</td></tr>
+<tr><td>コピー, 指=1</td><td>37</td><td>9.3%</td></tr>
+<tr><td>ブースト, 指=0</td><td>36</td><td>9.0%</td></tr>
+<tr><td>ロック, 指=0</td><td>19</td><td>4.8%</td></tr>
+<tr><td>クイック, 指=0</td><td>16</td><td>4.0%</td></tr>
+<tr><td>タイム, 指=0</td><td>12</td><td>3.0%</td></tr>
+<tr><td>フェイント, 指=0</td><td>10</td><td>2.5%</td></tr>
+<tr><td>ガード, 指=0</td><td>9</td><td>2.3%</td></tr>
+<tr><td>チャージ, 指=0</td><td>9</td><td>2.3%</td></tr>
+<tr><td>フラッシュ, 指=0</td><td>8</td><td>2.0%</td></tr>
+<tr><td>スキップ, 指=0</td><td>8</td><td>2.0%</td></tr>
+<tr><td>ロック, 指=2</td><td>6</td><td>1.5%</td></tr>
+<tr><td>ストック, 指=0</td><td>5</td><td>1.3%</td></tr>
+<tr><td>フェイント, 指=2</td><td>5</td><td>1.3%</td></tr>
+<tr><td>数字宣言 合計=2, 指=2</td><td>4</td><td>1.0%</td></tr>
+<tr><td>ブースト, 指=2</td><td>3</td><td>0.8%</td></tr>
+<tr><td>ストック, 指=1</td><td>3</td><td>0.8%</td></tr>
+<tr><td>数字宣言 合計=0, 指=1</td><td>3</td><td>0.8%</td></tr>
+<tr><td>数字宣言 合計=2, 指=1</td><td>3</td><td>0.8%</td></tr>
+<tr><td>クイック, 指=2</td><td>3</td><td>0.8%</td></tr>
+<tr><td>ブースト, 指=1</td><td>2</td><td>0.5%</td></tr>
+<tr><td>クイック, 指=1</td><td>2</td><td>0.5%</td></tr>
+<tr><td>数字宣言 合計=1, 指=2</td><td>2</td><td>0.5%</td></tr>
+<tr><td>数字宣言 合計=1, 指=1</td><td>2</td><td>0.5%</td></tr>
+<tr><td>タイム, 指=1</td><td>2</td><td>0.5%</td></tr>
+<tr><td>チャージ, 指=1</td><td>2</td><td>0.5%</td></tr>
+<tr><td>ガード, 指=2</td><td>2</td><td>0.5%</td></tr>
+<tr><td>セメント, 指=2</td><td>2</td><td>0.5%</td></tr>
+<tr><td>数字宣言 合計=0, 指=0</td><td>1</td><td>0.3%</td></tr>
+<tr><td>数字宣言 合計=0, 指=2</td><td>1</td><td>0.3%</td></tr>
+<tr><td>フラッシュ, 指=2</td><td>1</td><td>0.3%</td></tr>
+<tr><td>スキップ, 指=1</td><td>1</td><td>0.3%</td></tr>
+<tr><td>フラッシュ, 指=1</td><td>1</td><td>0.3%</td></tr>
+<tr><td>数字宣言 合計=2, 指=0</td><td>1</td><td>0.3%</td></tr>
+<tr><td>コピー, 指=2</td><td>1</td><td>0.3%</td></tr>
+<tr><td>ロック, 指=1</td><td>1</td><td>0.3%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>カテゴリ集計（参考）</h3>
+                      <table><thead><tr><th>分類</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>通常スキル</td><td>125</td><td>31.3%</td></tr>
+<tr><td>対カウンター</td><td>114</td><td>28.6%</td></tr>
+<tr><td>参照スキル</td><td>88</td><td>22.1%</td></tr>
+<tr><td>アルティメット</td><td>55</td><td>13.8%</td></tr>
+<tr><td>数字宣言</td><td>17</td><td>4.3%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>初手分布</h3>
+                      <table><thead><tr><th>行動</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>フェイント, 指=1</td><td>69</td><td>86.2%</td></tr>
+<tr><td>フェイント, 指=0</td><td>9</td><td>11.2%</td></tr>
+<tr><td>フェイント, 指=2</td><td>2</td><td>2.5%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>追加ターン後の次手</h3>
+                      <table><thead><tr><th>行動</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>セメント, 指=0</td><td>59</td><td>24.7%</td></tr>
+<tr><td>コピー, 指=0</td><td>42</td><td>17.6%</td></tr>
+<tr><td>コピー, 指=1</td><td>37</td><td>15.5%</td></tr>
+<tr><td>ブースト, 指=0</td><td>34</td><td>14.2%</td></tr>
+<tr><td>ロック, 指=0</td><td>17</td><td>7.1%</td></tr>
+<tr><td>クイック, 指=0</td><td>14</td><td>5.9%</td></tr>
+<tr><td>タイム, 指=0</td><td>9</td><td>3.8%</td></tr>
+<tr><td>ガード, 指=0</td><td>8</td><td>3.3%</td></tr>
+<tr><td>チャージ, 指=0</td><td>8</td><td>3.3%</td></tr>
+<tr><td>スキップ, 指=0</td><td>6</td><td>2.5%</td></tr>
+<tr><td>ストック, 指=0</td><td>4</td><td>1.7%</td></tr>
+<tr><td>フェイント, 指=1</td><td>1</td><td>0.4%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>NTP反応分布</h3>
+                      <table><thead><tr><th>反応</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>カウンター</td><td>392</td><td>98.2%</td></tr>
+<tr><td>なし</td><td>7</td><td>1.8%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>NTP指分布</h3>
+                      <table><thead><tr><th>指</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>0</td><td>200</td><td>50.1%</td></tr>
+<tr><td>2</td><td>114</td><td>28.6%</td></tr>
+<tr><td>1</td><td>85</td><td>21.3%</td></tr>
+                      </tbody></table>
+                    </div>
+                  </div>
+                  <h3>代表トレース（最初の1エピソード）</h3>
+                  <table class="trace"><thead><tr><th>手</th><th>TP側</th><th>直前状態</th><th>TP行動</th><th>NTP反応</th><th>コピー対象</th><th>イベント</th><th>結果</th></tr></thead><tbody>
+                    <tr><td>1</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=-</td><td>フェイント, 指=1</td><td>カウンター, 指=2</td><td>-</td><td>feint_success</td><td>追加ターン</td></tr>
+<tr><td>2</td><td>開始側</td><td>TP手=1, NTP手=2, 直前=フェイント</td><td>コピー, 指=1</td><td>カウンター, 指=0</td><td>フェイント</td><td>copy_counter_used</td><td>追加ターン</td></tr>
+<tr><td>3</td><td>開始側</td><td>TP手=0, NTP手=2, 直前=コピー</td><td>ブースト, 指=0</td><td>カウンター, 指=1</td><td>-</td><td>counter_no_effect</td><td>追加ターン</td></tr>
+<tr><td>4</td><td>開始側</td><td>TP手=0, NTP手=2, 直前=ブースト</td><td>セメント, 指=0</td><td>カウンター, 指=2</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>5</td><td>手番交代後側</td><td>TP手=2, NTP手=0, 直前=セメント</td><td>ブースト, 指=1</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>終端報酬=-1.0</td></tr>
+                  </tbody></table>
+                  <div class="warn"><strong>警告:</strong><p class="ok">警告なし</p></div>
+                </details>
+                
+</main>
+</body>
+</html>

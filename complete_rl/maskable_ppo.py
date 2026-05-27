@@ -38,6 +38,7 @@ class EvaluationResult:
 class TrainingArtifacts:
     model_path: Path | None
     metrics_path: Path | None
+    bc_checkpoint_path: Path | None = None
 
 
 @dataclass(frozen=True)
@@ -272,16 +273,21 @@ def build_model(
     tensorboard_log: str | None = None,
     verbose: int = 0,
 ):
-    """Create an untrained MaskablePPO model for CompleteEnv."""
+    """Create an untrained MaskablePPO model for CompleteEnv.
+
+    Uses PerspectiveMaskablePPO, which corrects the bootstrap value sign in
+    GAE-lambda when the env signals a turn switch (same_turn_player=False).
+    See complete_rl/perspective_aware_ppo.py for details.
+    """
     try:
-        from sb3_contrib import MaskablePPO
+        from complete_rl.perspective_aware_ppo import PerspectiveMaskablePPO
     except ImportError as exc:  # pragma: no cover - environment dependent
         raise ImportError(
             "MaskablePPO baseline requires sb3-contrib, stable-baselines3, and torch. "
             "Install requirements.txt before training."
         ) from exc
 
-    return MaskablePPO(
+    return PerspectiveMaskablePPO(
         "MlpPolicy",
         env,
         learning_rate=learning_rate,
@@ -327,6 +333,7 @@ def evaluate_model(
         obs, _ = env.reset(seed=reset_seed)
         total_reward = 0.0
         steps = 0
+        start_side_sign = 1.0
 
         while True:
             action_masks = env.action_masks()
@@ -335,12 +342,14 @@ def evaluate_model(
                 deterministic=deterministic,
                 action_masks=action_masks,
             )
-            obs, reward, terminated, truncated, _ = env.step(int(action))
-            total_reward += float(reward)
+            obs, reward, terminated, truncated, info = env.step(int(action))
+            total_reward += start_side_sign * float(reward)
             steps += 1
 
             if terminated or truncated:
                 break
+            if not info.get("same_turn_player", False):
+                start_side_sign *= -1.0
 
         rewards.append(total_reward)
         steps_list.append(steps)
@@ -384,6 +393,9 @@ def train_maskable_ppo(
     bc_max_states: int = 400,
     bc_epochs: int = 5,
     bc_lr: float = 1e-3,
+    bc_leaf_mode: str = "zero",
+    bc_depth: int | None = None,
+    save_bc_checkpoint: bool = False,
     curriculum_warmup_steps: int = 0,
     curriculum_warmup_policy: str = "none",
 ) -> TrainingResult:
@@ -414,12 +426,20 @@ def train_maskable_ppo(
         tensorboard_log=tensorboard_log,
         verbose=verbose,
     )
+    bc_checkpoint_path: Path | None = None
     if use_bc_pretrain:
         from complete_rl.bc_pretrain import generate_bc_dataset, bc_pretrain as _bc_pretrain
         if verbose:
-            print(f"BC pre-train: generating dataset (max_states={bc_max_states})...")
+            print(
+                "BC pre-train: generating dataset "
+                f"(max_states={bc_max_states}, leaf_mode={bc_leaf_mode})..."
+            )
         bc_dataset = generate_bc_dataset(
-            config=config, max_states=bc_max_states, gamma=gamma
+            config=config,
+            max_states=bc_max_states,
+            gamma=gamma,
+            leaf_mode=bc_leaf_mode,
+            bc_depth=bc_depth,
         )
         if verbose:
             print(f"BC pre-train: {len(bc_dataset)} states, training {bc_epochs} epochs...")
@@ -431,6 +451,8 @@ def train_maskable_ppo(
             seed=seed,
             verbose=bool(verbose),
         )
+        if save_bc_checkpoint and output_dir is not None:
+            bc_checkpoint_path = _save_bc_checkpoint(model, Path(output_dir))
     if curriculum_warmup_steps > 0:
         warmup_env = make_env(
             config=config,
@@ -473,8 +495,30 @@ def train_maskable_ppo(
             config=config,
             total_timesteps=total_timesteps,
             seed=seed,
+            max_steps=max_steps,
+            eval_episodes=eval_episodes,
             ntp_policy=ntp_policy,
             reward_mode=reward_mode,
+            learning_rate=learning_rate,
+            n_steps=n_steps,
+            batch_size=batch_size,
+            n_epochs=n_epochs,
+            gamma=gamma,
+            ent_coef=ent_coef,
+            device=device,
+            tensorboard_log=tensorboard_log,
+            use_bc_pretrain=use_bc_pretrain,
+            bc_max_states=bc_max_states if use_bc_pretrain else None,
+            bc_epochs=bc_epochs if use_bc_pretrain else None,
+            bc_lr=bc_lr if use_bc_pretrain else None,
+            bc_leaf_mode=bc_leaf_mode if use_bc_pretrain else None,
+            bc_depth=bc_depth if use_bc_pretrain else None,
+            save_bc_checkpoint=save_bc_checkpoint,
+            bc_checkpoint_path=bc_checkpoint_path,
+            curriculum_warmup_steps=curriculum_warmup_steps,
+            curriculum_warmup_policy=(
+                curriculum_warmup_policy if curriculum_warmup_steps > 0 else None
+            ),
         )
     return TrainingResult(evaluation=evaluation, artifacts=artifacts)
 
@@ -494,15 +538,18 @@ def finetune_saved_model(
 ) -> TrainingResult:
     """Load a saved MaskablePPO model and continue training with a new environment.
 
+    Uses PerspectiveMaskablePPO for the loaded model so further training applies
+    the perspective-aware GAE-lambda correction.
+
     Useful for curriculum fine-tuning: start from a specialist model and adapt
     it to a different NTP policy without full retraining.
     """
     try:
-        from sb3_contrib import MaskablePPO
+        from complete_rl.perspective_aware_ppo import PerspectiveMaskablePPO
     except ImportError as exc:
         raise ImportError("Fine-tuning requires sb3-contrib.") from exc
 
-    model = MaskablePPO.load(str(model_path))
+    model = PerspectiveMaskablePPO.load(str(model_path))
     env = make_env(
         config=config,
         seed=seed,
@@ -526,6 +573,9 @@ def finetune_saved_model(
     )
     artifacts = TrainingArtifacts(model_path=None, metrics_path=None)
     if output_dir is not None:
+        loaded_learning_rate = getattr(model, "learning_rate", None)
+        if not isinstance(loaded_learning_rate, (int, float)):
+            loaded_learning_rate = None
         artifacts = _write_artifacts(
             model=model,
             evaluation=evaluation,
@@ -533,8 +583,23 @@ def finetune_saved_model(
             config=config,
             total_timesteps=total_timesteps,
             seed=seed,
+            max_steps=max_steps,
+            eval_episodes=eval_episodes,
             ntp_policy=ntp_policy,
             reward_mode=reward_mode,
+            learning_rate=(
+                float(loaded_learning_rate)
+                if loaded_learning_rate is not None
+                else None
+            ),
+            n_steps=int(model.n_steps),
+            batch_size=int(model.batch_size),
+            n_epochs=int(model.n_epochs),
+            gamma=float(model.gamma),
+            ent_coef=float(model.ent_coef),
+            device=str(model.device),
+            tensorboard_log=getattr(model, "tensorboard_log", None),
+            source_model_path=str(model_path),
         )
     return TrainingResult(evaluation=evaluation, artifacts=artifacts)
 
@@ -552,13 +617,13 @@ def evaluate_saved_model(
 ) -> EvaluationResult:
     """Load and evaluate a saved MaskablePPO model."""
     try:
-        from sb3_contrib import MaskablePPO
+        from complete_rl.perspective_aware_ppo import PerspectiveMaskablePPO
     except ImportError as exc:  # pragma: no cover - environment dependent
         raise ImportError(
             "Evaluating a saved MaskablePPO model requires sb3-contrib."
         ) from exc
 
-    model = MaskablePPO.load(str(model_path))
+    model = PerspectiveMaskablePPO.load(str(model_path))
     return evaluate_model(
         model,
         config=config,
@@ -651,6 +716,9 @@ def train_maskable_ppo_multi_seed(
     bc_max_states: int = 400,
     bc_epochs: int = 5,
     bc_lr: float = 1e-3,
+    bc_leaf_mode: str = "zero",
+    bc_depth: int | None = None,
+    save_bc_checkpoint: bool = False,
     curriculum_warmup_steps: int = 0,
     curriculum_warmup_policy: str = "none",
 ) -> MultiSeedResult:
@@ -664,7 +732,15 @@ def train_maskable_ppo_multi_seed(
         existing = (
             None
             if force
-            else _load_existing_seed_run(seed_dir, seed, ntp_policy, reward_mode)
+            else _load_existing_seed_run(
+                seed_dir,
+                seed,
+                ntp_policy,
+                reward_mode,
+                bc_leaf_mode if use_bc_pretrain else None,
+                bc_depth if use_bc_pretrain else None,
+                save_bc_checkpoint if use_bc_pretrain else False,
+            )
         )
         if existing is not None:
             runs.append(existing)
@@ -695,6 +771,9 @@ def train_maskable_ppo_multi_seed(
             bc_max_states=bc_max_states,
             bc_epochs=bc_epochs,
             bc_lr=bc_lr,
+            bc_leaf_mode=bc_leaf_mode,
+            bc_depth=bc_depth,
+            save_bc_checkpoint=save_bc_checkpoint,
             curriculum_warmup_steps=curriculum_warmup_steps,
             curriculum_warmup_policy=curriculum_warmup_policy,
         )
@@ -738,6 +817,9 @@ def train_maskable_ppo_all_configs(
     bc_max_states: int = 400,
     bc_epochs: int = 5,
     bc_lr: float = 1e-3,
+    bc_leaf_mode: str = "zero",
+    bc_depth: int | None = None,
+    save_bc_checkpoint: bool = False,
     curriculum_warmup_steps: int = 0,
     curriculum_warmup_policy: str = "none",
 ) -> AllConfigsResult:
@@ -773,6 +855,9 @@ def train_maskable_ppo_all_configs(
             bc_max_states=bc_max_states,
             bc_epochs=bc_epochs,
             bc_lr=bc_lr,
+            bc_leaf_mode=bc_leaf_mode,
+            bc_depth=bc_depth,
+            save_bc_checkpoint=save_bc_checkpoint,
             curriculum_warmup_steps=curriculum_warmup_steps,
             curriculum_warmup_policy=curriculum_warmup_policy,
         )
@@ -894,6 +979,33 @@ def main(argv: Iterable[str] | None = None) -> int:
         help="Adam learning rate for BC pre-training (default: 1e-3).",
     )
     parser.add_argument(
+        "--bc-leaf-mode",
+        choices=("zero", "material"),
+        default="zero",
+        help=(
+            "Leaf evaluator used for BC value-iteration teacher generation. "
+            "'zero' keeps legacy behavior; 'material' uses material_leaf_evaluator. "
+            "Ignored when --bc-depth is set."
+        ),
+    )
+    parser.add_argument(
+        "--bc-depth",
+        type=int,
+        default=None,
+        help=(
+            "If set, use FiniteHorizonSolver(depth=N) as the BC teacher instead of "
+            "value iteration. depth=4 is recommended (naturally captures copy/counter risk)."
+        ),
+    )
+    parser.add_argument(
+        "--save-bc-checkpoint",
+        action="store_true",
+        help=(
+            "When --bc-pretrain and --output-dir are set, save the model immediately "
+            "after behavioral cloning as maskable_ppo_after_bc.zip."
+        ),
+    )
+    parser.add_argument(
         "--curriculum-warmup-steps",
         type=int,
         default=0,
@@ -976,6 +1088,8 @@ def main(argv: Iterable[str] | None = None) -> int:
             print(f"Wrote {result.artifacts.model_path}")
         if result.artifacts.metrics_path:
             print(f"Wrote {result.artifacts.metrics_path}")
+        if result.artifacts.bc_checkpoint_path:
+            print(f"Wrote {result.artifacts.bc_checkpoint_path}")
         return 0
 
     if args.all_configs:
@@ -1001,6 +1115,9 @@ def main(argv: Iterable[str] | None = None) -> int:
             bc_max_states=args.bc_max_states,
             bc_epochs=args.bc_epochs,
             bc_lr=args.bc_lr,
+            bc_leaf_mode=args.bc_leaf_mode,
+            bc_depth=args.bc_depth,
+            save_bc_checkpoint=args.save_bc_checkpoint,
             curriculum_warmup_steps=args.curriculum_warmup_steps,
             curriculum_warmup_policy=args.curriculum_warmup_policy,
         )
@@ -1035,6 +1152,9 @@ def main(argv: Iterable[str] | None = None) -> int:
             bc_max_states=args.bc_max_states,
             bc_epochs=args.bc_epochs,
             bc_lr=args.bc_lr,
+            bc_leaf_mode=args.bc_leaf_mode,
+            bc_depth=args.bc_depth,
+            save_bc_checkpoint=args.save_bc_checkpoint,
             curriculum_warmup_steps=args.curriculum_warmup_steps,
             curriculum_warmup_policy=args.curriculum_warmup_policy,
         )
@@ -1067,6 +1187,9 @@ def main(argv: Iterable[str] | None = None) -> int:
         bc_max_states=args.bc_max_states,
         bc_epochs=args.bc_epochs,
         bc_lr=args.bc_lr,
+        bc_leaf_mode=args.bc_leaf_mode,
+        bc_depth=args.bc_depth,
+        save_bc_checkpoint=args.save_bc_checkpoint,
         curriculum_warmup_steps=args.curriculum_warmup_steps,
         curriculum_warmup_policy=args.curriculum_warmup_policy,
     )
@@ -1076,6 +1199,8 @@ def main(argv: Iterable[str] | None = None) -> int:
         print(f"Wrote {result.artifacts.model_path}")
     if result.artifacts.metrics_path:
         print(f"Wrote {result.artifacts.metrics_path}")
+    if result.artifacts.bc_checkpoint_path:
+        print(f"Wrote {result.artifacts.bc_checkpoint_path}")
     return 0
 
 
@@ -1087,8 +1212,29 @@ def _write_artifacts(
     config: RulesConfig,
     total_timesteps: int,
     seed: int,
+    max_steps: int,
+    eval_episodes: int,
     ntp_policy: str,
     reward_mode: str,
+    learning_rate: float | None = None,
+    n_steps: int | None = None,
+    batch_size: int | None = None,
+    n_epochs: int | None = None,
+    gamma: float | None = None,
+    ent_coef: float | None = None,
+    device: str | None = None,
+    tensorboard_log: str | None = None,
+    use_bc_pretrain: bool = False,
+    bc_max_states: int | None = None,
+    bc_epochs: int | None = None,
+    bc_lr: float | None = None,
+    bc_leaf_mode: str | None = None,
+    bc_depth: int | None = None,
+    save_bc_checkpoint: bool = False,
+    bc_checkpoint_path: Path | None = None,
+    curriculum_warmup_steps: int = 0,
+    curriculum_warmup_policy: str | None = None,
+    source_model_path: str | None = None,
 ) -> TrainingArtifacts:
     output_dir.mkdir(parents=True, exist_ok=True)
     model_path = output_dir / "maskable_ppo_complete.zip"
@@ -1100,6 +1246,33 @@ def _write_artifacts(
         "seed": seed,
         "ntp_policy": ntp_policy,
         "reward_mode": reward_mode,
+        "bc_leaf_mode": bc_leaf_mode,
+        "bc_depth": bc_depth,
+        "bc_checkpoint_path": (
+            str(bc_checkpoint_path) if bc_checkpoint_path is not None else None
+        ),
+        "hyperparameters": {
+            "learning_rate": learning_rate,
+            "n_steps": n_steps,
+            "batch_size": batch_size,
+            "n_epochs": n_epochs,
+            "gamma": gamma,
+            "ent_coef": ent_coef,
+            "max_steps": max_steps,
+            "eval_episodes": eval_episodes,
+            "device": device,
+            "tensorboard_log": tensorboard_log,
+            "use_bc_pretrain": use_bc_pretrain,
+            "bc_max_states": bc_max_states,
+            "bc_epochs": bc_epochs,
+            "bc_lr": bc_lr,
+            "bc_leaf_mode": bc_leaf_mode,
+            "bc_depth": bc_depth,
+            "save_bc_checkpoint": save_bc_checkpoint,
+            "curriculum_warmup_steps": curriculum_warmup_steps,
+            "curriculum_warmup_policy": curriculum_warmup_policy,
+            "source_model_path": source_model_path,
+        },
         "config": {
             **_config_to_dict(config),
         },
@@ -1109,7 +1282,18 @@ def _write_artifacts(
         json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
-    return TrainingArtifacts(model_path=model_path, metrics_path=metrics_path)
+    return TrainingArtifacts(
+        model_path=model_path,
+        metrics_path=metrics_path,
+        bc_checkpoint_path=bc_checkpoint_path,
+    )
+
+
+def _save_bc_checkpoint(model, output_dir: Path) -> Path:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    checkpoint_path = output_dir / "maskable_ppo_after_bc.zip"
+    model.save(checkpoint_path)
+    return checkpoint_path
 
 
 def _load_existing_seed_run(
@@ -1117,6 +1301,9 @@ def _load_existing_seed_run(
     seed: int,
     ntp_policy: str = "random",
     reward_mode: str = "terminal",
+    bc_leaf_mode: str | None = None,
+    bc_depth: int | None = None,
+    require_bc_checkpoint: bool = False,
 ) -> SeedRunResult | None:
     model_path = seed_dir / "maskable_ppo_complete.zip"
     metrics_path = seed_dir / "metrics.json"
@@ -1129,6 +1316,14 @@ def _load_existing_seed_run(
             return None
         if payload.get("reward_mode", "terminal") != reward_mode:
             return None
+        if bc_leaf_mode is not None and payload.get("bc_leaf_mode") != bc_leaf_mode:
+            return None
+        if bc_depth is not None and payload.get("bc_depth") != bc_depth:
+            return None
+        if require_bc_checkpoint:
+            checkpoint = payload.get("bc_checkpoint_path")
+            if not checkpoint or not Path(checkpoint).exists():
+                return None
         evaluation_payload = payload["evaluation"]
         evaluation = EvaluationResult(
             episodes=int(evaluation_payload["episodes"]),

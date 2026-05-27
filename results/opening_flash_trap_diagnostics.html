@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <title>初手フラッシュ過大評価診断</title>
+  <style>
+    body { margin: 0; background: #f7f7f4; color: #202124; font-family: "Segoe UI", "Yu Gothic", "Meiryo", sans-serif; line-height: 1.7; }
+    main { max-width: 1220px; margin: 0 auto; padding: 28px 20px 56px; }
+    h1 { margin: 0 0 8px; font-size: 28px; letter-spacing: 0; }
+    h2 { margin: 0 0 12px; font-size: 20px; letter-spacing: 0; }
+    .lead { color: #5f6368; margin-bottom: 18px; }
+    .section { background: #fff; border: 1px solid #d8d7d0; border-radius: 8px; padding: 18px; margin: 16px 0; }
+    .note { border-left: 4px solid #0b6b6f; background: #edf7f7; padding: 10px 12px; margin: 12px 0; }
+    .warn { border-left: 4px solid #9b1c1c; background: #fff0f0; padding: 10px 12px; margin: 12px 0; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { border: 1px solid #d8d7d0; padding: 7px 8px; vertical-align: top; }
+    th { background: #eef1ef; text-align: left; }
+    code { padding: 1px 5px; background: #eef1ef; border: 1px solid #dde3df; border-radius: 4px; font-family: Consolas, "Courier New", monospace; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>初手フラッシュ過大評価診断</h1>
+  <p class="lead">初手フラッシュは合法だが、相手にコピー/ストックを許すため人間視点では通常採用しない、という前提で確認。</p>
+
+  <section class="section">
+    <h2>結論</h2>
+    <div class="warn">
+      finite horizon depth=3 が初手フラッシュを約33%混ぜるのは妥当ではありません。
+      depth=4 ではフラッシュが0%に落ちるため、少なくとも depth=3 の教師分布をそのまま採用するのは危険です。
+      material leaf BC教師は zero leaf より改善していますが、人間らしい初期方策としてはまだ不十分です。
+    </div>
+    <p>
+      原因候補は「合法手生成」ではなく、短い探索深さと葉評価が、初手フラッシュ後に相手へ参照スキル資産を渡すリスクを十分に評価できていないことです。
+      次の工程では、学習ではなく教師生成・評価器側を先に修正対象にします。
+    </p>
+  </section>
+
+  <section class="section">
+    <h2>深さ別の初期方策</h2>
+    <table>
+      <thead>
+        <tr><th>評価</th><th>価値</th><th>フラッシュ率</th><th>数字率</th><th>対カウンター率</th><th>準備/ターン率</th><th>上位行動</th><th>判定</th></tr>
+      </thead>
+      <tbody><tr><td>depth=1</td><td>+0.0400</td><td>0.0%</td><td>24.0%</td><td>76.0%</td><td>0.0%</td><td>ロック, thumb=2 (76.0%)<br>数字 total=2, thumb=2 (8.0%)<br>数字 total=3, thumb=2 (8.0%)<br>数字 total=4, thumb=2 (8.0%)</td><td></td></tr>
+<tr><td>depth=2</td><td>+0.0283</td><td>0.0%</td><td>24.0%</td><td>5.2%</td><td>70.8%</td><td>スキップ, thumb=2 (70.8%)<br>数字 total=2, thumb=2 (8.0%)<br>数字 total=3, thumb=2 (8.0%)<br>数字 total=4, thumb=2 (8.0%)<br>フェイント, thumb=2 (5.2%)</td><td></td></tr>
+<tr><td>depth=3</td><td>+0.0984</td><td>33.1%</td><td>0.0%</td><td>42.0%</td><td>25.0%</td><td>フェイント, thumb=2 (42.0%)<br>スキップ, thumb=2 (25.0%)<br>フラッシュ, thumb=0 (11.0%)<br>フラッシュ, thumb=1 (11.0%)<br>フラッシュ, thumb=2 (11.0%)</td><td>警告: depth=3だけ初手フラッシュが高い。</td></tr>
+<tr><td>depth=4</td><td>+0.0484</td><td>0.0%</td><td>0.0%</td><td>22.6%</td><td>77.4%</td><td>ガード, thumb=2 (72.8%)<br>フェイント, thumb=2 (22.6%)<br>スキップ, thumb=2 (4.6%)</td><td>depth=4では消えるため、短期探索の境界アーティファクト疑い。</td></tr></tbody>
+    </table>
+  </section>
+
+  <section class="section">
+    <h2>初手フラッシュ後の危険</h2>
+    <table>
+      <thead>
+        <tr><th>状況</th><th>初手</th><th>相手の次手例</th><th>イベント</th><th>元TP視点</th><th>解釈</th></tr>
+      </thead>
+      <tbody><tr><td>初手フラッシュが外れた後</td><td>フラッシュ, thumb=1 / NTP なし, thumb=0</td><td>コピー, thumb=1</td><td>flash_miss, referenced_flash_two_hands, referenced_flash_one_hand, copy_used</td><td>元TP視点では敗北</td><td>相手がコピーでフラッシュを参照すると、即勝ち筋になり得る。</td></tr>
+<tr><td>初手フラッシュが外れた後</td><td>フラッシュ, thumb=1 / NTP なし, thumb=0</td><td>ストック, thumb=1</td><td>flash_miss, stock_added</td><td>相手に参照資産を渡す</td><td>相手にフラッシュをストックされ、チョイス等の長期的な圧を与える。</td></tr>
+<tr><td>初手フラッシュが当たった後</td><td>フラッシュ, thumb=1 / NTP なし, thumb=1</td><td>コピー, thumb=1</td><td>flash_two_hands, referenced_flash_two_hands, referenced_flash_one_hand, copy_used</td><td>元TP視点では敗北</td><td>初手の勝利判定が保留されるため、相手がコピーで逆に即勝ちできる形がある。</td></tr></tbody>
+    </table>
+  </section>
+
+  <section class="section">
+    <h2>BC教師の現状</h2>
+    <table>
+      <thead>
+        <tr><th>教師</th><th>価値</th><th>状態数</th><th>収束</th><th>delta</th><th>数字率</th><th>フラッシュ率</th><th>上位行動</th></tr>
+      </thead>
+      <tbody><tr><td>zero leaf BC教師</td><td>-0.0000</td><td>448</td><td>True</td><td>0.00e+00</td><td>100.0%</td><td>0.0%</td><td>数字 total=0, thumb=0 (100.0%)</td></tr>
+<tr><td>material leaf BC教師</td><td>+0.0726</td><td>448</td><td>True</td><td>7.32e-05</td><td>72.6%</td><td>1.3%</td><td>スキップ, thumb=2 (26.2%)<br>数字 total=3, thumb=2 (24.4%)<br>数字 total=0, thumb=0 (23.8%)<br>数字 total=4, thumb=2 (23.8%)<br>フラッシュ, thumb=2 (0.6%)<br>フラッシュ, thumb=0 (0.6%)<br>数字 total=4, thumb=1 (0.6%)</td></tr></tbody>
+    </table>
+    <div class="note">
+      zero leaf は数字100%に寄るため不採用候補です。
+      material leaf は数字100%を崩しますが、数字やスキップへの寄りが残り、人間の初期方策とはまだズレています。
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>次にやるべきこと</h2>
+    <ol>
+      <li>depth=3 の教師を採用対象から外し、少なくとも depth=4 相当または参照リスクを含む葉評価で比較する。</li>
+      <li>初手フラッシュ、初手数字連打、追加ターン維持を警告する教師分布チェックを gate として追加する。</li>
+      <li>material leaf を最終案にせず、コピー/ストックされる危険、相手に強い参照資産を渡す危険を評価器に入れる案を作る。</li>
+      <li>修正後の教師分布HTMLを確認してから、BC smoke 学習に進む。</li>
+    </ol>
+  </section>
+</main>
+</body>
+</html>

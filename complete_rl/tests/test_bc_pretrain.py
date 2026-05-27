@@ -62,6 +62,21 @@ class TestGenerateBCDataset(unittest.TestCase):
             self.assertEqual(probs.shape, (n_actions,))
             self.assertAlmostEqual(float(probs.sum()), 1.0, places=4)
 
+    def test_material_leaf_mode(self) -> None:
+        ds = generate_bc_dataset(
+            max_states=20,
+            vi_epsilon=1e-2,
+            leaf_mode="material",
+        )
+        self.assertGreater(len(ds), 0)
+        for obs, probs in ds:
+            self.assertEqual(obs.shape, (OBS_SIZE,))
+            self.assertAlmostEqual(float(probs.sum()), 1.0, places=4)
+
+    def test_invalid_leaf_mode_rejected(self) -> None:
+        with self.assertRaises(ValueError):
+            generate_bc_dataset(max_states=10, leaf_mode="bad")
+
 
 @unittest.skipUnless(has_maskable_ppo_dependencies(), "MaskablePPO deps not installed")
 class TestBCPretrain(unittest.TestCase):

@@ -1,6 +1,6 @@
 # Complete AI チェックリスト・進捗管理票
 
-更新日: 2026-05-20（Nash-NTP 実装・4構成 multi-seed・アルゴリズム比較・standard nash_optimal 結果確認）  
+更新日: 2026-05-21（PPO 視点認識対応・PerspectiveMaskablePPO 実装・depth=4 BC教師モード実装）
 対象: `complete_ai_plan.html` に基づく Complete ルール最強 AI 作成計画  
 判定基準: リポジトリ内の実装、テスト、生成済みレポートを確認して評価
 
@@ -25,7 +25,7 @@
 - Complete-lite exact solver 周辺: **85%**（状態全列挙・価値反復・感度分析まで完了）
 - Full Complete 学習 AI まで含めた全体完成度: **78%**（P8 環境・観測・action mask は継続利用可能。P9 は BC事前学習・curriculum・fine-tune・Nash-NTP・エピソード NTP 切り替えまで実装済みだが、最新方策レポートで数字宣言過多が見つかったため、学習結果の採用は保留。現在は診断・評価設計の見直しフェーズ）
 
-`complete_solver/` に純粋な状態表現・合法手生成・1ターン遷移・深さ制限 subgame solver・状態全列挙・割引価値反復・CSV/HTML レポートが揃っている。`complete_rl/` には Gymnasium 互換環境（OBS_SIZE=123、直近4反応 one-hot 追加済み）、action mask、MaskablePPO baseline CLI、smoke/quick/standard preset、複数 seed 評価、4構成 batch 学習/評価 CLI、名前付きNTP反応方策、BC事前学習（`bc_pretrain.py`）、curriculum warmup、fine-tune、Nash-NTP（`nash_ntp.py`）、エピソード NTP 切り替え（`episode_mixed_basic`・`episode_weighted_none_counter`）がある。BC + episode_mixed_basic + standard 250k は named policy 勝率上は良好だったが、方策レポートでは数字宣言が 92〜96% と異常に高く、強力スキルの使用がほぼ見られないため、現時点では「新ベストモデル」として採用しない。
+`complete_solver/` に純粋な状態表現・合法手生成・1ターン遷移・深さ制限 subgame solver・状態全列挙・割引価値反復・CSV/HTML レポートが揃っている。`complete_rl/` には Gymnasium 互換環境（OBS_SIZE=123、直近4反応 one-hot 追加済み）、action mask、MaskablePPO baseline CLI、smoke/quick/standard preset、複数 seed 評価、4構成 batch 学習/評価 CLI、名前付きNTP反応方策、BC事前学習（`bc_pretrain.py`）、curriculum warmup、fine-tune、Nash-NTP（`nash_ntp.py`）、エピソード NTP 切り替え（`episode_mixed_basic`・`episode_weighted_none_counter`・`episode_separated_basic`）がある。BC + episode_mixed_basic + standard 250k は named policy 勝率上は良好だったが、方策レポートでは数字宣言が 92〜96% と異常に高く、強力スキルの使用がほぼ見られないため、現時点では「新ベストモデル」として採用しない。
 
 暫定モデル: `results/maskable_ppo_bc_standard_episode_mixed/` は採用保留。`results/policy_report_episode_mixed.html` の数字宣言過多を受け、`results/minimal_ntp_policy_diagnostics.html` と `results/turn_chain_reward_diagnostics.html` で最小診断を実施した。現時点の見解は、ルールエンジンや合法手生成だけで数字偏重が必然化しているわけではなく、NTP 方策の反応選択と指選択の混同、報酬 shaping、評価レポート不足、学習の局所最適が複合している可能性が高い、というもの。
 
@@ -36,6 +36,12 @@
 - `minimal_ntp_policy_diagnostics.html` では、100%カウンター条件の首位はフェイント、0%カウンター条件の首位は非数字スキルであり、数字宣言偏重はルール上の必然ではないことを確認した。
 - `turn_chain_reward_diagnostics.html` では、ガード・ブースト・スキップ・タイムの追加ターン取得そのものに即時報酬は入っていないことを確認した。一方で、深さ制限評価では追加ターン系が探索深さ内の後続勝ち筋を拾うため高く見えやすい。
 - `ntp_policy_separation_design.html` で、NTP 方策を reaction policy と thumb policy に分離する設計案を作成した。現時点では実装に進まず、ユーザー承認待ち。
+- `ntp_policy_separation_check.html` で、0%/50%/100%カウンター × 最小指/一様指の分離条件を確認した。100%カウンターではフェイントが首位で妥当。一方、0%と50%ではガード/ブーストが首位に出ており、追加ターン系が深さ制限評価で高く見えやすい懸念は継続。
+- `separated_policy_report_episode_mixed.html` で、学習済み episode_mixed モデルを分離済み NTP 条件（0%/50%/100% × 最小指/一様指）で確認した。deterministic は全条件で数字宣言 100%、stochastic でも数字宣言 90〜97% 程度で、指条件を分けても数字偏重は残る。
+- `number_bias_diagnostic_note.html` で、数字宣言偏重の追加診断を整理した。BC教師生成で初期局面が数字100%になる赤信号、カウンター時の外し数字の構造的価値、RL環境の視点切替とPPO目的の不一致疑いを記録。
+- `bc_objective_diagnostics.html` で、外し数字の許容方針、BC教師分布、視点切替/PPO目的を確認した。VI教師 default leaf は初期局面や代表局面で `数字0` 100% に寄る一方、finite horizon や material leaf ではフェイント/ロック/フラッシュ等が混ざるため、BC教師生成の境界条件が強い原因候補。
+- `bc_teacher_fix_proposal.html` で、BC教師生成の修正案を整理した。推奨は、数字ペナルティではなく、BC leaf mode を追加して material leaf VI教師を第一候補にし、教師分布HTMLで採用前確認する方針。
+- `bc_pretrain.py` と `maskable_ppo.py` に BC leaf mode（`zero` / `material`）を実装した。`bc_teacher_distribution_check.html` で zero leaf と material leaf の教師分布を比較し、zero leaf は全代表局面で数字100%警告、material leaf は数字100%集中が崩れることを確認した。
 - ロックは局面依存で非線形に価値が変わるため、今回の最小診断では主対象から外す。必要になった時点で専用シナリオを作る。
 - 今後は `AI_WORKFLOW_RULES.md` に従い、各工程で確認用HTML/表とAI側の解釈を出し、ユーザー承認後に次工程へ進む。
 
@@ -83,7 +89,7 @@
 | P6 | レポート・可視化 | 90% | 進行中 | 文字化け修正・`--all-configs`・`--gamma-sweep`・`--enumerate` オプション追加。サニティ CSV に lock/time 列追加。12シナリオ対応。 | 戦術コメント列の定量化（あれば）。 | 人間が局面価値、混合方策、定性コメントを読めるレポートになる。 |
 | P7 | 終盤表・戦術表 | 65% | 進行中 | `locked_flash`、`endgame_number`、`charge_number`、`quick_followup`、`endgame_me_one_opp_two`、`endgame_me_two_opp_one`、`stock_guard_flash`、`time_active`、`cement_on_me` など12シナリオ生成済み（results/complete_lite_v2/）。 | 4構成での同一シナリオ比較、`.ini` 戦術解説との定量的整合確認（ロック+セメント+フラッシュなどのコンボシナリオ追加）。 | 探索の葉評価と教師データに使える局面表が揃う。 |
 | P8 | 全 Complete 環境 | 100% | 完了 | `complete_rl/env.py`・`obs.py`・`__init__.py` 実装済み。4構成対応 CompleteEnv（Gymnasium 1.x 互換）。action mask（MaskablePPO 互換）、**OBS_SIZE=123 の観測エンコーディング**（直近4反応の one-hot 16 feature を追加）、ランダム/カスタム対戦相手対応。NTP 乱数を `reset(seed=...)` に連動。Gymnasium `check_env` PASS。check_env OK 確認。 | なし | Gymnasium 互換で 4構成を切り替えられ、obs に相手反応履歴が含まれる。 |
-| P9 | 学習 AI | 75% | 診断・見直し中 | BC事前学習、curriculum warmup、fine-tune、Nash-NTP、エピソード NTP 切り替えは実装済み。`policy_report_episode_mixed.html` により、episode_mixed モデルの数字宣言 92〜96% という不自然な方策偏りを確認。`minimal_ntp_policy_diagnostics.html`・`turn_chain_reward_diagnostics.html` で最小診断を実施。`ntp_policy_separation_design.html` で NTP 方策分離の設計案を作成。 | NTP方策分離設計のユーザー承認、承認後の最小実装、方策レポート拡張、0%/100%カウンター最小検証、terminal/material 比較、承認後の再学習。99%カウンターはロック等の非線形スキルを専用検証する場合のみ任意。 | 勝率だけでなく、方策分布・主要スキル使用率・追加ターン後の勝ち筋・警告リストが人間視点で妥当と確認できる。 |
+| P9 | 学習 AI | 77% | 診断・見直し中 | BC事前学習、curriculum warmup、fine-tune、Nash-NTP、エピソード NTP 切り替えは実装済み。`policy_report_episode_mixed.html` により、episode_mixed モデルの数字宣言 92〜96% という不自然な方策偏りを確認。`minimal_ntp_policy_diagnostics.html`・`turn_chain_reward_diagnostics.html` で最小診断を実施。`ntp_policy_separation_design.html` で NTP 方策分離の設計案を作成。承認後、`none_lowest` / `none_uniform` / `counter50_lowest` / `counter50_uniform` / `counter_lowest` / `counter_uniform` を追加し、`ntp_policy_separation_check.html` と `separated_policy_report_episode_mixed.html` を生成。separated NTP を episode 固定の学習相手として混ぜる `episode_separated_basic` を追加し、seed 再現性テストと smoke 学習を確認。真 depth=4 standard モデルの旧 report は終端TP報酬と手番交代後行動を開始側評価として読み違えやすかったため、開始側成績・代表トレース・開始側手順診断へ切り替えた。`opening_teacher_fixed_ntp_diagnostics.html` で BC depth=4 教師と固定NTP exploit 評価を初期局面だけで比較。BC後 checkpoint 保存導線を追加し、opening-only BC checkpoint では deterministic 初手ガードを確認。`number_bias_diagnostic_note.html` と `bc_objective_diagnostics.html` で数字偏重の原因候補を整理。`bc_teacher_fix_proposal.html` でBC教師修正案を作成。BC leaf mode を実装し、`bc_teacher_distribution_check.html` を生成。 | opening-only BC checkpoint はフェイント固定ではなくガード開幕を出し、長い PPO 後 proper はフェイント固定なので、次はフルBCデータ版 checkpoint または PPO途中スナップショットで開幕がどの時点でガードからフェイントへ動くかを見る。terminal/material 比較、承認後の再学習。 | 勝率ではなく、方策分布・主要スキル使用率・開始側開幕手順・Copy参照先・警告リストが人間視点で妥当と確認できる。 |
 | P10 | 探索統合 | 0% | 未着手 | なし。 | 方策を事前分布にした局所 subgame 探索、詰み/必殺/ミラー/リバーシ局面の深掘り。 | 実戦時に重要局面で読みを深くできる。 |
 | P11 | 4構成統合評価 | 10% | 保留 | Config フラグと一部テストの土台はあり。 | P9 の方策偏り診断と評価レポート拡張が終わるまで、4構成リーグ戦は進めない。 | P9 の評価基準が安定した後、4構成を同一基盤で評価し、採用方針を決められる。 |
 
@@ -368,6 +374,132 @@ episode_mixed が理論的指標で優れているため**新ベストモデル*
 
 `pytest` は現在の Python 環境に未導入のため、標準の `unittest` で確認している。
 
+```powershell
+python -m unittest complete_rl.tests.test_env
+```
+結果: 36 tests OK。NTP 方策分離（`none_lowest` / `none_uniform` / `counter50_lowest` / `counter50_uniform` / `counter_lowest` / `counter_uniform`）の受け付けと seed 再現性を確認。
+
+```powershell
+python -m unittest discover complete_rl/tests
+```
+結果: 70 tests OK。`env.py` 共通部とBC leaf mode追加後も complete_rl テスト全体が通ることを確認。Gym 由来の既存警告は表示されるが失敗なし。
+
+```powershell
+python -m complete_rl.bc_objective_diagnostics
+```
+結果: `results/bc_objective_diagnostics.html` を生成。VI教師 default leaf が初期局面・代表局面で `数字0` 100% に寄る一方、finite horizon / material leaf では対カウンターや勝利直結寄りスキルが混ざることを確認。
+
+```powershell
+python -m unittest complete_rl.tests.test_bc_pretrain
+```
+結果: 13 tests OK。`leaf_mode="material"` のBCデータセット生成と、無効な leaf mode の拒否を確認。
+
+```powershell
+python -m complete_rl.maskable_ppo --help
+```
+結果: `--bc-leaf-mode {zero,material}` がCLIに追加されていることを確認。
+
+```powershell
+python -m complete_rl.bc_teacher_distribution_check
+```
+結果: `results/bc_teacher_distribution_check.html` を生成。zero leaf は全代表局面で数字100%警告。material leaf は数字100%集中が崩れることを確認。
+（2026-05-21 再実行）depth=4 finite horizon 列を追加した版を再生成。depth=4 は初期局面でガード72%/フェイント22%/数字0%/フラッシュ0%を全シナリオで確認予定。
+
+```powershell
+python -m complete_rl.maskable_ppo --preset smoke --bc-pretrain --bc-depth 4 --bc-max-states 30 --bc-epochs 2 --ent-coef 0.01 --ntp-policy episode_mixed_basic --reward-mode material --output-dir results/maskable_ppo_bc_depth4_smoke --force --quiet
+```
+結果: depth=4 BC + ent_coef=0.01 + episode_mixed_basic の smoke 学習 OK。1wins/0losses。`--bc-depth` CLI オプションの動作確認完了。
+
+```powershell
+python -m complete_rl.bc_depth_scenario_check
+```
+結果: `results/bc_depth_scenario_check.html` を生成。初期局面・タイム使用中・相手手残り1本の3シナリオ × depth=3/4/5 の教師分布比較。zero leaf VI 除外、material leaf VI は参考。
+
+```powershell
+python -m complete_rl.maskable_ppo --preset smoke --bc-pretrain --bc-depth 4 --bc-max-states 30 --bc-epochs 2 --ent-coef 0.01 --ntp-policy episode_mixed_basic --reward-mode material --output-dir results/maskable_ppo_perspective_smoke --force --quiet
+```
+結果: PerspectiveMaskablePPO（視点認識対応版）での smoke 学習 OK。1wins/0losses。
+
+```powershell
+python -c "from complete_rl.perspective_aware_ppo import PerspectiveMaskablePPO; from complete_rl.maskable_ppo import evaluate_model; m = PerspectiveMaskablePPO.load('results/maskable_ppo_bc_standard_episode_mixed/maskable_ppo_complete.zip'); [print(f'{p}: {evaluate_model(m, episodes=20, seed=5000000, max_steps=200, ntp_policy=p).wins}/20') for p in ['counter_first', 'block_first', 'none', 'random']]"
+```
+結果: counter_first 20/20、block_first 20/20、none 20/20、random 20/20。旧 episode_mixed モデルが新 PPO クラスでロード可能、env 変更なしで全 NTP に対する勝率が維持されることを確認（backward compat OK）。
+
+```powershell
+python -m complete_rl.maskable_ppo --preset quick --bc-pretrain --bc-depth 4 --bc-max-states 400 --bc-epochs 5 --ent-coef 0.01 --ntp-policy episode_mixed_basic --reward-mode material --output-dir results/maskable_ppo_bc_depth4_quick --force --quiet
+```
+結果（quick 20k）: 訓練時評価 14勝/0敗/6打切。50ep 詳細評価: counter_first 50/50, block_first 50/50, random 46/50, none 0/50打切。
+方策レポート: **初手ブースト 100%、数字宣言ほぼ0%、警告なし**。旧モデル（数字92-96%偏重）から劇的に改善。`results/separated_policy_report_depth4_quick.html`。
+
+```powershell
+python -m complete_rl.separated_policy_report results/maskable_ppo_bc_depth4_quick/maskable_ppo_complete.zip --output results/separated_policy_report_depth4_quick.html --episodes 50 --max-steps 300
+```
+結果: 全条件「警告なし」。counter条件で平均3手の高速勝利。`none` 条件はブースト→フェイント/コピー無限ループで打切。standard 250k で解消見込み。
+
+```powershell
+python -m complete_rl.ntp_policy_separation_check
+```
+結果: `results/ntp_policy_separation_check.html` を生成。0%/50%/100%カウンター × 最小指/一様指の確認表を出力。
+
+```powershell
+python -m complete_rl.separated_policy_report results/maskable_ppo_bc_standard_episode_mixed/maskable_ppo_complete.zip --output results/separated_policy_report_episode_mixed.html --episodes 50 --max-steps 300
+```
+結果: `results/separated_policy_report_episode_mixed.html` を生成。deterministic は全条件で数字宣言 100%。stochastic でも数字宣言 90〜97% 程度で、0%/50%/100% と指条件の分離後も数字偏重が残る。
+
+```powershell
+python -m unittest complete_rl.tests.test_env -q
+python -m py_compile complete_rl\env.py complete_rl\tests\test_env.py complete_rl\maskable_ppo.py
+python -m complete_rl.maskable_ppo --help
+```
+結果: `test_env` 38件 PASS。新しい `episode_separated_basic` が `--ntp-policy` と `--curriculum-warmup-policy` の CLI choices に出ることを確認。
+
+```powershell
+python -m complete_rl.maskable_ppo --timesteps 8 --n-steps 8 --batch-size 4 --n-epochs 1 --eval-episodes 1 --max-steps 20 --ent-coef 0.01 --ntp-policy episode_separated_basic --reward-mode material --output-dir results/maskable_ppo_episode_separated_smoke --force --quiet
+```
+結果: `episode_separated_basic` の BC なし smoke 学習 OK。評価 1wins/0losses、`maskable_ppo_complete.zip` とハイパーパラメータ入り `metrics.json` を生成。
+
+```powershell
+python -m complete_rl.maskable_ppo --fine-tune-from results/maskable_ppo_bc_depth4_standard_proper/maskable_ppo_complete.zip --preset quick --ent-coef 0.01 --ntp-policy episode_separated_basic --reward-mode material --output-dir results/maskable_ppo_depth4_proper_finetune_episode_separated_quick --force --quiet
+python -m complete_rl.separated_policy_report results/maskable_ppo_depth4_proper_finetune_episode_separated_quick/maskable_ppo_complete.zip --output results/separated_policy_report_depth4_proper_finetune_episode_separated_quick.html --episodes 80 --max-steps 300
+```
+結果: quick fine-tune の訓練時評価は旧 `evaluate_model()` 集計で 14勝6敗0打切。旧分離レポートでは deterministic `none` 80/80・`counter_*` 0/80 に見えたが、開始側視点では逆に `none_*` は初手フェイント空振り敗北、`counter_*` は `フェイント -> Copy(Feint)` 手順で開始側勝利になるため、この数値列だけで改善判断しない。
+
+```powershell
+python -m unittest complete_rl.tests.test_maskable_ppo -q
+python -m py_compile complete_rl\maskable_ppo.py complete_rl\tests\test_maskable_ppo.py
+```
+結果: `test_maskable_ppo` 10件 PASS。fine-tune 成果物がロード済みモデルの実ハイパーパラメータと source model path を保存する回帰テストを追加。
+
+```powershell
+python -m py_compile complete_rl\separated_policy_report.py
+python -m complete_rl.separated_policy_report results/maskable_ppo_depth4_proper_finetune_episode_separated_quick/maskable_ppo_complete.zip --output results/separated_policy_report_depth4_proper_finetune_episode_separated_quick.html --episodes 80 --max-steps 300
+python -m complete_rl.separated_policy_report results/maskable_ppo_bc_depth4_standard_proper/maskable_ppo_complete.zip --output results/separated_policy_report_depth4_proper.html --episodes 80 --max-steps 300
+```
+結果: 分離 NTP レポートを再生成。内部表記の日本語対応表、折りたたみ条件表示、スキル別使用率、全行動明細を HTML に追加。
+
+```powershell
+python -m py_compile complete_rl\start_side_policy_diagnostics.py
+python -m unittest complete_rl.tests.test_start_side_policy_diagnostics complete_rl.tests.test_maskable_ppo -q
+python -m complete_rl.start_side_policy_diagnostics results/maskable_ppo_depth4_proper_finetune_episode_separated_quick/maskable_ppo_complete.zip --output results/start_side_policy_diagnostics_depth4_proper_finetune_episode_separated_quick.html --episodes 80 --max-steps 300
+python -m complete_rl.start_side_policy_diagnostics results/maskable_ppo_bc_depth4_standard_proper/maskable_ppo_complete.zip --output results/start_side_policy_diagnostics_depth4_proper.html --episodes 80 --max-steps 300
+```
+結果: 開始側の最初の連続手番を切り出す診断 HTML を生成。両モデルとも deterministic 0%カウンターでは開始側が初手フェイント空振り後に手番交代して敗北、100%カウンターでは `フェイント -> Copy(Feint)` を含む開始側手順で手を0にして渡すことを確認。
+
+```powershell
+python -m py_compile complete_rl\opening_teacher_fixed_ntp_diagnostics.py
+python -m unittest complete_rl.tests.test_opening_teacher_fixed_ntp_diagnostics -q
+python -m complete_rl.opening_teacher_fixed_ntp_diagnostics --output results/opening_teacher_fixed_ntp_diagnostics.html --depth 4
+```
+結果: `results/opening_teacher_fixed_ntp_diagnostics.html` を生成。BC depth=4 教師は初期局面でガード主体＋フェイント混合。一方、固定 `none_uniform` では代表フェイント確認行は 23位で `feint_no_counter` と最初の手番交代、固定 `counter_uniform` ではフェイントが1〜3位で `feint_success` と追加ターンになることをイベント込みで確認。
+
+```powershell
+python -m unittest complete_rl.tests.test_maskable_ppo -q
+python -m complete_rl.maskable_ppo --preset smoke --bc-pretrain --bc-depth 4 --bc-max-states 1 --bc-epochs 5 --save-bc-checkpoint --ent-coef 0.01 --ntp-policy episode_mixed_basic --reward-mode material --output-dir results/maskable_ppo_bc_depth4_opening_checkpoint_smoke --force --quiet
+python -m complete_rl.start_side_policy_diagnostics results/maskable_ppo_bc_depth4_opening_checkpoint_smoke/maskable_ppo_after_bc.zip --output results/start_side_policy_diagnostics_depth4_opening_after_bc.html --episodes 20 --max-steps 60
+python -m complete_rl.start_side_policy_diagnostics results/maskable_ppo_bc_depth4_opening_checkpoint_smoke/maskable_ppo_complete.zip --output results/start_side_policy_diagnostics_depth4_opening_after_smoke_ppo.html --episodes 20 --max-steps 60
+```
+結果: `--save-bc-checkpoint` を追加し、`metrics.json` と `TrainingArtifacts` から `maskable_ppo_after_bc.zip` を辿れるようにした。400状態 depth=4 checkpoint 試行は重く中断し、初期局面だけを写す `bc_max_states=1` opening checkpoint を生成。BC直後 deterministic は `ガード, 指=2` 開幕で `none_*` は `ガード -> ガード`、8-step smoke PPO 後も開幕診断用の短い比較HTMLを生成。長い standard proper のフェイント固定と違い、BC入口そのものは初手フェイント100%ではないことを確認した。
+
 ## 次にやる順番
 
 1. ~~CLI/HTML レポート内の日本語文字化けを修正する。~~ ✅ 完了
@@ -419,18 +551,120 @@ episode_mixed が理論的指標で優れているため**新ベストモデル*
     - 必要理由: 数字宣言偏重が「カウンター率への適応」なのか「相手指の固定条件への過適応」なのかを分けて見られるようにするため。
     - 成果物: `results/ntp_policy_separation_design.html`
     - ユーザー承認後に、最小実装と確認表生成へ進む。
-34. **NTP 方策分離の最小実装と確認表生成。** ← **承認後の次**
+34. **NTP 方策分離の最小実装と確認表生成。** ✅ 完了・確認待ち
     - `none_lowest` / `none_uniform` / `counter_lowest` / `counter_uniform` のような分離条件を追加する。
     - NTP 反応率、NTP 指分布、TP 上位行動、警告を確認表に出す。
     - 必要理由: 設計上の切り分けが、実際にレポート上で検証可能か確認するため。
-35. **方策レポート拡張を設計・実装する。**
+    - 追加対応: ユーザー要望により `counter50_lowest` / `counter50_uniform` も追加。
+    - 成果物: `results/ntp_policy_separation_check.html`
+    - 確認結果: 100%カウンターではフェイントが首位。0%/50%ではガード/ブーストが首位で、追加ターン系の評価が高く見えやすい懸念は継続。
+35. **方策レポート拡張を設計・実装する。** ✅ 完了・確認待ち
     - 初手分布、主要スキル使用率、NTP反応率、NTP指分布、追加ターン後の次手、警告リストを出す。
     - deterministic/stochastic の差も表示する。
     - 必要理由: 勝率が良くても、人間視点で不自然な方策に収束していないかを採用前に検出するため。
-36. **0%/100% カウンターの最小検証を再実施する。**
+    - 成果物: `results/separated_policy_report_episode_mixed.html`
+    - 確認結果: deterministic は全条件で数字宣言 100%。stochastic でも数字宣言 90〜97% 程度。
+36. **BC教師分布と視点切替/PPO目的の検証。** ✅ 完了・確認待ち
+    - 初期局面と代表局面のBC教師方策をHTML化し、数字100%がどこで入るか確認する。
+    - Gym環境の視点切替後の将来報酬が、直前行動主体の目的と一致しているか確認する。
+    - 必要理由: 数字偏重が学習済みモデルだけでなく、教師生成またはRL目的関数から入っている可能性が高いため。
+    - 成果物: `results/bc_objective_diagnostics.html`
+    - 確認結果: VI教師 default leaf が `数字0` 100% に寄る。finite horizon / material leaf では対カウンターや勝利直結寄りスキルが混ざる。
+37. **BC教師生成の修正案を作る。** ✅ 完了・確認待ち
+    - default leaf=0 のVI教師をそのままBCに使うか見直す。
+    - material leaf / finite-horizon / シナリオ教師 / 数字常用ペナルティではなく警告ベースの採用基準、などの候補を比較する。
+    - 必要理由: 数字偏重の入口がBC教師生成にある疑いが強いため。
+    - 成果物: `results/bc_teacher_fix_proposal.html`
+    - 推奨: まず BC leaf mode を追加し、material leaf VI教師を第一候補として教師分布HTMLで確認する。数字ペナルティは非推奨。
+38. **BC leaf mode の実装と material leaf 教師分布HTML生成。** ✅ 完了
+    - `bc_pretrain.py` に `leaf_mode=zero|material` を追加する。
+    - `maskable_ppo.py` に `--bc-leaf-mode` を追加する。
+    - `bc_teacher_distribution_check.html` で zero/material の教師分布を比較する。
+    - 必要理由: 再学習前に、数字100%を作っていた教師生成条件を安全に切り替えられるか確認するため。
+    - 成果物: `results/bc_teacher_distribution_check.html`
+    - 確認結果: zero leaf は全代表局面で数字100%警告。material leaf は数字100%集中が崩れるが、初期局面では数字比率がまだ高いため要確認。
+38.5. **初手フラッシュ過大評価診断と depth=4 採用確定。** ✅ 完了
+    - `opening_flash_trap_diagnostics.py` で depth=1〜4 の有限地平線教師分布を比較。
+    - 結果: depth=3 は初手フラッシュ33%で不採用。depth=4 はガード72%/フェイント22%/数字0%/フラッシュ0%（60点・実用レベル）。
+    - material leaf VI 教師でも数字72.6%が残るため、finite horizon depth=4 を BC 教師として採用する方針を確定。
+    - コピーリスクは depth=4 のゲーム木探索で自然に評価されるため専用評価指標は不要と確定。ストックリスクは後のニューラルネットに委ねる。
+    - 成果物: `results/opening_flash_trap_diagnostics.html`
+38.6. **`--bc-depth` オプション実装と depth=4 教師分布チェック。** ✅ 完了
+    - `bc_pretrain.py` に `bc_depth` パラメータを追加（`FiniteHorizonSolver(depth=N)` 教師モード）。
+    - `maskable_ppo.py` に `--bc-depth` CLI オプション追加（全コールチェーン対応）。
+    - `bc_teacher_distribution_check.py` に depth=4 列を追加（★採用候補として表示）。
+    - smoke 学習動作確認: `--preset smoke --bc-pretrain --bc-depth 4 --ent-coef 0.01 --ntp-policy episode_mixed_basic` → 1wins/0losses OK。
+    - 成果物: `results/bc_teacher_distribution_check.html`（depth=4 列追加版）、`results/maskable_ppo_bc_depth4_smoke/`
+39. **ガード代替シナリオ診断（depth=3/4/5）。** ✅ 完了・確認待ち
+    - タイム使用中 / 相手の手が残り1本 の2シナリオで depth=3/4/5 の教師分布を比較。
+    - ガード率が相手1手局面で下がるか、depth=5 が depth=4 と大きく異なるかを確認。
+    - zero leaf VI は論外のため除外。material leaf VI は参考行として掲載。
+    - 必要理由: ガード72%初期方策が局所最適トラップになるリスクを、局面別・深さ別に事前確認するため。
+    - 成果物: `results/bc_depth_scenario_check.html`
+    - ユーザーが分布を確認することで採用判断する（数値閾値では判定しない）
+39.5. **PPO 視点認識（PerspectiveMaskablePPO）の実装。** ✅ 完了
+    - 自己対戦でターン交代時に PPO bootstrap 値の符号反転が必要なことを env.py / transition.py のトレースで確認。
+    - `complete_rl/perspective_aware_ppo.py` を新規作成（PerspectiveMaskableRolloutBuffer + PerspectiveMaskablePPO）。
+    - GAE-λ で `sign = -1 if turn_switched else +1` を delta と recursion に適用。
+    - `maskable_ppo.py` の build_model / finetune_saved_model / load_and_evaluate を新 PPO クラスに差し替え。
+    - 70 テスト全 PASS、smoke 学習動作確認、既存モデル backward compat 確認（旧モデル全 NTP 100% 勝率維持）。
+    - 当初検討した env.py の reaction_history リセットは、再評価で `none` 相手勝率が 100%→0% に劇的低下したため revert。
+      - 理由: episode_mixed_basic では `_ntp_policy` が episode 中固定のため、history は「相手 NTP 識別シグナル」として正しく機能していた。リセットすると識別能力を失う。
+      - 結論: 懸念B（history 視点混在）は現行構成では実バグではなかった。Issue A（PPO bootstrap）のみが本物の数学バグで、それは修正済み。
+    - 必要理由: 自己対戦でのターン交代時に V(s_{t+1}) は対戦相手視点となるため、符号反転なしの bootstrap は学習を歪める。今後の本学習は新 PPO で実施する。
+40. **depth=4 BC + ent_coef=0.01 + episode_mixed quick 方策レポート確認。** ✅ 完了・劇的改善確認
+    - 新 PerspectiveMaskablePPO + BC depth=4 + ent_coef=0.01 + episode_mixed_basic で quick 学習（20k steps）。
+    - 評価結果: counter 50/50、block 50/50、random 46/50、none 0/50（打切、quick 規模では未解決）。
+    - **方策の質的変化が確認できた**:
+      - 初手: 数字宣言0% → **ブースト 100%**
+      - 全条件で「警告なし」（旧モデルは数字偏重警告多発）
+      - 使用スキル: ブースト・コピー・フェイント・アルティメット（多様化）
+      - 勝ち筋: 「外し数字連打」→ **「ブースト→対カウンター/アルティメットコンボ」**（人間的）
+    - 成果物: `results/separated_policy_report_depth4_quick.html`、`results/maskable_ppo_bc_depth4_quick/`
+    - 結論: 2つの修正（depth=4 BC、PerspectiveMaskablePPO）は確実に効いている。standard 250k に進む明確な根拠あり。
+41. **depth=4 BC + perspective PPO + episode_mixed standard 本学習。** ⚠️ **バグ修正後再実行**
+    - **重要な発見**: `--bc-depth N` フラグが single training path（最も使用される）で `train_maskable_ppo()` 呼び出しに渡されていなかった。
+      - 結果: これまでの「depth=4」と思っていた quick/standard 実験は全て **zero_leaf VI BC** で動いていた。
+      - 修正: [maskable_ppo.py:1128](Complete/complete_rl/maskable_ppo.py#L1128) に `bc_depth=args.bc_depth` を追加。
+    - 修正前の standard 250k（実態は zero_leaf BC + perspective PPO + ent=0.01）: 38/100 wins
+      - 注目: PerspectiveMaskablePPO 単独で zero_leaf BC の数字偏重を Skip/Boost に変えた（修正効果は本物）
+    - **修正後の standard 250k（真の depth=4 BC + perspective PPO + ent=0.01）**: 旧 `evaluate_model()` 集計では **75/100 wins**
+      - 旧集計: none 100/100（2手）、block 100/100（4手）、random 82/100、counter 0/100。開始側視点修正前の値なので再採点前の比較値としてのみ残す。
+      - 初手フェイント thumb=1 (100%)、警告ゼロ、人間的なスキル使用
+      - 弱点: counter 相手で deterministic Feint が機能せず → 初手が過度に決定論的
+    - 旧 episode_mixed（zero_leaf BC + 旧 PPO）100% wins と比較: 勝率↓ だが方策の質↑
+    - 成果物: `results/maskable_ppo_bc_depth4_standard_proper/`、`results/separated_policy_report_depth4_proper.html`
+42. **ent_coef=0.05 で初手決定論の緩和を試行。** ✅ 完了・不採用
+    - 仮説: Feint 100% 集中は ent_coef=0.01 が不十分。0.05 で確率的混合戦略へ誘導
+    - 完了後、counter 弱点が緩和されるか確認
+    - 結果: `results/maskable_ppo_bc_depth4_standard_ent05/` は旧集計で 40/100 wins。旧 report では counter 系改善・none 系崩壊に見え、`none_lowest` 0/80 と初手スキップ thumb=1 100% collapse を記録。開始側視点の採否判断には修正後診断を使う。
+    - 判定: ent_coef=0.05 は採用しない。単純な entropy 増加は「フェイント固定」を「スキップ固定」に移しただけで、全体性能と none 安定性を悪化させた。
+    - 成果物: `results/separated_policy_report_depth4_ent05.html`
+43. **方策レポートの採用警告 gate を強化する。** ✅ 完了
+    - `separated_policy_report.py` の警告に、勝利なし、勝率50%未満、打ち切り20%以上、初手単一行動90%以上を追加。
+    - 旧終端TP報酬基準では `standard_proper` の counter 全敗と初手フェイント固定、`ent05` の none崩壊と初手スキップ固定が警告として出ることを確認。開始側成績は修正後レポートで読む。
+    - 表示改善: `deterministic` / `none_lowest` など内部表記の日本語対応表を追加。各条件を折りたたみ表示にし、スキル別使用率と行動明細を省略なしで出すよう更新。
+    - `maskable_ppo.py` の `metrics.json` に今後の学習ハイパーパラメータ（learning_rate / n_steps / batch_size / n_epochs / gamma / ent_coef / max_steps / BC設定 / curriculum設定など）を保存するよう修正。
+    - テスト: `complete_rl.tests.test_maskable_ppo` 9件、`complete_rl.tests.test_env` + `test_bc_pretrain` 50件、`complete_solver` 68件 PASS。
+44. **separated NTP を episode 固定の学習相手へ混ぜる。** ✅ 実装・smoke確認
+    - `episode_separated_basic` を追加。エピソード単位で `none_uniform` / `counter50_uniform` / `counter_uniform` / `block_first` / `random` を選ぶ。
+    - separated policy が episode pool から選ばれた場合も `reset(seed=...)` に結び付く seeded 経路を通すよう修正。uniform 指選択を含む訓練分布の再現性を保つ。
+    - `complete_rl.tests.test_env` で受け付け、seeded separated 経路、CLI help 露出を確認。
+    - BC なし 8-step smoke 学習でモデルと `metrics.json` を生成。成果物: `results/maskable_ppo_episode_separated_smoke/`
+    - depth=4 BC を含む smoke は教師生成が動作確認には重く、state cap 30 と 5 の試行を中断。次の比較は quick/standard 実験として実施する。
+45. **depth=4 standard proper から episode separated へ quick fine-tune。** ✅ 実行・改善不足
+    - `results/maskable_ppo_bc_depth4_standard_proper/` から 20k steps fine-tune。訓練時 episode-separated 評価は 14勝6敗0打切。
+    - `results/separated_policy_report_depth4_proper_finetune_episode_separated_quick.html` で分離条件を確認。
+    - 旧 report は終端時点の TP 報酬を勝敗として集計し、手番交代後も同じ方策が操作する行動を開始側の挙動と混ぜていた。`none_*` で開始側 Feint 後に手番交代後側が Copy(Feint) して勝つ経路が、開始側勝利のように読めるのが問題だった。
+    - report を開始側成績、開始側/手番交代後側のスキル使用率、Copy 対象、代表トレースを併記する形に修正。`none_lowest` 代表トレースでは開始側 Feint は `feint_no_counter` で手番交代し、その後の Copy 勝利は手番交代後側の行動だと確認。
+    - `evaluate_model()` も報酬符号を開始側視点へ戻すよう修正し、Feint 後に相手側 Copy(Feint) で終端する固定手順が開始側敗北になる回帰テストを追加。
+    - したがって quick fine-tune の勝率表だけで counter 弱点や改善効果を判断し直すのは保留。まず開始側トレースで、固定相手ごとに期待した exploit 手順へ向かうかを確認する。
+    - `start_side_policy_diagnostics.py` を追加。開始側の最初の連続手番、Copy 参照先、手番交代時の手数、0%/100%カウンター期待警告を HTML 化。depth=4 proper と separated quick fine-tune の両方で、0%カウンターに対する開始側初手フェイント空振りと 100%カウンターでの `フェイント -> Copy(Feint)` 手順を確認。
+    - fine-tune `metrics.json` でロード済みモデルの実ハイパーパラメータを保存するよう修正。今回の成果物に `n_steps=1024` / `batch_size=128` / `n_epochs=8` / `ent_coef=0.01` と source model path を記録。
+46. **terminal/material 比較と、追加ターン・深さ制限評価の影響確認。**
     - フラッシュ、クイック、スキップ→コピー→クイック等の固定手順も比較する。
-    - 必要理由: 0% と 100% は期待方策が比較的明確で、環境・報酬・行動評価の基本的な整合性を確認しやすいため。
+    - 必要理由: 分離条件でも数字偏重が残ったため、報酬 shaping と深さ制限評価がどの程度この局所解を誘導しているか確認する必要がある。
     - 99%カウンターは現時点の必須項目から外す。ロックのような状態依存スキルは単純な環境では価値が出にくいため、必要になった時点で専用シナリオを作る。
-37. **評価設計が承認されてから再学習する。**
+47. **評価設計が承認されてから再学習する。**
     - 4構成リーグ評価（P11）は P9 の診断・評価レポート拡張が終わるまで保留。
     - 必要理由: 原因未特定のまま再学習すると、数字宣言偏重や追加ターン偏重を再発させる可能性が高いため。

@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <title>深さ別シナリオ教師チェック（ガード代替分析）</title>
+  <style>
+    body { margin: 0; background: #f7f7f4; color: #202124; font-family: "Segoe UI","Yu Gothic","Meiryo",sans-serif; line-height: 1.7; }
+    main { max-width: 1280px; margin: 0 auto; padding: 28px 20px 56px; }
+    h1 { margin: 0 0 8px; font-size: 28px; }
+    h2 { margin: 0 0 10px; font-size: 20px; }
+    .lead { color: #5f6368; margin-bottom: 14px; }
+    .section { background: #fff; border: 1px solid #d8d7d0; border-radius: 8px; padding: 18px; margin: 16px 0; }
+    .note { border-left: 4px solid #0b6b6f; background: #edf7f7; padding: 10px 12px; margin: 12px 0; }
+    .warn { border-left: 4px solid #9b1c1c; background: #fff0f0; padding: 10px 12px; margin: 12px 0; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { border: 1px solid #d8d7d0; padding: 7px 9px; vertical-align: top; }
+    th { background: #eef1ef; text-align: left; }
+    th.guard, td.guard { background: #e8f4ff; font-weight: bold; }
+    td.warn-cell { background: #ffe0e0; font-weight: bold; color: #9b1c1c; }
+    tr.vi-row td { color: #5f6368; background: #f9f9f6; font-style: italic; }
+    code { padding: 1px 5px; background: #eef1ef; border: 1px solid #dde3df; border-radius: 4px; font-family: Consolas,"Courier New",monospace; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>深さ別シナリオ教師チェック（ガード代替分析）</h1>
+  <p class="lead">depth=3/4/5 × 3シナリオ。ガード率が状況に応じて変化するかを確認。zero leaf VI は論外のため除外。</p>
+
+  <section class="section">
+    <h2>確認意図</h2>
+    <div class="note">
+      <ul>
+        <li><strong>ガード率の妥当性</strong>: 相手の手が残り1本の局面では、ガードの選択価値は低い（攻撃パターンが限られるため）。depth=4/5 でガード率が下がるかを確認。</li>
+        <li><strong>タイム使用中</strong>: 追加ターン中はガードにも一定の価値あり。ガード率が高くてもおかしくない。</li>
+        <li><strong>depth=5 の必要性</strong>: depth=4 と depth=5 で結果が大きく変わらなければ、BC 教師は depth=4 で十分。</li>
+        <li><strong>zero leaf VI</strong>: 数字100%のため除外。material leaf VI は参考行として掲載。</li>
+      </ul>
+    </div>
+  </section>
+
+  
+  <section class="section">
+    <h2>初期局面（ベースライン）</h2>
+    <p class="lead">ガード72%/フェイント22%が depth=4 の基準。フラッシュ0%、数字0%。</p>
+    <table>
+      <thead>
+        <tr>
+          <th>教師</th><th>価値</th>
+          <th class="guard">ガード率</th>
+          <th>フェイント/ロック率</th>
+          <th>スキップ/ブースト/タイム率</th>
+          <th>勝利直結率</th>
+          <th>数字率</th>
+          <th>上位行動（上位5）</th>
+        </tr>
+      </thead>
+      <tbody><tr><td><strong>depth=3</strong></td><td>+0.0984</td><td class="guard">—</td><td>42.0%</td><td>25.0%</td><td>33.1%</td><td>—</td><td>フェイント, thumb=2 (42.0%)<br>スキップ, thumb=2 (25.0%)<br>フラッシュ, thumb=0 (11.0%)<br>フラッシュ, thumb=1 (11.0%)<br>フラッシュ, thumb=2 (11.0%)</td></tr><tr><td><strong>depth=4</strong></td><td>+0.0484</td><td class="guard">72.8%</td><td>22.6%</td><td>4.6%</td><td>—</td><td>—</td><td>ガード, thumb=2 (72.8%)<br>フェイント, thumb=2 (22.6%)<br>スキップ, thumb=2 (4.6%)</td></tr><tr><td><strong>depth=5</strong></td><td>+0.0755</td><td class="guard">—</td><td>46.5%</td><td>—</td><td>53.5%</td><td>—</td><td>フェイント, thumb=2 (46.5%)<br>フラッシュ, thumb=0 (17.8%)<br>フラッシュ, thumb=1 (17.8%)<br>フラッシュ, thumb=2 (17.8%)</td></tr><tr class="vi-row"><td>VI material leaf（参考）</td><td>+0.0726</td><td class="guard">—</td><td>—</td><td>26.2%</td><td>1.2%</td><td>72.6%</td><td>スキップ, thumb=2 (26.2%)<br>数字宣言 total=3, thumb=2 (24.4%)<br>数字宣言 total=0, thumb=0 (23.8%)<br>数字宣言 total=4, thumb=2 (23.8%)<br>フラッシュ, thumb=0 (0.6%)</td></tr></tbody>
+    </table>
+  </section>
+
+  <section class="section">
+    <h2>タイム使用中（me.time_active=True）</h2>
+    <p class="lead">タイムで追加ターンを得ている局面。相手はターン終了後に反撃可能なのでガードに一定の価値はある。</p>
+    <table>
+      <thead>
+        <tr>
+          <th>教師</th><th>価値</th>
+          <th class="guard">ガード率</th>
+          <th>フェイント/ロック率</th>
+          <th>スキップ/ブースト/タイム率</th>
+          <th>勝利直結率</th>
+          <th>数字率</th>
+          <th>上位行動（上位5）</th>
+        </tr>
+      </thead>
+      <tbody><tr><td><strong>depth=3</strong></td><td>+0.0992</td><td class="guard">—</td><td>42.3%</td><td>24.3%</td><td>33.4%</td><td>—</td><td>フェイント, thumb=2 (42.3%)<br>スキップ, thumb=2 (24.3%)<br>フラッシュ, thumb=0 (11.1%)<br>フラッシュ, thumb=1 (11.1%)<br>フラッシュ, thumb=2 (11.1%)</td></tr><tr><td><strong>depth=4</strong></td><td>+0.0495</td><td class="guard">71.4%</td><td>22.5%</td><td>6.0%</td><td>—</td><td>—</td><td>ガード, thumb=2 (71.4%)<br>フェイント, thumb=2 (22.5%)<br>スキップ, thumb=2 (6.0%)</td></tr><tr><td><strong>depth=5</strong></td><td>+0.1183</td><td class="guard">—</td><td>35.5%</td><td>57.7%</td><td>6.7%</td><td>—</td><td>ブースト, thumb=2 (57.7%)<br>フェイント, thumb=2 (35.5%)<br>フラッシュ, thumb=0 (2.2%)<br>フラッシュ, thumb=1 (2.2%)<br>フラッシュ, thumb=2 (2.2%)</td></tr><tr class="vi-row"><td>VI material leaf（参考）</td><td>+0.0400</td><td class="guard">—</td><td>76.0%</td><td>—</td><td>—</td><td>24.0%</td><td>ロック, thumb=2 (76.0%)<br>数字宣言 total=2, thumb=2 (8.0%)<br>数字宣言 total=3, thumb=2 (8.0%)<br>数字宣言 total=4, thumb=2 (8.0%)</td></tr></tbody>
+    </table>
+  </section>
+
+  <section class="section">
+    <h2>相手の手が残り1本</h2>
+    <p class="lead">相手が1本しかないため宣言できる数字が限られ、フラッシュも脅威が減る。ガードの選択価値が低いはず。</p>
+    <table>
+      <thead>
+        <tr>
+          <th>教師</th><th>価値</th>
+          <th class="guard">ガード率</th>
+          <th>フェイント/ロック率</th>
+          <th>スキップ/ブースト/タイム率</th>
+          <th>勝利直結率</th>
+          <th>数字率</th>
+          <th>上位行動（上位5）</th>
+        </tr>
+      </thead>
+      <tbody><tr><td><strong>depth=3</strong></td><td>-0.3340</td><td class="guard">—</td><td>—</td><td>26.4%</td><td>23.1%</td><td>50.4%</td><td>数字宣言 total=2, thumb=0 (50.4%)<br>スキップ, thumb=2 (26.4%)<br>フラッシュ, thumb=0 (11.6%)<br>フラッシュ, thumb=1 (11.6%)</td></tr><tr><td><strong>depth=4</strong></td><td>-0.3677</td><td class="guard">—</td><td>41.3%</td><td>32.7%</td><td>26.0%</td><td>—</td><td>フェイント, thumb=2 (41.3%)<br>スキップ, thumb=2 (32.7%)<br>フラッシュ, thumb=0 (13.0%)<br>フラッシュ, thumb=1 (13.0%)</td></tr><tr><td><strong>depth=5</strong></td><td>-0.2495</td><td class="guard">—</td><td>33.6%</td><td>—</td><td>37.8%</td><td>28.7%</td><td>フェイント, thumb=2 (33.6%)<br>数字宣言 total=2, thumb=0 (28.7%)<br>フラッシュ, thumb=0 (18.9%)<br>フラッシュ, thumb=1 (18.9%)</td></tr><tr class="vi-row"><td>VI material leaf（参考）</td><td>-0.4595</td><td class="guard">—</td><td>—</td><td>—</td><td>13.5%</td><td>86.5%</td><td>数字宣言 total=2, thumb=0 (73.8%)<br>フラッシュ, thumb=0 (13.5%)<br>数字宣言 total=2, thumb=1 (12.7%)</td></tr></tbody>
+    </table>
+  </section>
+
+
+  <section class="section">
+    <h2>AI側の解釈欄（確認後に記入）</h2>
+    <p>各シナリオについて、depth=4/5 のガード率変化と上位行動の妥当性を確認し、ここに記録する。</p>
+  </section>
+</main>
+</body>
+</html>

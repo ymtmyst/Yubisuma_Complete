@@ -1,0 +1,21 @@
+{
+  "algorithm": "MaskablePPO",
+  "total_timesteps": 20000,
+  "seed": 0,
+  "ntp_policy": "episode_mixed_basic",
+  "reward_mode": "material",
+  "bc_leaf_mode": "zero",
+  "bc_depth": null,
+  "config": {
+    "enable_mirror": false,
+    "enable_reversi": false
+  },
+  "evaluation": {
+    "episodes": 20,
+    "wins": 14,
+    "losses": 0,
+    "truncations": 6,
+    "average_reward": 0.7,
+    "average_steps": 152.65
+  }
+}

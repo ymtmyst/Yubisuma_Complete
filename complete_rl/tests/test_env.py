@@ -8,7 +8,7 @@ import numpy as np
 from gymnasium.utils.env_checker import check_env
 
 from complete_solver import RulesConfig
-from complete_rl import CompleteEnv, MIXED_NTP_POLICIES, OBS_SIZE, REWARD_MODES
+from complete_rl import CompleteEnv, MIXED_NTP_POLICIES, OBS_SIZE, REWARD_MODES, SEPARATED_NTP_POLICIES
 from complete_rl.env import (
     NAMED_NTP_POLICIES,
     block_first_ntp_policy,
@@ -17,6 +17,7 @@ from complete_rl.env import (
     counter_first_ntp_policy,
     none_ntp_policy,
     resolve_canonical_action,
+    separated_ntp_policy,
 )
 from complete_solver.constants import BLOCK, COUNTER, NONE, PASS
 from complete_solver.state import PlayerState, State
@@ -263,8 +264,51 @@ class NamedNTPPolicyTests(unittest.TestCase):
         self.assertEqual(counter_first_ntp_policy(state, config).reaction, COUNTER)
         self.assertEqual(block_first_ntp_policy(state, config).reaction, BLOCK)
 
+    def test_step_info_contains_resolved_actions(self) -> None:
+        env = CompleteEnv(opponent_policy="none_lowest")
+        env.reset(seed=7)
+        action = int(np.where(env.action_masks())[0][0])
+        _, _, _, _, info = env.step(action)
+        self.assertEqual(info["ntp_reaction"], NONE)
+        self.assertEqual(info["ntp_thumb"], 0)
+        self.assertIn("tp_action", info)
+
+    def test_separated_ntp_policy_reaction_and_thumb(self) -> None:
+        state = State()
+        config = RulesConfig()
+        none_lowest = separated_ntp_policy(state, config, 0.0, "lowest")
+        counter_lowest = separated_ntp_policy(state, config, 1.0, "lowest")
+        self.assertEqual((none_lowest.reaction, none_lowest.thumb), (NONE, 0))
+        self.assertEqual((counter_lowest.reaction, counter_lowest.thumb), (COUNTER, 0))
+
+    def test_separated_ntp_policies_are_accepted(self) -> None:
+        for name in SEPARATED_NTP_POLICIES:
+            with self.subTest(name=name):
+                env = CompleteEnv(opponent_policy=name)
+                obs, _ = env.reset(seed=5)
+                self.assertEqual(obs.shape, (OBS_SIZE,))
+
+    def test_separated_uniform_policy_is_seed_deterministic(self) -> None:
+        env = CompleteEnv(opponent_policy="counter50_uniform")
+        obs0, _ = env.reset(seed=123)
+        action = int(np.where(env.action_masks())[0][0])
+        obs1, r1, t1, tr1, _ = env.step(action)
+
+        obs0b, _ = env.reset(seed=123)
+        obs2, r2, t2, tr2, _ = env.step(action)
+
+        np.testing.assert_array_equal(obs0, obs0b)
+        np.testing.assert_array_equal(obs1, obs2)
+        self.assertEqual(r1, r2)
+        self.assertEqual(t1, t2)
+        self.assertEqual(tr1, tr2)
+
     def test_episode_mixed_policies_are_accepted(self) -> None:
-        for name in ("episode_mixed_basic", "episode_weighted_none_counter"):
+        for name in (
+            "episode_mixed_basic",
+            "episode_separated_basic",
+            "episode_weighted_none_counter",
+        ):
             with self.subTest(name=name):
                 env = CompleteEnv(opponent_policy=name)
                 obs, _ = env.reset(seed=5)
@@ -292,6 +336,20 @@ class NamedNTPPolicyTests(unittest.TestCase):
             env.reset(seed=seed * 1000)
             seen_ids.add(id(env._ntp_policy))
         self.assertGreater(len(seen_ids), 1, "NTP policy fn should vary across episodes")
+
+    def test_episode_separated_policy_uses_seeded_separated_policies(self) -> None:
+        env = CompleteEnv(opponent_policy="episode_separated_basic")
+        seen_separated: set[str] = set()
+        for seed in range(50):
+            env.reset(seed=seed)
+            if env._separated_ntp_policy_name is not None:
+                seen_separated.add(env._separated_ntp_policy_name)
+                self.assertEqual(env._ntp_policy, env._seeded_separated_ntp_policy)
+
+        self.assertEqual(
+            seen_separated,
+            {"none_uniform", "counter50_uniform", "counter_uniform"},
+        )
 
     def test_nash_optimal_policy_returns_legal_action(self) -> None:
         from complete_rl.nash_ntp import compute_nash_ntp_strategies

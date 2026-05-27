@@ -21,6 +21,7 @@ import numpy as np
 from complete_solver import RulesConfig
 from complete_solver.actions import legal_ntp_actions, legal_tp_actions
 from complete_solver.constants import ALL
+from complete_solver.finite_horizon import FiniteHorizonSolver, material_leaf_evaluator
 from complete_solver.matrix_game import solve_zero_sum_matrix
 from complete_solver.state_space import enumerate_reachable_states, value_iteration
 from complete_solver.transition import transition
@@ -33,6 +34,39 @@ if TYPE_CHECKING:
 
 # Type alias: each entry is (obs_float32 shape=(OBS_SIZE,), probs_float32 shape=(n_actions,))
 BCDataset = list[tuple[np.ndarray, np.ndarray]]
+BC_LEAF_MODES: tuple[str, ...] = ("zero", "material")
+
+
+def _map_tp_probs(
+    tp_acts,
+    tp_probs,
+    canonical,
+    canonical_exact: dict,
+    all_thumb_idx: dict,
+    state,
+    config,
+) -> np.ndarray:
+    """Map solver TP probabilities onto the canonical action index space."""
+    probs = np.zeros(len(canonical), dtype=np.float32)
+    for act, prob in zip(tp_acts, tp_probs):
+        if act.skill == ALL:
+            k = all_thumb_idx.get(act.thumb)
+            if k is not None:
+                probs[k] += float(prob)
+        else:
+            k = canonical_exact.get(act)
+            if k is not None:
+                probs[k] += float(prob)
+
+    total = float(probs.sum())
+    if total <= 1e-10:
+        mask = build_action_mask(canonical, state, config)
+        n_legal = int(mask.sum())
+        if n_legal > 0:
+            probs[mask] = 1.0 / n_legal
+    else:
+        probs /= total
+    return probs
 
 
 def generate_bc_dataset(
@@ -41,6 +75,8 @@ def generate_bc_dataset(
     gamma: float = 0.999,
     vi_epsilon: float = 1e-4,
     vi_max_iter: int = 500,
+    leaf_mode: str = "zero",
+    bc_depth: int | None = None,
 ) -> BCDataset:
     """Generate behavioral cloning pairs from the exact solver.
 
@@ -62,17 +98,22 @@ def generate_bc_dataset(
         Convergence threshold for value iteration.
     vi_max_iter:
         Maximum number of value-iteration sweeps.
+    leaf_mode:
+        How to score states outside the enumerated VI set. ``"zero"`` keeps
+        the legacy behavior; ``"material"`` uses the bounded material
+        heuristic to avoid treating all frontier states as neutral.
+        Ignored when *bc_depth* is set.
+    bc_depth:
+        If set, use ``FiniteHorizonSolver(depth=bc_depth)`` to generate
+        teacher policies instead of value iteration.  ``material_leaf_evaluator``
+        is always used as the leaf function for finite-horizon mode.
+        depth=4 is recommended (naturally captures copy/counter risk).
     """
-    states = enumerate_reachable_states(config=config, max_states=max_states)
-    vi = value_iteration(
-        states,
-        config=config,
-        gamma=gamma,
-        epsilon=vi_epsilon,
-        max_iterations=vi_max_iter,
-    )
-    V = vi.values
+    if leaf_mode not in BC_LEAF_MODES:
+        valid = ", ".join(BC_LEAF_MODES)
+        raise ValueError(f"leaf_mode must be one of {valid}; got {leaf_mode!r}")
 
+    states = enumerate_reachable_states(config=config, max_states=max_states)
     canonical = build_canonical_tp_actions(config)
 
     # Pre-compute lookup maps for O(1) canonical matching.
@@ -86,6 +127,36 @@ def generate_bc_dataset(
             canonical_exact[canon] = k
 
     dataset: BCDataset = []
+
+    if bc_depth is not None:
+        # Finite-horizon mode: solve each state independently with FiniteHorizonSolver.
+        solver = FiniteHorizonSolver(
+            config=config,
+            gamma=gamma,
+            leaf_evaluator=material_leaf_evaluator,
+        )
+        for state in states:
+            policy = solver.solve_state(state, bc_depth)
+            if not policy.tp_actions:
+                continue
+            tp_acts = policy.tp_actions
+            tp_probs_list = list(policy.tp_policy)
+            probs = _map_tp_probs(tp_acts, tp_probs_list, canonical, canonical_exact, all_thumb_idx, state, config)
+            obs = encode_state(state)
+            dataset.append((obs, probs))
+        return dataset
+
+    # VI mode (default).
+    leaf_evaluator = material_leaf_evaluator if leaf_mode == "material" else None
+    vi = value_iteration(
+        states,
+        config=config,
+        gamma=gamma,
+        epsilon=vi_epsilon,
+        max_iterations=vi_max_iter,
+        leaf_evaluator=leaf_evaluator,
+    )
+    V = vi.values
 
     for state in states:
         tp_acts = legal_tp_actions(state, config)
@@ -102,35 +173,19 @@ def generate_bc_dataset(
                     matrix[i, j] = float(res.terminal_reward)
                 else:
                     assert res.next_state is not None
-                    v_next = V.get(res.next_state, 0.0)
+                    if res.next_state in V:
+                        v_next = V[res.next_state]
+                    elif leaf_evaluator is not None:
+                        v_next = float(leaf_evaluator(res.next_state))
+                    else:
+                        v_next = 0.0
                     sign = 1.0 if res.same_turn_player else -1.0
                     matrix[i, j] = gamma * sign * v_next
 
         solution = solve_zero_sum_matrix(matrix)
-        tp_probs = solution.row_policy  # shape (len(tp_acts),)
+        tp_probs = list(solution.row_policy)
 
-        # Map solver probs onto the canonical action space.
-        probs = np.zeros(len(canonical), dtype=np.float32)
-        for act, prob in zip(tp_acts, tp_probs):
-            if act.skill == ALL:
-                k = all_thumb_idx.get(act.thumb)
-                if k is not None:
-                    probs[k] += float(prob)
-            else:
-                k = canonical_exact.get(act)
-                if k is not None:
-                    probs[k] += float(prob)
-
-        total = float(probs.sum())
-        if total <= 1e-10:
-            # Fallback: uniform over legal actions.
-            mask = build_action_mask(canonical, state, config)
-            n_legal = int(mask.sum())
-            if n_legal > 0:
-                probs[mask] = 1.0 / n_legal
-        else:
-            probs /= total
-
+        probs = _map_tp_probs(tp_acts, tp_probs, canonical, canonical_exact, all_thumb_idx, state, config)
         obs = encode_state(state)
         dataset.append((obs, probs))
 

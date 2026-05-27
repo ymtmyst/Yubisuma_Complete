@@ -1,0 +1,687 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <title>分離NTP 方策レポート</title>
+  <style>
+    body { margin: 0; background: #f7f7f4; color: #202124; font-family: "Segoe UI", "Yu Gothic", "Meiryo", sans-serif; line-height: 1.7; }
+    main { max-width: 1240px; margin: 0 auto; padding: 28px 20px 56px; }
+    h1 { margin: 0 0 6px; font-size: 28px; letter-spacing: 0; }
+    h2 { margin: 0 0 12px; font-size: 20px; letter-spacing: 0; }
+    h3 { margin: 12px 0 8px; font-size: 15px; letter-spacing: 0; }
+    .lead { color: #5f6368; margin-bottom: 18px; }
+    .section { background: #fff; border: 1px solid #d8d7d0; border-radius: 8px; padding: 18px; margin: 16px 0; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); gap: 14px; }
+    .summary { display: flex; flex-wrap: wrap; gap: 10px; margin: 0 0 12px; }
+    .summary span { background: #eef1ef; border: 1px solid #dde3df; border-radius: 999px; padding: 3px 10px; font-size: 13px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { border: 1px solid #d8d7d0; padding: 6px 8px; vertical-align: top; }
+    th { background: #eef1ef; text-align: left; }
+    .note { border-left: 4px solid #0b6b6f; background: #edf7f7; padding: 10px 12px; margin: 12px 0; }
+    .warn { border-left: 4px solid #8a5300; background: #fff6e5; padding: 10px 12px; margin: 12px 0 0; }
+    .ok { color: #246b32; margin: 4px 0; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>分離NTP 方策レポート</h1>
+  <p class="lead">モデル: results\maskable_ppo_bc_standard_episode_mixed\maskable_ppo_complete.zip / 各条件 50 episodes / deterministic と stochastic を比較</p>
+  <section class="section">
+    <h2>確認意図</h2>
+    <p>
+      0%/50%/100%カウンターと、最小指/一様指を分離した条件で、学習済みモデルの実際の行動分布を確認します。
+      勝率だけでなく、初手、主要スキル、追加ターン後の次手、NTP反応・指分布、警告を並べています。
+    </p>
+    <div class="note">
+      ここでの警告は採用判断の補助です。特に数字宣言過多、追加ターン/維持系の過多、カウンター条件での対カウンター不足を確認します。
+    </div>
+  </section>
+  
+                <section class="section">
+                  <h2>deterministic / none_lowest</h2>
+                  <div class="summary">
+                    <span>勝敗: 50勝 0敗 0打切</span>
+                    <span>平均手数: 4.0</span>
+                    <span>総TP行動: 200</span>
+                  </div>
+                  <div class="grid">
+                    <div>
+                      <h3>行動カテゴリ</h3>
+                      <table><thead><tr><th>分類</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>数字宣言</td><td>200</td><td>100.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>初手上位</h3>
+                      <table><thead><tr><th>行動</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>数字宣言 total=4, thumb=1</td><td>50</td><td>100.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>主要スキル</h3>
+                      <table><thead><tr><th>スキル</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td colspan="3">なし</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>追加ターン後の次手</h3>
+                      <table><thead><tr><th>行動</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td colspan="3">なし</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>NTP反応分布</h3>
+                      <table><thead><tr><th>反応</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>なし</td><td>200</td><td>100.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>NTP指分布</h3>
+                      <table><thead><tr><th>指</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>0</td><td>200</td><td>100.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                  </div>
+                  <div class="warn"><strong>警告:</strong><ul><li>数字宣言が過多: 100.0%</li></ul></div>
+                </section>
+                
+                <section class="section">
+                  <h2>deterministic / none_uniform</h2>
+                  <div class="summary">
+                    <span>勝敗: 50勝 0敗 0打切</span>
+                    <span>平均手数: 7.8</span>
+                    <span>総TP行動: 389</span>
+                  </div>
+                  <div class="grid">
+                    <div>
+                      <h3>行動カテゴリ</h3>
+                      <table><thead><tr><th>分類</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>数字宣言</td><td>389</td><td>100.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>初手上位</h3>
+                      <table><thead><tr><th>行動</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>数字宣言 total=4, thumb=1</td><td>50</td><td>100.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>主要スキル</h3>
+                      <table><thead><tr><th>スキル</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td colspan="3">なし</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>追加ターン後の次手</h3>
+                      <table><thead><tr><th>行動</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td colspan="3">なし</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>NTP反応分布</h3>
+                      <table><thead><tr><th>反応</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>なし</td><td>389</td><td>100.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>NTP指分布</h3>
+                      <table><thead><tr><th>指</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>0</td><td>164</td><td>42.2%</td></tr>
+<tr><td>1</td><td>143</td><td>36.8%</td></tr>
+<tr><td>2</td><td>82</td><td>21.1%</td></tr>
+                      </tbody></table>
+                    </div>
+                  </div>
+                  <div class="warn"><strong>警告:</strong><ul><li>数字宣言が過多: 100.0%</li></ul></div>
+                </section>
+                
+                <section class="section">
+                  <h2>deterministic / counter50_lowest</h2>
+                  <div class="summary">
+                    <span>勝敗: 36勝 14敗 0打切</span>
+                    <span>平均手数: 3.9</span>
+                    <span>総TP行動: 197</span>
+                  </div>
+                  <div class="grid">
+                    <div>
+                      <h3>行動カテゴリ</h3>
+                      <table><thead><tr><th>分類</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>数字宣言</td><td>197</td><td>100.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>初手上位</h3>
+                      <table><thead><tr><th>行動</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>数字宣言 total=4, thumb=1</td><td>50</td><td>100.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>主要スキル</h3>
+                      <table><thead><tr><th>スキル</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td colspan="3">なし</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>追加ターン後の次手</h3>
+                      <table><thead><tr><th>行動</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td colspan="3">なし</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>NTP反応分布</h3>
+                      <table><thead><tr><th>反応</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>なし</td><td>100</td><td>50.8%</td></tr>
+<tr><td>カウンター</td><td>97</td><td>49.2%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>NTP指分布</h3>
+                      <table><thead><tr><th>指</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>0</td><td>197</td><td>100.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                  </div>
+                  <div class="warn"><strong>警告:</strong><ul><li>数字宣言が過多: 100.0%</li><li>カウンター条件に対して対カウンター使用率が低い: 0.0%</li></ul></div>
+                </section>
+                
+                <section class="section">
+                  <h2>deterministic / counter50_uniform</h2>
+                  <div class="summary">
+                    <span>勝敗: 47勝 3敗 0打切</span>
+                    <span>平均手数: 4.7</span>
+                    <span>総TP行動: 237</span>
+                  </div>
+                  <div class="grid">
+                    <div>
+                      <h3>行動カテゴリ</h3>
+                      <table><thead><tr><th>分類</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>数字宣言</td><td>237</td><td>100.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>初手上位</h3>
+                      <table><thead><tr><th>行動</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>数字宣言 total=4, thumb=1</td><td>50</td><td>100.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>主要スキル</h3>
+                      <table><thead><tr><th>スキル</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td colspan="3">なし</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>追加ターン後の次手</h3>
+                      <table><thead><tr><th>行動</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td colspan="3">なし</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>NTP反応分布</h3>
+                      <table><thead><tr><th>反応</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>カウンター</td><td>119</td><td>50.2%</td></tr>
+<tr><td>なし</td><td>118</td><td>49.8%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>NTP指分布</h3>
+                      <table><thead><tr><th>指</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>0</td><td>102</td><td>43.0%</td></tr>
+<tr><td>1</td><td>94</td><td>39.7%</td></tr>
+<tr><td>2</td><td>41</td><td>17.3%</td></tr>
+                      </tbody></table>
+                    </div>
+                  </div>
+                  <div class="warn"><strong>警告:</strong><ul><li>数字宣言が過多: 100.0%</li><li>カウンター条件に対して対カウンター使用率が低い: 0.0%</li></ul></div>
+                </section>
+                
+                <section class="section">
+                  <h2>deterministic / counter_lowest</h2>
+                  <div class="summary">
+                    <span>勝敗: 50勝 0敗 0打切</span>
+                    <span>平均手数: 3.0</span>
+                    <span>総TP行動: 150</span>
+                  </div>
+                  <div class="grid">
+                    <div>
+                      <h3>行動カテゴリ</h3>
+                      <table><thead><tr><th>分類</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>数字宣言</td><td>150</td><td>100.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>初手上位</h3>
+                      <table><thead><tr><th>行動</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>数字宣言 total=4, thumb=1</td><td>50</td><td>100.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>主要スキル</h3>
+                      <table><thead><tr><th>スキル</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td colspan="3">なし</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>追加ターン後の次手</h3>
+                      <table><thead><tr><th>行動</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td colspan="3">なし</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>NTP反応分布</h3>
+                      <table><thead><tr><th>反応</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>カウンター</td><td>150</td><td>100.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>NTP指分布</h3>
+                      <table><thead><tr><th>指</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>0</td><td>150</td><td>100.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                  </div>
+                  <div class="warn"><strong>警告:</strong><ul><li>数字宣言が過多: 100.0%</li><li>カウンター条件に対して対カウンター使用率が低い: 0.0%</li></ul></div>
+                </section>
+                
+                <section class="section">
+                  <h2>deterministic / counter_uniform</h2>
+                  <div class="summary">
+                    <span>勝敗: 50勝 0敗 0打切</span>
+                    <span>平均手数: 3.0</span>
+                    <span>総TP行動: 150</span>
+                  </div>
+                  <div class="grid">
+                    <div>
+                      <h3>行動カテゴリ</h3>
+                      <table><thead><tr><th>分類</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>数字宣言</td><td>150</td><td>100.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>初手上位</h3>
+                      <table><thead><tr><th>行動</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>数字宣言 total=4, thumb=1</td><td>50</td><td>100.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>主要スキル</h3>
+                      <table><thead><tr><th>スキル</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td colspan="3">なし</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>追加ターン後の次手</h3>
+                      <table><thead><tr><th>行動</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td colspan="3">なし</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>NTP反応分布</h3>
+                      <table><thead><tr><th>反応</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>カウンター</td><td>150</td><td>100.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>NTP指分布</h3>
+                      <table><thead><tr><th>指</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>0</td><td>82</td><td>54.7%</td></tr>
+<tr><td>1</td><td>51</td><td>34.0%</td></tr>
+<tr><td>2</td><td>17</td><td>11.3%</td></tr>
+                      </tbody></table>
+                    </div>
+                  </div>
+                  <div class="warn"><strong>警告:</strong><ul><li>数字宣言が過多: 100.0%</li><li>カウンター条件に対して対カウンター使用率が低い: 0.0%</li></ul></div>
+                </section>
+                
+                <section class="section">
+                  <h2>stochastic / none_lowest</h2>
+                  <div class="summary">
+                    <span>勝敗: 50勝 0敗 0打切</span>
+                    <span>平均手数: 4.0</span>
+                    <span>総TP行動: 202</span>
+                  </div>
+                  <div class="grid">
+                    <div>
+                      <h3>行動カテゴリ</h3>
+                      <table><thead><tr><th>分類</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>数字宣言</td><td>192</td><td>95.0%</td></tr>
+<tr><td>アルティメット</td><td>8</td><td>4.0%</td></tr>
+<tr><td>対カウンター</td><td>1</td><td>0.5%</td></tr>
+<tr><td>通常スキル</td><td>1</td><td>0.5%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>初手上位</h3>
+                      <table><thead><tr><th>行動</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>数字宣言 total=4, thumb=1</td><td>28</td><td>56.0%</td></tr>
+<tr><td>数字宣言 total=4, thumb=0</td><td>8</td><td>16.0%</td></tr>
+<tr><td>タイム, thumb=1</td><td>6</td><td>12.0%</td></tr>
+<tr><td>数字宣言 total=0, thumb=2</td><td>3</td><td>6.0%</td></tr>
+<tr><td>タイム, thumb=0</td><td>2</td><td>4.0%</td></tr>
+<tr><td>数字宣言 total=1, thumb=2</td><td>1</td><td>2.0%</td></tr>
+<tr><td>数字宣言 total=4, thumb=2</td><td>1</td><td>2.0%</td></tr>
+<tr><td>セメント, thumb=0</td><td>1</td><td>2.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>主要スキル</h3>
+                      <table><thead><tr><th>スキル</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>タイム</td><td>8</td><td>4.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>追加ターン後の次手</h3>
+                      <table><thead><tr><th>行動</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>数字宣言 total=1, thumb=1</td><td>7</td><td>87.5%</td></tr>
+<tr><td>数字宣言 total=4, thumb=1</td><td>1</td><td>12.5%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>NTP反応分布</h3>
+                      <table><thead><tr><th>反応</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>なし</td><td>202</td><td>100.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>NTP指分布</h3>
+                      <table><thead><tr><th>指</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>0</td><td>202</td><td>100.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                  </div>
+                  <div class="warn"><strong>警告:</strong><ul><li>数字宣言が過多: 95.0%</li></ul></div>
+                </section>
+                
+                <section class="section">
+                  <h2>stochastic / none_uniform</h2>
+                  <div class="summary">
+                    <span>勝敗: 50勝 0敗 0打切</span>
+                    <span>平均手数: 8.0</span>
+                    <span>総TP行動: 402</span>
+                  </div>
+                  <div class="grid">
+                    <div>
+                      <h3>行動カテゴリ</h3>
+                      <table><thead><tr><th>分類</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>数字宣言</td><td>391</td><td>97.3%</td></tr>
+<tr><td>アルティメット</td><td>9</td><td>2.2%</td></tr>
+<tr><td>対カウンター</td><td>2</td><td>0.5%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>初手上位</h3>
+                      <table><thead><tr><th>行動</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>数字宣言 total=4, thumb=1</td><td>24</td><td>48.0%</td></tr>
+<tr><td>数字宣言 total=4, thumb=0</td><td>13</td><td>26.0%</td></tr>
+<tr><td>タイム, thumb=1</td><td>6</td><td>12.0%</td></tr>
+<tr><td>タイム, thumb=0</td><td>2</td><td>4.0%</td></tr>
+<tr><td>数字宣言 total=0, thumb=2</td><td>2</td><td>4.0%</td></tr>
+<tr><td>数字宣言 total=0, thumb=1</td><td>1</td><td>2.0%</td></tr>
+<tr><td>数字宣言 total=1, thumb=2</td><td>1</td><td>2.0%</td></tr>
+<tr><td>タイム, thumb=2</td><td>1</td><td>2.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>主要スキル</h3>
+                      <table><thead><tr><th>スキル</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>タイム</td><td>9</td><td>2.2%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>追加ターン後の次手</h3>
+                      <table><thead><tr><th>行動</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>数字宣言 total=1, thumb=1</td><td>9</td><td>100.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>NTP反応分布</h3>
+                      <table><thead><tr><th>反応</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>なし</td><td>402</td><td>100.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>NTP指分布</h3>
+                      <table><thead><tr><th>指</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>0</td><td>173</td><td>43.0%</td></tr>
+<tr><td>1</td><td>147</td><td>36.6%</td></tr>
+<tr><td>2</td><td>82</td><td>20.4%</td></tr>
+                      </tbody></table>
+                    </div>
+                  </div>
+                  <div class="warn"><strong>警告:</strong><ul><li>数字宣言が過多: 97.3%</li></ul></div>
+                </section>
+                
+                <section class="section">
+                  <h2>stochastic / counter50_lowest</h2>
+                  <div class="summary">
+                    <span>勝敗: 37勝 13敗 0打切</span>
+                    <span>平均手数: 4.2</span>
+                    <span>総TP行動: 208</span>
+                  </div>
+                  <div class="grid">
+                    <div>
+                      <h3>行動カテゴリ</h3>
+                      <table><thead><tr><th>分類</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>数字宣言</td><td>194</td><td>93.3%</td></tr>
+<tr><td>アルティメット</td><td>12</td><td>5.8%</td></tr>
+<tr><td>対カウンター</td><td>2</td><td>1.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>初手上位</h3>
+                      <table><thead><tr><th>行動</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>数字宣言 total=4, thumb=1</td><td>23</td><td>46.0%</td></tr>
+<tr><td>数字宣言 total=4, thumb=0</td><td>14</td><td>28.0%</td></tr>
+<tr><td>タイム, thumb=1</td><td>9</td><td>18.0%</td></tr>
+<tr><td>タイム, thumb=0</td><td>2</td><td>4.0%</td></tr>
+<tr><td>数字宣言 total=0, thumb=2</td><td>1</td><td>2.0%</td></tr>
+<tr><td>数字宣言 total=2, thumb=0</td><td>1</td><td>2.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>主要スキル</h3>
+                      <table><thead><tr><th>スキル</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>タイム</td><td>12</td><td>5.8%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>追加ターン後の次手</h3>
+                      <table><thead><tr><th>行動</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>数字宣言 total=1, thumb=1</td><td>6</td><td>100.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>NTP反応分布</h3>
+                      <table><thead><tr><th>反応</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>なし</td><td>105</td><td>50.5%</td></tr>
+<tr><td>カウンター</td><td>103</td><td>49.5%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>NTP指分布</h3>
+                      <table><thead><tr><th>指</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>0</td><td>208</td><td>100.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                  </div>
+                  <div class="warn"><strong>警告:</strong><ul><li>数字宣言が過多: 93.3%</li><li>カウンター条件に対して対カウンター使用率が低い: 1.0%</li></ul></div>
+                </section>
+                
+                <section class="section">
+                  <h2>stochastic / counter50_uniform</h2>
+                  <div class="summary">
+                    <span>勝敗: 47勝 3敗 0打切</span>
+                    <span>平均手数: 5.1</span>
+                    <span>総TP行動: 254</span>
+                  </div>
+                  <div class="grid">
+                    <div>
+                      <h3>行動カテゴリ</h3>
+                      <table><thead><tr><th>分類</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>数字宣言</td><td>246</td><td>96.9%</td></tr>
+<tr><td>アルティメット</td><td>8</td><td>3.1%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>初手上位</h3>
+                      <table><thead><tr><th>行動</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>数字宣言 total=4, thumb=1</td><td>34</td><td>68.0%</td></tr>
+<tr><td>タイム, thumb=1</td><td>6</td><td>12.0%</td></tr>
+<tr><td>数字宣言 total=4, thumb=0</td><td>3</td><td>6.0%</td></tr>
+<tr><td>数字宣言 total=4, thumb=2</td><td>2</td><td>4.0%</td></tr>
+<tr><td>数字宣言 total=1, thumb=2</td><td>1</td><td>2.0%</td></tr>
+<tr><td>数字宣言 total=1, thumb=0</td><td>1</td><td>2.0%</td></tr>
+<tr><td>タイム, thumb=0</td><td>1</td><td>2.0%</td></tr>
+<tr><td>数字宣言 total=2, thumb=0</td><td>1</td><td>2.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>主要スキル</h3>
+                      <table><thead><tr><th>スキル</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>タイム</td><td>8</td><td>3.1%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>追加ターン後の次手</h3>
+                      <table><thead><tr><th>行動</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>数字宣言 total=1, thumb=1</td><td>4</td><td>100.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>NTP反応分布</h3>
+                      <table><thead><tr><th>反応</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>なし</td><td>131</td><td>51.6%</td></tr>
+<tr><td>カウンター</td><td>123</td><td>48.4%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>NTP指分布</h3>
+                      <table><thead><tr><th>指</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>0</td><td>111</td><td>43.7%</td></tr>
+<tr><td>1</td><td>98</td><td>38.6%</td></tr>
+<tr><td>2</td><td>45</td><td>17.7%</td></tr>
+                      </tbody></table>
+                    </div>
+                  </div>
+                  <div class="warn"><strong>警告:</strong><ul><li>数字宣言が過多: 96.9%</li><li>カウンター条件に対して対カウンター使用率が低い: 0.0%</li></ul></div>
+                </section>
+                
+                <section class="section">
+                  <h2>stochastic / counter_lowest</h2>
+                  <div class="summary">
+                    <span>勝敗: 50勝 0敗 0打切</span>
+                    <span>平均手数: 3.3</span>
+                    <span>総TP行動: 164</span>
+                  </div>
+                  <div class="grid">
+                    <div>
+                      <h3>行動カテゴリ</h3>
+                      <table><thead><tr><th>分類</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>数字宣言</td><td>150</td><td>91.5%</td></tr>
+<tr><td>アルティメット</td><td>13</td><td>7.9%</td></tr>
+<tr><td>通常スキル</td><td>1</td><td>0.6%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>初手上位</h3>
+                      <table><thead><tr><th>行動</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>数字宣言 total=4, thumb=1</td><td>18</td><td>36.0%</td></tr>
+<tr><td>タイム, thumb=1</td><td>10</td><td>20.0%</td></tr>
+<tr><td>数字宣言 total=4, thumb=0</td><td>8</td><td>16.0%</td></tr>
+<tr><td>数字宣言 total=0, thumb=2</td><td>5</td><td>10.0%</td></tr>
+<tr><td>数字宣言 total=1, thumb=2</td><td>3</td><td>6.0%</td></tr>
+<tr><td>タイム, thumb=0</td><td>3</td><td>6.0%</td></tr>
+<tr><td>数字宣言 total=2, thumb=0</td><td>1</td><td>2.0%</td></tr>
+<tr><td>数字宣言 total=4, thumb=2</td><td>1</td><td>2.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>主要スキル</h3>
+                      <table><thead><tr><th>スキル</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>タイム</td><td>13</td><td>7.9%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>追加ターン後の次手</h3>
+                      <table><thead><tr><th>行動</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td colspan="3">なし</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>NTP反応分布</h3>
+                      <table><thead><tr><th>反応</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>カウンター</td><td>164</td><td>100.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>NTP指分布</h3>
+                      <table><thead><tr><th>指</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>0</td><td>164</td><td>100.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                  </div>
+                  <div class="warn"><strong>警告:</strong><ul><li>数字宣言が過多: 91.5%</li><li>カウンター条件に対して対カウンター使用率が低い: 0.0%</li></ul></div>
+                </section>
+                
+                <section class="section">
+                  <h2>stochastic / counter_uniform</h2>
+                  <div class="summary">
+                    <span>勝敗: 50勝 0敗 0打切</span>
+                    <span>平均手数: 3.3</span>
+                    <span>総TP行動: 165</span>
+                  </div>
+                  <div class="grid">
+                    <div>
+                      <h3>行動カテゴリ</h3>
+                      <table><thead><tr><th>分類</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>数字宣言</td><td>150</td><td>90.9%</td></tr>
+<tr><td>アルティメット</td><td>14</td><td>8.5%</td></tr>
+<tr><td>通常スキル</td><td>1</td><td>0.6%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>初手上位</h3>
+                      <table><thead><tr><th>行動</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>数字宣言 total=4, thumb=1</td><td>21</td><td>42.0%</td></tr>
+<tr><td>タイム, thumb=1</td><td>7</td><td>14.0%</td></tr>
+<tr><td>数字宣言 total=4, thumb=0</td><td>6</td><td>12.0%</td></tr>
+<tr><td>タイム, thumb=0</td><td>5</td><td>10.0%</td></tr>
+<tr><td>数字宣言 total=0, thumb=2</td><td>4</td><td>8.0%</td></tr>
+<tr><td>タイム, thumb=2</td><td>2</td><td>4.0%</td></tr>
+<tr><td>数字宣言 total=1, thumb=0</td><td>2</td><td>4.0%</td></tr>
+<tr><td>セメント, thumb=0</td><td>1</td><td>2.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>主要スキル</h3>
+                      <table><thead><tr><th>スキル</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>タイム</td><td>14</td><td>8.5%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>追加ターン後の次手</h3>
+                      <table><thead><tr><th>行動</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td colspan="3">なし</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>NTP反応分布</h3>
+                      <table><thead><tr><th>反応</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>カウンター</td><td>165</td><td>100.0%</td></tr>
+                      </tbody></table>
+                    </div>
+                    <div>
+                      <h3>NTP指分布</h3>
+                      <table><thead><tr><th>指</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>0</td><td>87</td><td>52.7%</td></tr>
+<tr><td>1</td><td>57</td><td>34.5%</td></tr>
+<tr><td>2</td><td>21</td><td>12.7%</td></tr>
+                      </tbody></table>
+                    </div>
+                  </div>
+                  <div class="warn"><strong>警告:</strong><ul><li>数字宣言が過多: 90.9%</li><li>カウンター条件に対して対カウンター使用率が低い: 0.0%</li></ul></div>
+                </section>
+                
+</main>
+</body>
+</html>

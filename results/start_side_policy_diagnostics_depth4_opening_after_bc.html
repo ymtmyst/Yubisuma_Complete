@@ -1,0 +1,997 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <title>開始側手順診断</title>
+  <style>
+    body { margin: 0; background: #f6f6f2; color: #202124; font-family: "Segoe UI", "Yu Gothic", "Meiryo", sans-serif; line-height: 1.65; }
+    main { max-width: 1320px; margin: 0 auto; padding: 28px 20px 56px; }
+    h1 { font-size: 28px; letter-spacing: 0; margin: 0 0 6px; }
+    h2 { font-size: 19px; letter-spacing: 0; margin: 0 0 10px; }
+    h3 { font-size: 15px; letter-spacing: 0; margin: 12px 0 7px; }
+    .lead, .internal-name { color: #5f6368; }
+    .panel, details.condition { background: #fff; border: 1px solid #d7d6cf; border-radius: 8px; margin: 15px 0; padding: 18px; }
+    details.condition > summary { align-items: baseline; cursor: pointer; display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; }
+    details.condition > summary strong { font-size: 19px; }
+    details.condition > summary span { color: #5f6368; font-size: 13px; }
+    details.condition[open] > summary { border-bottom: 1px solid #d7d6cf; margin-bottom: 12px; padding-bottom: 12px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 14px; }
+    .grid section { min-width: 0; }
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 12px; }
+    .chips span { background: #eef1ef; border: 1px solid #dce3dd; border-radius: 999px; font-size: 13px; padding: 3px 10px; }
+    .note, .expect { background: #edf6f5; border-left: 4px solid #0a6b6f; margin: 10px 0; padding: 10px 12px; }
+    .expect p { margin: 4px 0 0; }
+    .warn { background: #fff5e2; border-left: 4px solid #8a5300; margin-top: 12px; padding: 10px 12px; }
+    .ok { color: #246b32; margin: 4px 0; }
+    table { border-collapse: collapse; font-size: 13px; width: 100%; }
+    th, td { border: 1px solid #d7d6cf; padding: 6px 8px; text-align: left; vertical-align: top; }
+    th { background: #eef1ef; }
+    .trace { display: block; overflow-x: auto; white-space: nowrap; }
+    .trace td { min-width: 82px; white-space: normal; }
+    .trace td:nth-child(3), .trace td:nth-child(7) { min-width: 180px; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>開始側手順診断</h1>
+  <p class="lead">モデル: results\maskable_ppo_bc_depth4_opening_checkpoint_smoke\maskable_ppo_after_bc.zip / 各条件 20 episodes</p>
+  <section class="panel">
+    <h2>見るもの</h2>
+    <p>
+      開始側の最初の連続手番を切り出し、初手、追加ターン中の追撃、Copy の参照先、
+      最初に手番を渡す時点の手数を並べます。勝率だけでなく、固定相手に対する
+      開幕 exploit がどの方向へ進んでいるかを読むための診断です。
+    </p>
+    <div class="note">
+      「開始側最初の連続手番」は初期局面から最初の手番交代または終局までです。
+      0%カウンターではフェイント空振りを、100%カウンターでは対カウンター開幕と
+      その後の参照手順を重点的に見ます。
+    </div>
+    <h3>評価モード</h3>
+    <table><thead><tr><th>内部表記</th><th>日本語</th><th>意味</th></tr></thead><tbody><tr><td>deterministic</td><td>決定論評価</td><td>方策が最も高い確率を付けた合法手を毎手選ぶ。固定開幕や局所解の確認向け。</td></tr><tr><td>stochastic</td><td>確率サンプル評価</td><td>方策分布から合法手をサンプルする。学習済み分布に残った選択幅の確認向け。</td></tr></tbody></table>
+    <h3>NTP条件</h3>
+    <table><thead><tr><th>内部表記</th><th>日本語</th><th>意味</th></tr></thead><tbody><tr><td>none_lowest</td><td>カウンター0%・指最小</td><td>相手NTP反応は常に「なし」。合法な指のうち最小の指を選ぶ。</td></tr><tr><td>none_uniform</td><td>カウンター0%・指一様</td><td>相手NTP反応は常に「なし」。合法な指を一様ランダムに選ぶ。</td></tr><tr><td>counter_lowest</td><td>カウンター100%・指最小</td><td>相手NTP反応は常に「カウンター」。合法な指のうち最小の指を選ぶ。</td></tr><tr><td>counter_uniform</td><td>カウンター100%・指一様</td><td>相手NTP反応は常に「カウンター」。合法な指を一様ランダムに選ぶ。</td></tr></tbody></table>
+  </section>
+  
+                <details class="condition">
+                  <summary>
+                    <strong>決定論評価 / カウンター0%・指最小</strong>
+                    <span>打切 20</span>
+                  </summary>
+                  <p class="internal-name">内部表記: deterministic / none_lowest</p>
+                  <div class="expect">
+                    <strong>0%カウンターへの開始側手順</strong>
+                    <p>相手はカウンターしない。開始側初手がフェイント/ロックに寄るなら、固定相手を exploit する前に対カウンター開幕を空振りしている。</p>
+                  </div>
+                  <div class="chips">
+                    <span>平均総手数 60.0</span>
+                    <span>開始側コピー参照 0回</span>
+                    <span>開幕コピー参照 0回</span>
+                  </div>
+                  <div class="grid">
+                    <section>
+                      <h3>開始側最初の連続手番</h3>
+                      <table><thead><tr><th>手順</th><th>区切り</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>ガード, 指=2 -&gt; ガード, 指=2</td><td>手番交代: 開始側手=2, 相手手=2, 直前=ガード</td><td>20</td><td>100.0%</td></tr>
+                      </tbody></table>
+                    </section>
+                    <section>
+                      <h3>開始側初手</h3>
+                      <table><thead><tr><th>行動</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>ガード, 指=2</td><td>20</td><td>100.0%</td></tr>
+                      </tbody></table>
+                    </section>
+                    <section>
+                      <h3>開幕の区切り</h3>
+                      <table><thead><tr><th>区切り</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>手番交代: 開始側手=2, 相手手=2, 直前=ガード</td><td>20</td><td>100.0%</td></tr>
+                      </tbody></table>
+                    </section>
+                    <section>
+                      <h3>開始側の勝敗</h3>
+                      <table><thead><tr><th>結果</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>打切</td><td>20</td><td>100.0%</td></tr>
+                      </tbody></table>
+                    </section>
+                    <section>
+                      <h3>開幕コピー対象</h3>
+                      <table><thead><tr><th>参照先</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td colspan="3">なし</td></tr>
+                      </tbody></table>
+                    </section>
+                    <section>
+                      <h3>開始側コピー対象 全体</h3>
+                      <table><thead><tr><th>参照先</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td colspan="3">なし</td></tr>
+                      </tbody></table>
+                    </section>
+                  </div>
+                  <h3>代表トレース</h3>
+                  <table class="trace"><thead><tr><th>手</th><th>TP側</th><th>直前状態</th><th>TP行動</th><th>NTP反応</th><th>コピー対象</th><th>イベント</th><th>結果</th></tr></thead><tbody>
+                    <tr><td>1</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=-</td><td>ガード, 指=2</td><td>なし, 指=0</td><td>-</td><td>guard_extra_turn</td><td>追加ターン</td></tr>
+<tr><td>2</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=0</td><td>-</td><td>guard_no_extra_turn</td><td>手番交代</td></tr>
+<tr><td>3</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=0</td><td>-</td><td>guard_extra_turn</td><td>追加ターン</td></tr>
+<tr><td>4</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=0</td><td>-</td><td>guard_no_extra_turn</td><td>手番交代</td></tr>
+<tr><td>5</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=0</td><td>-</td><td>guard_extra_turn</td><td>追加ターン</td></tr>
+<tr><td>6</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=0</td><td>-</td><td>guard_no_extra_turn</td><td>手番交代</td></tr>
+<tr><td>7</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=0</td><td>-</td><td>guard_extra_turn</td><td>追加ターン</td></tr>
+<tr><td>8</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=0</td><td>-</td><td>guard_no_extra_turn</td><td>手番交代</td></tr>
+<tr><td>9</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=0</td><td>-</td><td>guard_extra_turn</td><td>追加ターン</td></tr>
+<tr><td>10</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=0</td><td>-</td><td>guard_no_extra_turn</td><td>手番交代</td></tr>
+<tr><td>11</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=0</td><td>-</td><td>guard_extra_turn</td><td>追加ターン</td></tr>
+<tr><td>12</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=0</td><td>-</td><td>guard_no_extra_turn</td><td>手番交代</td></tr>
+<tr><td>13</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=0</td><td>-</td><td>guard_extra_turn</td><td>追加ターン</td></tr>
+<tr><td>14</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=0</td><td>-</td><td>guard_no_extra_turn</td><td>手番交代</td></tr>
+<tr><td>15</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=0</td><td>-</td><td>guard_extra_turn</td><td>追加ターン</td></tr>
+<tr><td>16</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=0</td><td>-</td><td>guard_no_extra_turn</td><td>手番交代</td></tr>
+<tr><td>17</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=0</td><td>-</td><td>guard_extra_turn</td><td>追加ターン</td></tr>
+<tr><td>18</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=0</td><td>-</td><td>guard_no_extra_turn</td><td>手番交代</td></tr>
+<tr><td>19</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=0</td><td>-</td><td>guard_extra_turn</td><td>追加ターン</td></tr>
+<tr><td>20</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=0</td><td>-</td><td>guard_no_extra_turn</td><td>手番交代</td></tr>
+<tr><td>21</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=0</td><td>-</td><td>guard_extra_turn</td><td>追加ターン</td></tr>
+<tr><td>22</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=0</td><td>-</td><td>guard_no_extra_turn</td><td>手番交代</td></tr>
+<tr><td>23</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=0</td><td>-</td><td>guard_extra_turn</td><td>追加ターン</td></tr>
+<tr><td>24</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=0</td><td>-</td><td>guard_no_extra_turn</td><td>手番交代</td></tr>
+<tr><td>25</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=0</td><td>-</td><td>guard_extra_turn</td><td>追加ターン</td></tr>
+<tr><td>26</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=0</td><td>-</td><td>guard_no_extra_turn</td><td>手番交代</td></tr>
+<tr><td>27</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=0</td><td>-</td><td>guard_extra_turn</td><td>追加ターン</td></tr>
+<tr><td>28</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=0</td><td>-</td><td>guard_no_extra_turn</td><td>手番交代</td></tr>
+<tr><td>29</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=0</td><td>-</td><td>guard_extra_turn</td><td>追加ターン</td></tr>
+<tr><td>30</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=0</td><td>-</td><td>guard_no_extra_turn</td><td>手番交代</td></tr>
+<tr><td>31</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=0</td><td>-</td><td>guard_extra_turn</td><td>追加ターン</td></tr>
+<tr><td>32</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=0</td><td>-</td><td>guard_no_extra_turn</td><td>手番交代</td></tr>
+<tr><td>33</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=0</td><td>-</td><td>guard_extra_turn</td><td>追加ターン</td></tr>
+<tr><td>34</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=0</td><td>-</td><td>guard_no_extra_turn</td><td>手番交代</td></tr>
+<tr><td>35</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=0</td><td>-</td><td>guard_extra_turn</td><td>追加ターン</td></tr>
+<tr><td>36</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=0</td><td>-</td><td>guard_no_extra_turn</td><td>手番交代</td></tr>
+<tr><td>37</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=0</td><td>-</td><td>guard_extra_turn</td><td>追加ターン</td></tr>
+<tr><td>38</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=0</td><td>-</td><td>guard_no_extra_turn</td><td>手番交代</td></tr>
+<tr><td>39</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=0</td><td>-</td><td>guard_extra_turn</td><td>追加ターン</td></tr>
+<tr><td>40</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=0</td><td>-</td><td>guard_no_extra_turn</td><td>手番交代</td></tr>
+<tr><td>41</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=0</td><td>-</td><td>guard_extra_turn</td><td>追加ターン</td></tr>
+<tr><td>42</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=0</td><td>-</td><td>guard_no_extra_turn</td><td>手番交代</td></tr>
+<tr><td>43</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=0</td><td>-</td><td>guard_extra_turn</td><td>追加ターン</td></tr>
+<tr><td>44</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=0</td><td>-</td><td>guard_no_extra_turn</td><td>手番交代</td></tr>
+<tr><td>45</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=0</td><td>-</td><td>guard_extra_turn</td><td>追加ターン</td></tr>
+<tr><td>46</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=0</td><td>-</td><td>guard_no_extra_turn</td><td>手番交代</td></tr>
+<tr><td>47</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=0</td><td>-</td><td>guard_extra_turn</td><td>追加ターン</td></tr>
+<tr><td>48</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=0</td><td>-</td><td>guard_no_extra_turn</td><td>手番交代</td></tr>
+<tr><td>49</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=0</td><td>-</td><td>guard_extra_turn</td><td>追加ターン</td></tr>
+<tr><td>50</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=0</td><td>-</td><td>guard_no_extra_turn</td><td>手番交代</td></tr>
+<tr><td>51</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=0</td><td>-</td><td>guard_extra_turn</td><td>追加ターン</td></tr>
+<tr><td>52</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=0</td><td>-</td><td>guard_no_extra_turn</td><td>手番交代</td></tr>
+<tr><td>53</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=0</td><td>-</td><td>guard_extra_turn</td><td>追加ターン</td></tr>
+<tr><td>54</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=0</td><td>-</td><td>guard_no_extra_turn</td><td>手番交代</td></tr>
+<tr><td>55</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=0</td><td>-</td><td>guard_extra_turn</td><td>追加ターン</td></tr>
+<tr><td>56</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=0</td><td>-</td><td>guard_no_extra_turn</td><td>手番交代</td></tr>
+<tr><td>57</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=0</td><td>-</td><td>guard_extra_turn</td><td>追加ターン</td></tr>
+<tr><td>58</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=0</td><td>-</td><td>guard_no_extra_turn</td><td>手番交代</td></tr>
+<tr><td>59</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=0</td><td>-</td><td>guard_extra_turn</td><td>追加ターン</td></tr>
+<tr><td>60</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=0</td><td>-</td><td>guard_no_extra_turn</td><td>打切</td></tr>
+                  </tbody></table>
+                  <div class="warn"><strong>期待確認:</strong><p class="ok">期待確認上の警告なし</p></div>
+                </details>
+                
+                <details class="condition">
+                  <summary>
+                    <strong>決定論評価 / カウンター0%・指一様</strong>
+                    <span>打切 20</span>
+                  </summary>
+                  <p class="internal-name">内部表記: deterministic / none_uniform</p>
+                  <div class="expect">
+                    <strong>0%カウンターへの開始側手順</strong>
+                    <p>相手はカウンターせず、指だけ揺れる。指固定の癖を除いても対カウンター開幕が残るかを見る。</p>
+                  </div>
+                  <div class="chips">
+                    <span>平均総手数 60.0</span>
+                    <span>開始側コピー参照 0回</span>
+                    <span>開幕コピー参照 0回</span>
+                  </div>
+                  <div class="grid">
+                    <section>
+                      <h3>開始側最初の連続手番</h3>
+                      <table><thead><tr><th>手順</th><th>区切り</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>ガード, 指=2 -&gt; ガード, 指=2</td><td>手番交代: 開始側手=2, 相手手=2, 直前=ガード</td><td>20</td><td>100.0%</td></tr>
+                      </tbody></table>
+                    </section>
+                    <section>
+                      <h3>開始側初手</h3>
+                      <table><thead><tr><th>行動</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>ガード, 指=2</td><td>20</td><td>100.0%</td></tr>
+                      </tbody></table>
+                    </section>
+                    <section>
+                      <h3>開幕の区切り</h3>
+                      <table><thead><tr><th>区切り</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>手番交代: 開始側手=2, 相手手=2, 直前=ガード</td><td>20</td><td>100.0%</td></tr>
+                      </tbody></table>
+                    </section>
+                    <section>
+                      <h3>開始側の勝敗</h3>
+                      <table><thead><tr><th>結果</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>打切</td><td>20</td><td>100.0%</td></tr>
+                      </tbody></table>
+                    </section>
+                    <section>
+                      <h3>開幕コピー対象</h3>
+                      <table><thead><tr><th>参照先</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td colspan="3">なし</td></tr>
+                      </tbody></table>
+                    </section>
+                    <section>
+                      <h3>開始側コピー対象 全体</h3>
+                      <table><thead><tr><th>参照先</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td colspan="3">なし</td></tr>
+                      </tbody></table>
+                    </section>
+                  </div>
+                  <h3>代表トレース</h3>
+                  <table class="trace"><thead><tr><th>手</th><th>TP側</th><th>直前状態</th><th>TP行動</th><th>NTP反応</th><th>コピー対象</th><th>イベント</th><th>結果</th></tr></thead><tbody>
+                    <tr><td>1</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=-</td><td>ガード, 指=2</td><td>なし, 指=2</td><td>-</td><td>guard_extra_turn</td><td>追加ターン</td></tr>
+<tr><td>2</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=1</td><td>-</td><td>guard_no_extra_turn</td><td>手番交代</td></tr>
+<tr><td>3</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=2</td><td>-</td><td>guard_extra_turn</td><td>追加ターン</td></tr>
+<tr><td>4</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=1</td><td>-</td><td>guard_no_extra_turn</td><td>手番交代</td></tr>
+<tr><td>5</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=2</td><td>-</td><td>guard_extra_turn</td><td>追加ターン</td></tr>
+<tr><td>6</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=1</td><td>-</td><td>guard_no_extra_turn</td><td>手番交代</td></tr>
+<tr><td>7</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=1</td><td>-</td><td>guard_extra_turn</td><td>追加ターン</td></tr>
+<tr><td>8</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=2</td><td>-</td><td>guard_no_extra_turn</td><td>手番交代</td></tr>
+<tr><td>9</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=2</td><td>-</td><td>guard_extra_turn</td><td>追加ターン</td></tr>
+<tr><td>10</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=1</td><td>-</td><td>guard_no_extra_turn</td><td>手番交代</td></tr>
+<tr><td>11</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=2</td><td>-</td><td>guard_extra_turn</td><td>追加ターン</td></tr>
+<tr><td>12</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=0</td><td>-</td><td>guard_no_extra_turn</td><td>手番交代</td></tr>
+<tr><td>13</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=0</td><td>-</td><td>guard_extra_turn</td><td>追加ターン</td></tr>
+<tr><td>14</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=2</td><td>-</td><td>guard_no_extra_turn</td><td>手番交代</td></tr>
+<tr><td>15</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=2</td><td>-</td><td>guard_extra_turn</td><td>追加ターン</td></tr>
+<tr><td>16</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=2</td><td>-</td><td>guard_no_extra_turn</td><td>手番交代</td></tr>
+<tr><td>17</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=2</td><td>-</td><td>guard_extra_turn</td><td>追加ターン</td></tr>
+<tr><td>18</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=1</td><td>-</td><td>guard_no_extra_turn</td><td>手番交代</td></tr>
+<tr><td>19</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=1</td><td>-</td><td>guard_extra_turn</td><td>追加ターン</td></tr>
+<tr><td>20</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=0</td><td>-</td><td>guard_no_extra_turn</td><td>手番交代</td></tr>
+<tr><td>21</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=2</td><td>-</td><td>guard_extra_turn</td><td>追加ターン</td></tr>
+<tr><td>22</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=1</td><td>-</td><td>guard_no_extra_turn</td><td>手番交代</td></tr>
+<tr><td>23</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=1</td><td>-</td><td>guard_extra_turn</td><td>追加ターン</td></tr>
+<tr><td>24</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=2</td><td>-</td><td>guard_no_extra_turn</td><td>手番交代</td></tr>
+<tr><td>25</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=1</td><td>-</td><td>guard_extra_turn</td><td>追加ターン</td></tr>
+<tr><td>26</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=0</td><td>-</td><td>guard_no_extra_turn</td><td>手番交代</td></tr>
+<tr><td>27</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=1</td><td>-</td><td>guard_extra_turn</td><td>追加ターン</td></tr>
+<tr><td>28</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=2</td><td>-</td><td>guard_no_extra_turn</td><td>手番交代</td></tr>
+<tr><td>29</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=1</td><td>-</td><td>guard_extra_turn</td><td>追加ターン</td></tr>
+<tr><td>30</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=1</td><td>-</td><td>guard_no_extra_turn</td><td>手番交代</td></tr>
+<tr><td>31</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=0</td><td>-</td><td>guard_extra_turn</td><td>追加ターン</td></tr>
+<tr><td>32</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=1</td><td>-</td><td>guard_no_extra_turn</td><td>手番交代</td></tr>
+<tr><td>33</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=0</td><td>-</td><td>guard_extra_turn</td><td>追加ターン</td></tr>
+<tr><td>34</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=1</td><td>-</td><td>guard_no_extra_turn</td><td>手番交代</td></tr>
+<tr><td>35</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=2</td><td>-</td><td>guard_extra_turn</td><td>追加ターン</td></tr>
+<tr><td>36</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=0</td><td>-</td><td>guard_no_extra_turn</td><td>手番交代</td></tr>
+<tr><td>37</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=2</td><td>-</td><td>guard_extra_turn</td><td>追加ターン</td></tr>
+<tr><td>38</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=0</td><td>-</td><td>guard_no_extra_turn</td><td>手番交代</td></tr>
+<tr><td>39</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=1</td><td>-</td><td>guard_extra_turn</td><td>追加ターン</td></tr>
+<tr><td>40</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=1</td><td>-</td><td>guard_no_extra_turn</td><td>手番交代</td></tr>
+<tr><td>41</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=1</td><td>-</td><td>guard_extra_turn</td><td>追加ターン</td></tr>
+<tr><td>42</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=1</td><td>-</td><td>guard_no_extra_turn</td><td>手番交代</td></tr>
+<tr><td>43</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=0</td><td>-</td><td>guard_extra_turn</td><td>追加ターン</td></tr>
+<tr><td>44</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=0</td><td>-</td><td>guard_no_extra_turn</td><td>手番交代</td></tr>
+<tr><td>45</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=1</td><td>-</td><td>guard_extra_turn</td><td>追加ターン</td></tr>
+<tr><td>46</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=1</td><td>-</td><td>guard_no_extra_turn</td><td>手番交代</td></tr>
+<tr><td>47</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=0</td><td>-</td><td>guard_extra_turn</td><td>追加ターン</td></tr>
+<tr><td>48</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=1</td><td>-</td><td>guard_no_extra_turn</td><td>手番交代</td></tr>
+<tr><td>49</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=1</td><td>-</td><td>guard_extra_turn</td><td>追加ターン</td></tr>
+<tr><td>50</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=1</td><td>-</td><td>guard_no_extra_turn</td><td>手番交代</td></tr>
+<tr><td>51</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=0</td><td>-</td><td>guard_extra_turn</td><td>追加ターン</td></tr>
+<tr><td>52</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=0</td><td>-</td><td>guard_no_extra_turn</td><td>手番交代</td></tr>
+<tr><td>53</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=2</td><td>-</td><td>guard_extra_turn</td><td>追加ターン</td></tr>
+<tr><td>54</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=2</td><td>-</td><td>guard_no_extra_turn</td><td>手番交代</td></tr>
+<tr><td>55</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=1</td><td>-</td><td>guard_extra_turn</td><td>追加ターン</td></tr>
+<tr><td>56</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=0</td><td>-</td><td>guard_no_extra_turn</td><td>手番交代</td></tr>
+<tr><td>57</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=2</td><td>-</td><td>guard_extra_turn</td><td>追加ターン</td></tr>
+<tr><td>58</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=2</td><td>-</td><td>guard_no_extra_turn</td><td>手番交代</td></tr>
+<tr><td>59</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=0</td><td>-</td><td>guard_extra_turn</td><td>追加ターン</td></tr>
+<tr><td>60</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>なし, 指=1</td><td>-</td><td>guard_no_extra_turn</td><td>打切</td></tr>
+                  </tbody></table>
+                  <div class="warn"><strong>期待確認:</strong><p class="ok">期待確認上の警告なし</p></div>
+                </details>
+                
+                <details class="condition">
+                  <summary>
+                    <strong>決定論評価 / カウンター100%・指最小</strong>
+                    <span>打切 20</span>
+                  </summary>
+                  <p class="internal-name">内部表記: deterministic / counter_lowest</p>
+                  <div class="expect">
+                    <strong>100%カウンターへの開始側手順</strong>
+                    <p>相手は必ずカウンターする。開始側がフェイント/ロックから追加ターンや参照手順へ進めるかを見る。</p>
+                  </div>
+                  <div class="chips">
+                    <span>平均総手数 60.0</span>
+                    <span>開始側コピー参照 0回</span>
+                    <span>開幕コピー参照 0回</span>
+                  </div>
+                  <div class="grid">
+                    <section>
+                      <h3>開始側最初の連続手番</h3>
+                      <table><thead><tr><th>手順</th><th>区切り</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>ガード, 指=2</td><td>手番交代: 開始側手=2, 相手手=2, 直前=ガード</td><td>20</td><td>100.0%</td></tr>
+                      </tbody></table>
+                    </section>
+                    <section>
+                      <h3>開始側初手</h3>
+                      <table><thead><tr><th>行動</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>ガード, 指=2</td><td>20</td><td>100.0%</td></tr>
+                      </tbody></table>
+                    </section>
+                    <section>
+                      <h3>開幕の区切り</h3>
+                      <table><thead><tr><th>区切り</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>手番交代: 開始側手=2, 相手手=2, 直前=ガード</td><td>20</td><td>100.0%</td></tr>
+                      </tbody></table>
+                    </section>
+                    <section>
+                      <h3>開始側の勝敗</h3>
+                      <table><thead><tr><th>結果</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>打切</td><td>20</td><td>100.0%</td></tr>
+                      </tbody></table>
+                    </section>
+                    <section>
+                      <h3>開幕コピー対象</h3>
+                      <table><thead><tr><th>参照先</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td colspan="3">なし</td></tr>
+                      </tbody></table>
+                    </section>
+                    <section>
+                      <h3>開始側コピー対象 全体</h3>
+                      <table><thead><tr><th>参照先</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td colspan="3">なし</td></tr>
+                      </tbody></table>
+                    </section>
+                  </div>
+                  <h3>代表トレース</h3>
+                  <table class="trace"><thead><tr><th>手</th><th>TP側</th><th>直前状態</th><th>TP行動</th><th>NTP反応</th><th>コピー対象</th><th>イベント</th><th>結果</th></tr></thead><tbody>
+                    <tr><td>1</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=-</td><td>ガード, 指=2</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>2</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>3</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>4</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>5</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>6</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>7</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>8</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>9</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>10</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>11</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>12</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>13</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>14</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>15</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>16</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>17</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>18</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>19</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>20</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>21</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>22</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>23</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>24</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>25</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>26</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>27</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>28</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>29</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>30</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>31</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>32</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>33</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>34</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>35</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>36</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>37</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>38</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>39</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>40</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>41</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>42</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>43</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>44</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>45</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>46</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>47</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>48</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>49</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>50</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>51</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>52</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>53</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>54</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>55</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>56</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>57</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>58</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>59</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>60</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>打切</td></tr>
+                  </tbody></table>
+                  <div class="warn"><strong>期待確認:</strong><ul><li>100%カウンターで初手フェイント/ロックが不足: 0.0%</li></ul></div>
+                </details>
+                
+                <details class="condition">
+                  <summary>
+                    <strong>決定論評価 / カウンター100%・指一様</strong>
+                    <span>打切 20</span>
+                  </summary>
+                  <p class="internal-name">内部表記: deterministic / counter_uniform</p>
+                  <div class="expect">
+                    <strong>100%カウンターへの開始側手順</strong>
+                    <p>相手は必ずカウンターし、指だけ揺れる。対カウンター手順が指条件に依存せず残るかを見る。</p>
+                  </div>
+                  <div class="chips">
+                    <span>平均総手数 60.0</span>
+                    <span>開始側コピー参照 0回</span>
+                    <span>開幕コピー参照 0回</span>
+                  </div>
+                  <div class="grid">
+                    <section>
+                      <h3>開始側最初の連続手番</h3>
+                      <table><thead><tr><th>手順</th><th>区切り</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>ガード, 指=2</td><td>手番交代: 開始側手=2, 相手手=2, 直前=ガード</td><td>20</td><td>100.0%</td></tr>
+                      </tbody></table>
+                    </section>
+                    <section>
+                      <h3>開始側初手</h3>
+                      <table><thead><tr><th>行動</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>ガード, 指=2</td><td>20</td><td>100.0%</td></tr>
+                      </tbody></table>
+                    </section>
+                    <section>
+                      <h3>開幕の区切り</h3>
+                      <table><thead><tr><th>区切り</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>手番交代: 開始側手=2, 相手手=2, 直前=ガード</td><td>20</td><td>100.0%</td></tr>
+                      </tbody></table>
+                    </section>
+                    <section>
+                      <h3>開始側の勝敗</h3>
+                      <table><thead><tr><th>結果</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>打切</td><td>20</td><td>100.0%</td></tr>
+                      </tbody></table>
+                    </section>
+                    <section>
+                      <h3>開幕コピー対象</h3>
+                      <table><thead><tr><th>参照先</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td colspan="3">なし</td></tr>
+                      </tbody></table>
+                    </section>
+                    <section>
+                      <h3>開始側コピー対象 全体</h3>
+                      <table><thead><tr><th>参照先</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td colspan="3">なし</td></tr>
+                      </tbody></table>
+                    </section>
+                  </div>
+                  <h3>代表トレース</h3>
+                  <table class="trace"><thead><tr><th>手</th><th>TP側</th><th>直前状態</th><th>TP行動</th><th>NTP反応</th><th>コピー対象</th><th>イベント</th><th>結果</th></tr></thead><tbody>
+                    <tr><td>1</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=-</td><td>ガード, 指=2</td><td>カウンター, 指=2</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>2</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=1</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>3</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=2</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>4</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=1</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>5</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=2</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>6</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=1</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>7</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=1</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>8</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=2</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>9</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=2</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>10</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=1</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>11</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=2</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>12</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>13</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>14</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=2</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>15</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=2</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>16</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=2</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>17</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=2</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>18</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=1</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>19</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=1</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>20</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>21</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=2</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>22</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=1</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>23</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=1</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>24</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=2</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>25</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=1</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>26</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>27</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=1</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>28</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=2</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>29</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=1</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>30</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=1</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>31</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>32</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=1</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>33</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>34</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=1</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>35</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=2</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>36</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>37</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=2</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>38</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>39</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=1</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>40</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=1</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>41</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=1</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>42</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=1</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>43</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>44</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>45</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=1</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>46</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=1</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>47</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>48</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=1</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>49</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=1</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>50</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=1</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>51</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>52</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>53</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=2</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>54</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=2</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>55</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=1</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>56</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>57</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=2</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>58</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=2</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>59</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>60</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ガード, 指=2</td><td>カウンター, 指=1</td><td>-</td><td>counter_no_effect</td><td>打切</td></tr>
+                  </tbody></table>
+                  <div class="warn"><strong>期待確認:</strong><ul><li>100%カウンターで初手フェイント/ロックが不足: 0.0%</li></ul></div>
+                </details>
+                
+                <details class="condition">
+                  <summary>
+                    <strong>確率サンプル評価 / カウンター0%・指最小</strong>
+                    <span>開始側勝利 12 / 開始側敗北 8</span>
+                  </summary>
+                  <p class="internal-name">内部表記: stochastic / none_lowest</p>
+                  <div class="expect">
+                    <strong>0%カウンターへの開始側手順</strong>
+                    <p>相手はカウンターしない。開始側初手がフェイント/ロックに寄るなら、固定相手を exploit する前に対カウンター開幕を空振りしている。</p>
+                  </div>
+                  <div class="chips">
+                    <span>平均総手数 15.6</span>
+                    <span>開始側コピー参照 9回</span>
+                    <span>開幕コピー参照 0回</span>
+                  </div>
+                  <div class="grid">
+                    <section>
+                      <h3>開始側最初の連続手番</h3>
+                      <table><thead><tr><th>手順</th><th>区切り</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>数字宣言 合計=0, 指=1</td><td>手番交代: 開始側手=2, 相手手=2, 直前=数字0</td><td>2</td><td>10.0%</td></tr>
+<tr><td>チャージ, 指=0</td><td>手番交代: 開始側手=2, 相手手=2, 直前=チャージ</td><td>1</td><td>5.0%</td></tr>
+<tr><td>ロック, 指=1</td><td>手番交代: 開始側手=2, 相手手=2, 直前=ロック</td><td>1</td><td>5.0%</td></tr>
+<tr><td>ガード, 指=2 -&gt; 数字宣言 合計=3, 指=0</td><td>手番交代: 開始側手=2, 相手手=2, 直前=数字3</td><td>1</td><td>5.0%</td></tr>
+<tr><td>数字宣言 合計=0, 指=2</td><td>手番交代: 開始側手=2, 相手手=2, 直前=数字0</td><td>1</td><td>5.0%</td></tr>
+<tr><td>フラッシュ, 指=2</td><td>手番交代: 開始側手=2, 相手手=2, 直前=フラッシュ</td><td>1</td><td>5.0%</td></tr>
+<tr><td>スキップ, 指=1</td><td>手番交代: 開始側手=2, 相手手=2, 直前=スキップ</td><td>1</td><td>5.0%</td></tr>
+<tr><td>ガード, 指=0 -&gt; タイム, 指=0 -&gt; スキップ, 指=2</td><td>手番交代: 開始側手=2, 相手手=2, 直前=スキップ</td><td>1</td><td>5.0%</td></tr>
+<tr><td>クイック, 指=1</td><td>手番交代: 開始側手=2, 相手手=2, 直前=クイック</td><td>1</td><td>5.0%</td></tr>
+<tr><td>タイム, 指=0 -&gt; フラッシュ, 指=0</td><td>手番交代: 開始側手=0, 相手手=2, 直前=フラッシュ</td><td>1</td><td>5.0%</td></tr>
+                      </tbody></table>
+                    </section>
+                    <section>
+                      <h3>開始側初手</h3>
+                      <table><thead><tr><th>行動</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>ガード, 指=2</td><td>3</td><td>15.0%</td></tr>
+<tr><td>数字宣言 合計=0, 指=1</td><td>2</td><td>10.0%</td></tr>
+<tr><td>チャージ, 指=0</td><td>1</td><td>5.0%</td></tr>
+<tr><td>ロック, 指=1</td><td>1</td><td>5.0%</td></tr>
+<tr><td>数字宣言 合計=0, 指=2</td><td>1</td><td>5.0%</td></tr>
+<tr><td>フラッシュ, 指=2</td><td>1</td><td>5.0%</td></tr>
+<tr><td>スキップ, 指=1</td><td>1</td><td>5.0%</td></tr>
+<tr><td>ガード, 指=0</td><td>1</td><td>5.0%</td></tr>
+<tr><td>クイック, 指=1</td><td>1</td><td>5.0%</td></tr>
+<tr><td>タイム, 指=0</td><td>1</td><td>5.0%</td></tr>
+<tr><td>ロック, 指=2</td><td>1</td><td>5.0%</td></tr>
+<tr><td>セメント, 指=1</td><td>1</td><td>5.0%</td></tr>
+<tr><td>数字宣言 合計=4, 指=0</td><td>1</td><td>5.0%</td></tr>
+<tr><td>セメント, 指=0</td><td>1</td><td>5.0%</td></tr>
+<tr><td>数字宣言 合計=0, 指=0</td><td>1</td><td>5.0%</td></tr>
+<tr><td>数字宣言 合計=3, 指=0</td><td>1</td><td>5.0%</td></tr>
+<tr><td>フラッシュ, 指=0</td><td>1</td><td>5.0%</td></tr>
+                      </tbody></table>
+                    </section>
+                    <section>
+                      <h3>開幕の区切り</h3>
+                      <table><thead><tr><th>区切り</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>手番交代: 開始側手=2, 相手手=2, 直前=数字0</td><td>3</td><td>15.0%</td></tr>
+<tr><td>手番交代: 開始側手=2, 相手手=2, 直前=ロック</td><td>3</td><td>15.0%</td></tr>
+<tr><td>手番交代: 開始側手=2, 相手手=2, 直前=数字3</td><td>2</td><td>10.0%</td></tr>
+<tr><td>手番交代: 開始側手=2, 相手手=2, 直前=スキップ</td><td>2</td><td>10.0%</td></tr>
+<tr><td>手番交代: 開始側手=0, 相手手=2, 直前=フラッシュ</td><td>2</td><td>10.0%</td></tr>
+<tr><td>手番交代: 開始側手=2, 相手手=2, 直前=セメント</td><td>2</td><td>10.0%</td></tr>
+<tr><td>手番交代: 開始側手=2, 相手手=2, 直前=チャージ</td><td>1</td><td>5.0%</td></tr>
+<tr><td>手番交代: 開始側手=2, 相手手=2, 直前=フラッシュ</td><td>1</td><td>5.0%</td></tr>
+<tr><td>手番交代: 開始側手=2, 相手手=2, 直前=クイック</td><td>1</td><td>5.0%</td></tr>
+<tr><td>手番交代: 開始側手=2, 相手手=2, 直前=数字4</td><td>1</td><td>5.0%</td></tr>
+<tr><td>手番交代: 開始側手=1, 相手手=2, 直前=数字0</td><td>1</td><td>5.0%</td></tr>
+<tr><td>手番交代: 開始側手=1, 相手手=2, 直前=数字1</td><td>1</td><td>5.0%</td></tr>
+                      </tbody></table>
+                    </section>
+                    <section>
+                      <h3>開始側の勝敗</h3>
+                      <table><thead><tr><th>結果</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>開始側勝利</td><td>12</td><td>60.0%</td></tr>
+<tr><td>開始側敗北</td><td>8</td><td>40.0%</td></tr>
+                      </tbody></table>
+                    </section>
+                    <section>
+                      <h3>開幕コピー対象</h3>
+                      <table><thead><tr><th>参照先</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td colspan="3">なし</td></tr>
+                      </tbody></table>
+                    </section>
+                    <section>
+                      <h3>開始側コピー対象 全体</h3>
+                      <table><thead><tr><th>参照先</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>ガード</td><td>3</td><td>33.3%</td></tr>
+<tr><td>クイック</td><td>2</td><td>22.2%</td></tr>
+<tr><td>数字2</td><td>2</td><td>22.2%</td></tr>
+<tr><td>数字4</td><td>1</td><td>11.1%</td></tr>
+<tr><td>セメント</td><td>1</td><td>11.1%</td></tr>
+                      </tbody></table>
+                    </section>
+                  </div>
+                  <h3>代表トレース</h3>
+                  <table class="trace"><thead><tr><th>手</th><th>TP側</th><th>直前状態</th><th>TP行動</th><th>NTP反応</th><th>コピー対象</th><th>イベント</th><th>結果</th></tr></thead><tbody>
+                    <tr><td>1</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=-</td><td>チャージ, 指=0</td><td>なし, 指=0</td><td>-</td><td>charge_set</td><td>手番交代</td></tr>
+<tr><td>2</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=チャージ</td><td>ガード, 指=0</td><td>なし, 指=0</td><td>-</td><td>guard_extra_turn</td><td>追加ターン</td></tr>
+<tr><td>3</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ガード</td><td>ロック, 指=2</td><td>なし, 指=0</td><td>-</td><td>lock_no_counter</td><td>手番交代</td></tr>
+<tr><td>4</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ロック</td><td>数字宣言 合計=2, 指=0</td><td>なし, 指=0</td><td>-</td><td>charge_consumed, number_miss</td><td>手番交代</td></tr>
+<tr><td>5</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=数字2</td><td>フラッシュ, 指=2</td><td>なし, 指=0</td><td>-</td><td>flash_miss</td><td>手番交代</td></tr>
+<tr><td>6</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=フラッシュ</td><td>ブースト, 指=1</td><td>なし, 指=0</td><td>-</td><td>boost</td><td>追加ターン</td></tr>
+<tr><td>7</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=ブースト</td><td>クイック, 指=2</td><td>なし, 指=0</td><td>-</td><td>quick</td><td>追加ターン</td></tr>
+<tr><td>8</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=クイック</td><td>セメント, 指=0</td><td>なし, 指=0</td><td>-</td><td>cement_applied</td><td>追加ターン</td></tr>
+<tr><td>9</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=セメント</td><td>スキップ, 指=2</td><td>なし, 指=0</td><td>-</td><td>skip_applied</td><td>手番交代</td></tr>
+<tr><td>10</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=スキップ</td><td>パス, 指=0</td><td>なし, 指=0</td><td>-</td><td>skip_pass</td><td>手番交代</td></tr>
+<tr><td>11</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=スキップ</td><td>ストック, 指=0</td><td>なし, 指=0</td><td>-</td><td>stock_added</td><td>手番交代</td></tr>
+<tr><td>12</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ストック</td><td>クイック, 指=0</td><td>なし, 指=0</td><td>-</td><td>quick</td><td>手番交代</td></tr>
+<tr><td>13</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=クイック</td><td>ロック, 指=1</td><td>なし, 指=0</td><td>-</td><td>lock_no_counter</td><td>手番交代</td></tr>
+<tr><td>14</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ロック</td><td>タイム, 指=1</td><td>なし, 指=0</td><td>-</td><td>time_set</td><td>追加ターン</td></tr>
+<tr><td>15</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=タイム</td><td>数字宣言 合計=0, 指=0</td><td>なし, 指=0</td><td>-</td><td>number_hit</td><td>手番交代</td></tr>
+<tr><td>16</td><td>開始側</td><td>TP手=2, NTP手=1, 直前=数字0</td><td>数字宣言 合計=3, 指=2</td><td>なし, 指=0</td><td>-</td><td>number_miss</td><td>手番交代</td></tr>
+<tr><td>17</td><td>手番交代後側</td><td>TP手=1, NTP手=2, 直前=数字3</td><td>フラッシュ, 指=0</td><td>なし, 指=0</td><td>-</td><td>flash_one_hand</td><td>終端報酬=+1.0</td></tr>
+                  </tbody></table>
+                  <div class="warn"><strong>期待確認:</strong><ul><li>0%カウンターで初手フェイント/ロックが残る: 10.0%</li></ul></div>
+                </details>
+                
+                <details class="condition">
+                  <summary>
+                    <strong>確率サンプル評価 / カウンター0%・指一様</strong>
+                    <span>開始側敗北 13 / 開始側勝利 7</span>
+                  </summary>
+                  <p class="internal-name">内部表記: stochastic / none_uniform</p>
+                  <div class="expect">
+                    <strong>0%カウンターへの開始側手順</strong>
+                    <p>相手はカウンターせず、指だけ揺れる。指固定の癖を除いても対カウンター開幕が残るかを見る。</p>
+                  </div>
+                  <div class="chips">
+                    <span>平均総手数 15.6</span>
+                    <span>開始側コピー参照 8回</span>
+                    <span>開幕コピー参照 0回</span>
+                  </div>
+                  <div class="grid">
+                    <section>
+                      <h3>開始側最初の連続手番</h3>
+                      <table><thead><tr><th>手順</th><th>区切り</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>ロック, 指=1</td><td>手番交代: 開始側手=2, 相手手=2, 直前=ロック</td><td>2</td><td>10.0%</td></tr>
+<tr><td>スキップ, 指=2</td><td>手番交代: 開始側手=2, 相手手=2, 直前=スキップ</td><td>2</td><td>10.0%</td></tr>
+<tr><td>チャージ, 指=1</td><td>手番交代: 開始側手=2, 相手手=2, 直前=チャージ</td><td>2</td><td>10.0%</td></tr>
+<tr><td>フェイント, 指=0</td><td>手番交代: 開始側手=2, 相手手=2, 直前=フェイント</td><td>1</td><td>5.0%</td></tr>
+<tr><td>ガード, 指=2 -&gt; ブースト, 指=1 -&gt; 数字宣言 合計=3, 指=2 -&gt; 数字宣言 合計=3, 指=2 -&gt; 数字宣言 合計=0, 指=0</td><td>手番交代: 開始側手=1, 相手手=2, 直前=数字0</td><td>1</td><td>5.0%</td></tr>
+<tr><td>スキップ, 指=1</td><td>手番交代: 開始側手=2, 相手手=2, 直前=スキップ</td><td>1</td><td>5.0%</td></tr>
+<tr><td>ロック, 指=0</td><td>手番交代: 開始側手=2, 相手手=2, 直前=ロック</td><td>1</td><td>5.0%</td></tr>
+<tr><td>セメント, 指=0</td><td>手番交代: 開始側手=2, 相手手=2, 直前=セメント</td><td>1</td><td>5.0%</td></tr>
+<tr><td>フラッシュ, 指=0</td><td>手番交代: 開始側手=2, 相手手=2, 直前=フラッシュ</td><td>1</td><td>5.0%</td></tr>
+<tr><td>数字宣言 合計=1, 指=1</td><td>手番交代: 開始側手=2, 相手手=2, 直前=数字1</td><td>1</td><td>5.0%</td></tr>
+                      </tbody></table>
+                    </section>
+                    <section>
+                      <h3>開始側初手</h3>
+                      <table><thead><tr><th>行動</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>ロック, 指=1</td><td>2</td><td>10.0%</td></tr>
+<tr><td>スキップ, 指=2</td><td>2</td><td>10.0%</td></tr>
+<tr><td>チャージ, 指=1</td><td>2</td><td>10.0%</td></tr>
+<tr><td>フェイント, 指=0</td><td>1</td><td>5.0%</td></tr>
+<tr><td>ガード, 指=2</td><td>1</td><td>5.0%</td></tr>
+<tr><td>スキップ, 指=1</td><td>1</td><td>5.0%</td></tr>
+<tr><td>ロック, 指=0</td><td>1</td><td>5.0%</td></tr>
+<tr><td>セメント, 指=0</td><td>1</td><td>5.0%</td></tr>
+<tr><td>フラッシュ, 指=0</td><td>1</td><td>5.0%</td></tr>
+<tr><td>数字宣言 合計=1, 指=1</td><td>1</td><td>5.0%</td></tr>
+<tr><td>ガード, 指=1</td><td>1</td><td>5.0%</td></tr>
+<tr><td>セメント, 指=1</td><td>1</td><td>5.0%</td></tr>
+<tr><td>タイム, 指=0</td><td>1</td><td>5.0%</td></tr>
+<tr><td>チャージ, 指=0</td><td>1</td><td>5.0%</td></tr>
+<tr><td>数字宣言 合計=1, 指=2</td><td>1</td><td>5.0%</td></tr>
+<tr><td>クイック, 指=0</td><td>1</td><td>5.0%</td></tr>
+<tr><td>数字宣言 合計=3, 指=2</td><td>1</td><td>5.0%</td></tr>
+                      </tbody></table>
+                    </section>
+                    <section>
+                      <h3>開幕の区切り</h3>
+                      <table><thead><tr><th>区切り</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>手番交代: 開始側手=2, 相手手=2, 直前=ロック</td><td>3</td><td>15.0%</td></tr>
+<tr><td>手番交代: 開始側手=2, 相手手=2, 直前=スキップ</td><td>3</td><td>15.0%</td></tr>
+<tr><td>手番交代: 開始側手=2, 相手手=2, 直前=数字1</td><td>3</td><td>15.0%</td></tr>
+<tr><td>手番交代: 開始側手=2, 相手手=2, 直前=チャージ</td><td>3</td><td>15.0%</td></tr>
+<tr><td>手番交代: 開始側手=2, 相手手=2, 直前=セメント</td><td>2</td><td>10.0%</td></tr>
+<tr><td>手番交代: 開始側手=2, 相手手=2, 直前=クイック</td><td>2</td><td>10.0%</td></tr>
+<tr><td>手番交代: 開始側手=2, 相手手=2, 直前=フェイント</td><td>1</td><td>5.0%</td></tr>
+<tr><td>手番交代: 開始側手=1, 相手手=2, 直前=数字0</td><td>1</td><td>5.0%</td></tr>
+<tr><td>手番交代: 開始側手=2, 相手手=2, 直前=フラッシュ</td><td>1</td><td>5.0%</td></tr>
+<tr><td>手番交代: 開始側手=2, 相手手=2, 直前=数字3</td><td>1</td><td>5.0%</td></tr>
+                      </tbody></table>
+                    </section>
+                    <section>
+                      <h3>開始側の勝敗</h3>
+                      <table><thead><tr><th>結果</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>開始側敗北</td><td>13</td><td>65.0%</td></tr>
+<tr><td>開始側勝利</td><td>7</td><td>35.0%</td></tr>
+                      </tbody></table>
+                    </section>
+                    <section>
+                      <h3>開幕コピー対象</h3>
+                      <table><thead><tr><th>参照先</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td colspan="3">なし</td></tr>
+                      </tbody></table>
+                    </section>
+                    <section>
+                      <h3>開始側コピー対象 全体</h3>
+                      <table><thead><tr><th>参照先</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>数字2</td><td>1</td><td>12.5%</td></tr>
+<tr><td>フェイント</td><td>1</td><td>12.5%</td></tr>
+<tr><td>数字3</td><td>1</td><td>12.5%</td></tr>
+<tr><td>数字0</td><td>1</td><td>12.5%</td></tr>
+<tr><td>チャージ</td><td>1</td><td>12.5%</td></tr>
+<tr><td>ガード</td><td>1</td><td>12.5%</td></tr>
+<tr><td>セメント</td><td>1</td><td>12.5%</td></tr>
+<tr><td>数字1</td><td>1</td><td>12.5%</td></tr>
+                      </tbody></table>
+                    </section>
+                  </div>
+                  <h3>代表トレース</h3>
+                  <table class="trace"><thead><tr><th>手</th><th>TP側</th><th>直前状態</th><th>TP行動</th><th>NTP反応</th><th>コピー対象</th><th>イベント</th><th>結果</th></tr></thead><tbody>
+                    <tr><td>1</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=-</td><td>ロック, 指=1</td><td>なし, 指=2</td><td>-</td><td>lock_no_counter</td><td>手番交代</td></tr>
+<tr><td>2</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ロック</td><td>数字宣言 合計=2, 指=2</td><td>なし, 指=1</td><td>-</td><td>number_miss</td><td>手番交代</td></tr>
+<tr><td>3</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=数字2</td><td>ロック, 指=1</td><td>なし, 指=2</td><td>-</td><td>lock_no_counter</td><td>手番交代</td></tr>
+<tr><td>4</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=ロック</td><td>数字宣言 合計=2, 指=1</td><td>なし, 指=1</td><td>-</td><td>number_hit</td><td>手番交代</td></tr>
+<tr><td>5</td><td>開始側</td><td>TP手=2, NTP手=1, 直前=数字2</td><td>コピー, 指=0</td><td>なし, 指=1</td><td>数字2</td><td>copy_used</td><td>手番交代</td></tr>
+<tr><td>6</td><td>手番交代後側</td><td>TP手=1, NTP手=2, 直前=コピー</td><td>ロック, 指=0</td><td>なし, 指=1</td><td>-</td><td>lock_no_counter</td><td>手番交代</td></tr>
+<tr><td>7</td><td>開始側</td><td>TP手=2, NTP手=1, 直前=ロック</td><td>スキップ, 指=0</td><td>なし, 指=1</td><td>-</td><td>skip_applied</td><td>手番交代</td></tr>
+<tr><td>8</td><td>手番交代後側</td><td>TP手=1, NTP手=2, 直前=スキップ</td><td>パス, 指=0</td><td>なし, 指=2</td><td>-</td><td>skip_pass</td><td>手番交代</td></tr>
+<tr><td>9</td><td>開始側</td><td>TP手=2, NTP手=1, 直前=スキップ</td><td>フェイント, 指=0</td><td>なし, 指=0</td><td>-</td><td>feint_no_counter</td><td>手番交代</td></tr>
+<tr><td>10</td><td>手番交代後側</td><td>TP手=1, NTP手=2, 直前=フェイント</td><td>ロック, 指=0</td><td>なし, 指=0</td><td>-</td><td>lock_no_counter</td><td>手番交代</td></tr>
+<tr><td>11</td><td>開始側</td><td>TP手=2, NTP手=1, 直前=ロック</td><td>数字宣言 合計=2, 指=2</td><td>なし, 指=1</td><td>-</td><td>number_miss</td><td>手番交代</td></tr>
+<tr><td>12</td><td>手番交代後側</td><td>TP手=1, NTP手=2, 直前=数字2</td><td>フェイント, 指=1</td><td>なし, 指=1</td><td>-</td><td>feint_no_counter</td><td>手番交代</td></tr>
+<tr><td>13</td><td>開始側</td><td>TP手=2, NTP手=1, 直前=フェイント</td><td>スキップ, 指=0</td><td>なし, 指=0</td><td>-</td><td>skip_applied</td><td>手番交代</td></tr>
+<tr><td>14</td><td>手番交代後側</td><td>TP手=1, NTP手=2, 直前=スキップ</td><td>パス, 指=0</td><td>なし, 指=2</td><td>-</td><td>skip_pass</td><td>手番交代</td></tr>
+<tr><td>15</td><td>開始側</td><td>TP手=2, NTP手=1, 直前=スキップ</td><td>スキップ, 指=2</td><td>なし, 指=1</td><td>-</td><td>skip_applied</td><td>手番交代</td></tr>
+<tr><td>16</td><td>手番交代後側</td><td>TP手=1, NTP手=2, 直前=スキップ</td><td>パス, 指=0</td><td>なし, 指=1</td><td>-</td><td>skip_pass</td><td>手番交代</td></tr>
+<tr><td>17</td><td>開始側</td><td>TP手=2, NTP手=1, 直前=スキップ</td><td>チャージ, 指=2</td><td>なし, 指=1</td><td>-</td><td>charge_set</td><td>手番交代</td></tr>
+<tr><td>18</td><td>手番交代後側</td><td>TP手=1, NTP手=2, 直前=チャージ</td><td>スキップ, 指=0</td><td>なし, 指=0</td><td>-</td><td>skip_applied</td><td>手番交代</td></tr>
+<tr><td>19</td><td>開始側</td><td>TP手=2, NTP手=1, 直前=スキップ</td><td>パス, 指=0</td><td>なし, 指=1</td><td>-</td><td>skip_pass</td><td>手番交代</td></tr>
+<tr><td>20</td><td>手番交代後側</td><td>TP手=1, NTP手=2, 直前=スキップ</td><td>ブースト, 指=0</td><td>なし, 指=2</td><td>-</td><td>boost</td><td>追加ターン</td></tr>
+<tr><td>21</td><td>手番交代後側</td><td>TP手=1, NTP手=2, 直前=ブースト</td><td>ガード, 指=1</td><td>なし, 指=1</td><td>-</td><td>guard_extra_turn</td><td>追加ターン</td></tr>
+<tr><td>22</td><td>手番交代後側</td><td>TP手=1, NTP手=2, 直前=ガード</td><td>数字宣言 合計=3, 指=1</td><td>なし, 指=1</td><td>-</td><td>number_miss</td><td>追加ターン</td></tr>
+<tr><td>23</td><td>手番交代後側</td><td>TP手=1, NTP手=2, 直前=数字3</td><td>セメント, 指=0</td><td>なし, 指=0</td><td>-</td><td>cement_applied</td><td>追加ターン</td></tr>
+<tr><td>24</td><td>手番交代後側</td><td>TP手=1, NTP手=2, 直前=セメント</td><td>コピー, 指=0</td><td>なし, 指=1</td><td>セメント</td><td>copy_used</td><td>手番交代</td></tr>
+<tr><td>25</td><td>開始側</td><td>TP手=2, NTP手=1, 直前=コピー</td><td>数字宣言 合計=2, 指=1</td><td>なし, 指=0</td><td>-</td><td>charge_consumed, number_miss</td><td>手番交代</td></tr>
+<tr><td>26</td><td>手番交代後側</td><td>TP手=1, NTP手=2, 直前=数字2</td><td>ロック, 指=1</td><td>なし, 指=2</td><td>-</td><td>lock_no_counter</td><td>手番交代</td></tr>
+<tr><td>27</td><td>開始側</td><td>TP手=2, NTP手=1, 直前=ロック</td><td>フェイント, 指=1</td><td>なし, 指=0</td><td>-</td><td>feint_no_counter</td><td>手番交代</td></tr>
+<tr><td>28</td><td>手番交代後側</td><td>TP手=1, NTP手=2, 直前=フェイント</td><td>ストック, 指=1</td><td>なし, 指=1</td><td>-</td><td>stock_added</td><td>手番交代</td></tr>
+<tr><td>29</td><td>開始側</td><td>TP手=2, NTP手=1, 直前=ストック</td><td>数字宣言 合計=1, 指=2</td><td>なし, 指=1</td><td>-</td><td>number_miss</td><td>手番交代</td></tr>
+<tr><td>30</td><td>手番交代後側</td><td>TP手=1, NTP手=2, 直前=数字1</td><td>オール(&#x27;フェイント&#x27;,), 指=0</td><td>なし, 指=2</td><td>-</td><td>all_used</td><td>終端報酬=+1.0</td></tr>
+                  </tbody></table>
+                  <div class="warn"><strong>期待確認:</strong><ul><li>0%カウンターで初手フェイント/ロックが残る: 20.0%</li></ul></div>
+                </details>
+                
+                <details class="condition">
+                  <summary>
+                    <strong>確率サンプル評価 / カウンター100%・指最小</strong>
+                    <span>開始側勝利 14 / 開始側敗北 6</span>
+                  </summary>
+                  <p class="internal-name">内部表記: stochastic / counter_lowest</p>
+                  <div class="expect">
+                    <strong>100%カウンターへの開始側手順</strong>
+                    <p>相手は必ずカウンターする。開始側がフェイント/ロックから追加ターンや参照手順へ進めるかを見る。</p>
+                  </div>
+                  <div class="chips">
+                    <span>平均総手数 7.3</span>
+                    <span>開始側コピー参照 2回</span>
+                    <span>開幕コピー参照 0回</span>
+                  </div>
+                  <div class="grid">
+                    <section>
+                      <h3>開始側最初の連続手番</h3>
+                      <table><thead><tr><th>手順</th><th>区切り</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>セメント, 指=0</td><td>手番交代: 開始側手=2, 相手手=2, 直前=セメント</td><td>2</td><td>10.0%</td></tr>
+<tr><td>ロック, 指=2</td><td>手番交代: 開始側手=2, 相手手=2, 直前=ロック</td><td>2</td><td>10.0%</td></tr>
+<tr><td>クイック, 指=2</td><td>手番交代: 開始側手=2, 相手手=2, 直前=クイック</td><td>1</td><td>5.0%</td></tr>
+<tr><td>ブースト, 指=0</td><td>手番交代: 開始側手=2, 相手手=2, 直前=ブースト</td><td>1</td><td>5.0%</td></tr>
+<tr><td>数字宣言 合計=0, 指=2</td><td>手番交代: 開始側手=1, 相手手=2, 直前=数字0</td><td>1</td><td>5.0%</td></tr>
+<tr><td>ガード, 指=0</td><td>手番交代: 開始側手=2, 相手手=2, 直前=ガード</td><td>1</td><td>5.0%</td></tr>
+<tr><td>スキップ, 指=2</td><td>手番交代: 開始側手=2, 相手手=2, 直前=スキップ</td><td>1</td><td>5.0%</td></tr>
+<tr><td>チャージ, 指=2</td><td>手番交代: 開始側手=2, 相手手=2, 直前=チャージ</td><td>1</td><td>5.0%</td></tr>
+<tr><td>数字宣言 合計=3, 指=0</td><td>手番交代: 開始側手=1, 相手手=2, 直前=数字3</td><td>1</td><td>5.0%</td></tr>
+<tr><td>スキップ, 指=0</td><td>手番交代: 開始側手=2, 相手手=2, 直前=スキップ</td><td>1</td><td>5.0%</td></tr>
+                      </tbody></table>
+                    </section>
+                    <section>
+                      <h3>開始側初手</h3>
+                      <table><thead><tr><th>行動</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>セメント, 指=0</td><td>2</td><td>10.0%</td></tr>
+<tr><td>ロック, 指=2</td><td>2</td><td>10.0%</td></tr>
+<tr><td>クイック, 指=2</td><td>1</td><td>5.0%</td></tr>
+<tr><td>ブースト, 指=0</td><td>1</td><td>5.0%</td></tr>
+<tr><td>数字宣言 合計=0, 指=2</td><td>1</td><td>5.0%</td></tr>
+<tr><td>ガード, 指=0</td><td>1</td><td>5.0%</td></tr>
+<tr><td>スキップ, 指=2</td><td>1</td><td>5.0%</td></tr>
+<tr><td>チャージ, 指=2</td><td>1</td><td>5.0%</td></tr>
+<tr><td>数字宣言 合計=3, 指=0</td><td>1</td><td>5.0%</td></tr>
+<tr><td>スキップ, 指=0</td><td>1</td><td>5.0%</td></tr>
+<tr><td>フェイント, 指=0</td><td>1</td><td>5.0%</td></tr>
+<tr><td>数字宣言 合計=2, 指=1</td><td>1</td><td>5.0%</td></tr>
+<tr><td>数字宣言 合計=3, 指=1</td><td>1</td><td>5.0%</td></tr>
+<tr><td>ガード, 指=2</td><td>1</td><td>5.0%</td></tr>
+<tr><td>タイム, 指=0</td><td>1</td><td>5.0%</td></tr>
+<tr><td>ロック, 指=1</td><td>1</td><td>5.0%</td></tr>
+<tr><td>クイック, 指=0</td><td>1</td><td>5.0%</td></tr>
+<tr><td>フラッシュ, 指=0</td><td>1</td><td>5.0%</td></tr>
+                      </tbody></table>
+                    </section>
+                    <section>
+                      <h3>開幕の区切り</h3>
+                      <table><thead><tr><th>区切り</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>手番交代: 開始側手=2, 相手手=2, 直前=ロック</td><td>3</td><td>15.0%</td></tr>
+<tr><td>手番交代: 開始側手=2, 相手手=2, 直前=クイック</td><td>2</td><td>10.0%</td></tr>
+<tr><td>手番交代: 開始側手=2, 相手手=2, 直前=ガード</td><td>2</td><td>10.0%</td></tr>
+<tr><td>手番交代: 開始側手=2, 相手手=2, 直前=スキップ</td><td>2</td><td>10.0%</td></tr>
+<tr><td>手番交代: 開始側手=1, 相手手=2, 直前=数字3</td><td>2</td><td>10.0%</td></tr>
+<tr><td>手番交代: 開始側手=2, 相手手=2, 直前=セメント</td><td>2</td><td>10.0%</td></tr>
+<tr><td>手番交代: 開始側手=2, 相手手=2, 直前=ブースト</td><td>1</td><td>5.0%</td></tr>
+<tr><td>手番交代: 開始側手=1, 相手手=2, 直前=数字0</td><td>1</td><td>5.0%</td></tr>
+<tr><td>手番交代: 開始側手=2, 相手手=2, 直前=チャージ</td><td>1</td><td>5.0%</td></tr>
+<tr><td>手番交代: 開始側手=1, 相手手=2, 直前=スキップ</td><td>1</td><td>5.0%</td></tr>
+<tr><td>手番交代: 開始側手=1, 相手手=2, 直前=数字2</td><td>1</td><td>5.0%</td></tr>
+<tr><td>手番交代: 開始側手=2, 相手手=2, 直前=タイム</td><td>1</td><td>5.0%</td></tr>
+<tr><td>手番交代: 開始側手=2, 相手手=0, 直前=フラッシュ</td><td>1</td><td>5.0%</td></tr>
+                      </tbody></table>
+                    </section>
+                    <section>
+                      <h3>開始側の勝敗</h3>
+                      <table><thead><tr><th>結果</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>開始側勝利</td><td>14</td><td>70.0%</td></tr>
+<tr><td>開始側敗北</td><td>6</td><td>30.0%</td></tr>
+                      </tbody></table>
+                    </section>
+                    <section>
+                      <h3>開幕コピー対象</h3>
+                      <table><thead><tr><th>参照先</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td colspan="3">なし</td></tr>
+                      </tbody></table>
+                    </section>
+                    <section>
+                      <h3>開始側コピー対象 全体</h3>
+                      <table><thead><tr><th>参照先</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>チャージ</td><td>1</td><td>50.0%</td></tr>
+<tr><td>数字3</td><td>1</td><td>50.0%</td></tr>
+                      </tbody></table>
+                    </section>
+                  </div>
+                  <h3>代表トレース</h3>
+                  <table class="trace"><thead><tr><th>手</th><th>TP側</th><th>直前状態</th><th>TP行動</th><th>NTP反応</th><th>コピー対象</th><th>イベント</th><th>結果</th></tr></thead><tbody>
+                    <tr><td>1</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=-</td><td>クイック, 指=2</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>2</td><td>手番交代後側</td><td>TP手=2, NTP手=2, 直前=クイック</td><td>数字宣言 合計=2, 指=2</td><td>カウンター, 指=0</td><td>-</td><td>counter_number_hit_opp_scores</td><td>手番交代</td></tr>
+<tr><td>3</td><td>開始側</td><td>TP手=1, NTP手=2, 直前=数字2</td><td>タイム, 指=1</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>4</td><td>手番交代後側</td><td>TP手=2, NTP手=1, 直前=タイム</td><td>ガード, 指=2</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>5</td><td>開始側</td><td>TP手=1, NTP手=2, 直前=ガード</td><td>ロック, 指=0</td><td>カウンター, 指=0</td><td>-</td><td>lock_success</td><td>手番交代</td></tr>
+<tr><td>6</td><td>手番交代後側</td><td>TP手=2, NTP手=1, 直前=ロック</td><td>ガード, 指=2</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>7</td><td>開始側</td><td>TP手=1, NTP手=2, 直前=ガード</td><td>数字宣言 合計=3, 指=0</td><td>なし, 指=0</td><td>-</td><td>number_miss</td><td>手番交代</td></tr>
+<tr><td>8</td><td>手番交代後側</td><td>TP手=2, NTP手=1, 直前=数字3</td><td>チャージ, 指=1</td><td>カウンター, 指=0</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>9</td><td>開始側</td><td>TP手=1, NTP手=2, 直前=チャージ</td><td>コピー, 指=1</td><td>カウンター, 指=0</td><td>チャージ</td><td>copy_counter_used</td><td>手番交代</td></tr>
+<tr><td>10</td><td>手番交代後側</td><td>TP手=2, NTP手=1, 直前=コピー</td><td>数字宣言 合計=0, 指=0</td><td>カウンター, 指=0</td><td>-</td><td>counter_number_hit_opp_scores</td><td>終端報酬=-1.0</td></tr>
+                  </tbody></table>
+                  <div class="warn"><strong>期待確認:</strong><ul><li>100%カウンターで初手フェイント/ロックが不足: 20.0%</li></ul></div>
+                </details>
+                
+                <details class="condition">
+                  <summary>
+                    <strong>確率サンプル評価 / カウンター100%・指一様</strong>
+                    <span>開始側勝利 14 / 開始側敗北 6</span>
+                  </summary>
+                  <p class="internal-name">内部表記: stochastic / counter_uniform</p>
+                  <div class="expect">
+                    <strong>100%カウンターへの開始側手順</strong>
+                    <p>相手は必ずカウンターし、指だけ揺れる。対カウンター手順が指条件に依存せず残るかを見る。</p>
+                  </div>
+                  <div class="chips">
+                    <span>平均総手数 7.2</span>
+                    <span>開始側コピー参照 4回</span>
+                    <span>開幕コピー参照 1回</span>
+                  </div>
+                  <div class="grid">
+                    <section>
+                      <h3>開始側最初の連続手番</h3>
+                      <table><thead><tr><th>手順</th><th>区切り</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>ブースト, 指=0</td><td>手番交代: 開始側手=2, 相手手=2, 直前=ブースト</td><td>2</td><td>10.0%</td></tr>
+<tr><td>セメント, 指=0</td><td>手番交代: 開始側手=2, 相手手=2, 直前=セメント</td><td>2</td><td>10.0%</td></tr>
+<tr><td>数字宣言 合計=4, 指=0</td><td>手番交代: 開始側手=1, 相手手=2, 直前=数字4</td><td>1</td><td>5.0%</td></tr>
+<tr><td>フラッシュ, 指=1</td><td>手番交代: 開始側手=2, 相手手=2, 直前=フラッシュ</td><td>1</td><td>5.0%</td></tr>
+<tr><td>数字宣言 合計=4, 指=2</td><td>手番交代: 開始側手=1, 相手手=2, 直前=数字4</td><td>1</td><td>5.0%</td></tr>
+<tr><td>フラッシュ, 指=2</td><td>手番交代: 開始側手=2, 相手手=2, 直前=フラッシュ</td><td>1</td><td>5.0%</td></tr>
+<tr><td>フェイント, 指=0 -&gt; コピー, 指=1 / 参照=フェイント -&gt; 数字宣言 合計=2, 指=0 -&gt; 数字宣言 合計=1, 指=0</td><td>手番交代: 開始側手=0, 相手手=2, 直前=数字1</td><td>1</td><td>5.0%</td></tr>
+<tr><td>ロック, 指=1</td><td>手番交代: 開始側手=2, 相手手=2, 直前=ロック</td><td>1</td><td>5.0%</td></tr>
+<tr><td>スキップ, 指=1</td><td>手番交代: 開始側手=2, 相手手=2, 直前=スキップ</td><td>1</td><td>5.0%</td></tr>
+<tr><td>数字宣言 合計=3, 指=0</td><td>手番交代: 開始側手=1, 相手手=2, 直前=数字3</td><td>1</td><td>5.0%</td></tr>
+                      </tbody></table>
+                    </section>
+                    <section>
+                      <h3>開始側初手</h3>
+                      <table><thead><tr><th>行動</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>ブースト, 指=0</td><td>2</td><td>10.0%</td></tr>
+<tr><td>セメント, 指=0</td><td>2</td><td>10.0%</td></tr>
+<tr><td>数字宣言 合計=4, 指=0</td><td>1</td><td>5.0%</td></tr>
+<tr><td>フラッシュ, 指=1</td><td>1</td><td>5.0%</td></tr>
+<tr><td>数字宣言 合計=4, 指=2</td><td>1</td><td>5.0%</td></tr>
+<tr><td>フラッシュ, 指=2</td><td>1</td><td>5.0%</td></tr>
+<tr><td>フェイント, 指=0</td><td>1</td><td>5.0%</td></tr>
+<tr><td>ロック, 指=1</td><td>1</td><td>5.0%</td></tr>
+<tr><td>スキップ, 指=1</td><td>1</td><td>5.0%</td></tr>
+<tr><td>数字宣言 合計=3, 指=0</td><td>1</td><td>5.0%</td></tr>
+<tr><td>数字宣言 合計=3, 指=1</td><td>1</td><td>5.0%</td></tr>
+<tr><td>セメント, 指=2</td><td>1</td><td>5.0%</td></tr>
+<tr><td>ロック, 指=0</td><td>1</td><td>5.0%</td></tr>
+<tr><td>チャージ, 指=2</td><td>1</td><td>5.0%</td></tr>
+<tr><td>タイム, 指=2</td><td>1</td><td>5.0%</td></tr>
+<tr><td>数字宣言 合計=4, 指=1</td><td>1</td><td>5.0%</td></tr>
+<tr><td>タイム, 指=1</td><td>1</td><td>5.0%</td></tr>
+<tr><td>数字宣言 合計=0, 指=2</td><td>1</td><td>5.0%</td></tr>
+                      </tbody></table>
+                    </section>
+                    <section>
+                      <h3>開幕の区切り</h3>
+                      <table><thead><tr><th>区切り</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>手番交代: 開始側手=1, 相手手=2, 直前=数字4</td><td>3</td><td>15.0%</td></tr>
+<tr><td>手番交代: 開始側手=2, 相手手=2, 直前=セメント</td><td>3</td><td>15.0%</td></tr>
+<tr><td>手番交代: 開始側手=2, 相手手=2, 直前=フラッシュ</td><td>2</td><td>10.0%</td></tr>
+<tr><td>手番交代: 開始側手=2, 相手手=2, 直前=ブースト</td><td>2</td><td>10.0%</td></tr>
+<tr><td>手番交代: 開始側手=2, 相手手=2, 直前=ロック</td><td>2</td><td>10.0%</td></tr>
+<tr><td>手番交代: 開始側手=1, 相手手=2, 直前=数字3</td><td>2</td><td>10.0%</td></tr>
+<tr><td>手番交代: 開始側手=2, 相手手=2, 直前=タイム</td><td>2</td><td>10.0%</td></tr>
+<tr><td>手番交代: 開始側手=0, 相手手=2, 直前=数字1</td><td>1</td><td>5.0%</td></tr>
+<tr><td>手番交代: 開始側手=2, 相手手=2, 直前=スキップ</td><td>1</td><td>5.0%</td></tr>
+<tr><td>手番交代: 開始側手=2, 相手手=2, 直前=チャージ</td><td>1</td><td>5.0%</td></tr>
+<tr><td>手番交代: 開始側手=1, 相手手=2, 直前=数字0</td><td>1</td><td>5.0%</td></tr>
+                      </tbody></table>
+                    </section>
+                    <section>
+                      <h3>開始側の勝敗</h3>
+                      <table><thead><tr><th>結果</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>開始側勝利</td><td>14</td><td>70.0%</td></tr>
+<tr><td>開始側敗北</td><td>6</td><td>30.0%</td></tr>
+                      </tbody></table>
+                    </section>
+                    <section>
+                      <h3>開幕コピー対象</h3>
+                      <table><thead><tr><th>参照先</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>フェイント</td><td>1</td><td>100.0%</td></tr>
+                      </tbody></table>
+                    </section>
+                    <section>
+                      <h3>開始側コピー対象 全体</h3>
+                      <table><thead><tr><th>参照先</th><th>回数</th><th>割合</th></tr></thead><tbody>
+                        <tr><td>スキップ</td><td>1</td><td>25.0%</td></tr>
+<tr><td>フェイント</td><td>1</td><td>25.0%</td></tr>
+<tr><td>ガード</td><td>1</td><td>25.0%</td></tr>
+<tr><td>数字1</td><td>1</td><td>25.0%</td></tr>
+                      </tbody></table>
+                    </section>
+                  </div>
+                  <h3>代表トレース</h3>
+                  <table class="trace"><thead><tr><th>手</th><th>TP側</th><th>直前状態</th><th>TP行動</th><th>NTP反応</th><th>コピー対象</th><th>イベント</th><th>結果</th></tr></thead><tbody>
+                    <tr><td>1</td><td>開始側</td><td>TP手=2, NTP手=2, 直前=-</td><td>数字宣言 合計=4, 指=0</td><td>カウンター, 指=2</td><td>-</td><td>counter_number_miss_me_scores</td><td>手番交代</td></tr>
+<tr><td>2</td><td>手番交代後側</td><td>TP手=2, NTP手=1, 直前=数字4</td><td>スキップ, 指=2</td><td>カウンター, 指=1</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>3</td><td>開始側</td><td>TP手=1, NTP手=2, 直前=スキップ</td><td>コピー, 指=0</td><td>カウンター, 指=2</td><td>スキップ</td><td>copy_counter_used</td><td>手番交代</td></tr>
+<tr><td>4</td><td>手番交代後側</td><td>TP手=2, NTP手=1, 直前=コピー</td><td>クイック, 指=0</td><td>カウンター, 指=1</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>5</td><td>開始側</td><td>TP手=1, NTP手=2, 直前=クイック</td><td>クイック, 指=1</td><td>カウンター, 指=2</td><td>-</td><td>counter_no_effect</td><td>手番交代</td></tr>
+<tr><td>6</td><td>手番交代後側</td><td>TP手=2, NTP手=1, 直前=クイック</td><td>フェイント, 指=2</td><td>カウンター, 指=1</td><td>-</td><td>feint_success</td><td>追加ターン</td></tr>
+<tr><td>7</td><td>手番交代後側</td><td>TP手=1, NTP手=1, 直前=フェイント</td><td>数字宣言 合計=2, 指=1</td><td>カウンター, 指=1</td><td>-</td><td>counter_number_hit_opp_scores</td><td>終端報酬=-1.0</td></tr>
+                  </tbody></table>
+                  <div class="warn"><strong>期待確認:</strong><ul><li>100%カウンターで初手フェイント/ロックが不足: 15.0%</li></ul></div>
+                </details>
+                
+</main>
+</body>
+</html>
