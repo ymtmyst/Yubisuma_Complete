@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ルール文書 完全ルール(新)</title>
+<style>
+:root { color-scheme: light dark; }
+* { box-sizing: border-box; }
+body { margin: 0; font-family: -apple-system, "Segoe UI", "Hiragino Kaku Gothic ProN",
+  "Yu Gothic", Meiryo, sans-serif; line-height: 1.75; color: #1f2328;
+  background: #f6f7f9; }
+.wrap { max-width: 820px; margin: 0 auto; padding: 32px 24px 96px; }
+.top { display: flex; align-items: center; gap: 12px; margin-bottom: 22px;
+  padding-bottom: 16px; border-bottom: 1px solid #e5e7eb; }
+.top a.back { font-size: 13px; color: #4f46e5; text-decoration: none; font-weight: 600;
+  padding: 6px 12px; border: 1px solid #e5e7eb; border-radius: 8px; background: #fff; }
+.top a.back:hover { border-color: #a5b4fc; }
+.top .meta { font-size: 12px; color: #9ca3af; margin-left: auto; }
+.doc { background: #fff; border: 1px solid #e5e7eb; border-radius: 14px;
+  padding: 36px 40px; box-shadow: 0 1px 3px rgba(0,0,0,.04); }
+.doc h1 { font-size: 26px; font-weight: 700; margin: 0 0 18px; padding-bottom: 12px;
+  border-bottom: 2px solid #e5e7eb; letter-spacing: .01em; }
+.doc h2 { font-size: 20px; font-weight: 700; margin: 34px 0 12px; padding-bottom: 8px;
+  border-bottom: 1px solid #eceef1; }
+.doc h3 { font-size: 16px; font-weight: 700; margin: 26px 0 10px; color: #374151; }
+.doc h4 { font-size: 14px; font-weight: 700; margin: 20px 0 8px; color: #4b5563; }
+.doc p { margin: 12px 0; }
+.doc ul, .doc ol { margin: 12px 0; padding-left: 26px; }
+.doc li { margin: 5px 0; }
+.doc a { color: #4f46e5; text-decoration: none; }
+.doc a:hover { text-decoration: underline; }
+.doc code { background: #f3f4f6; padding: 2px 6px; border-radius: 5px; font-size: 90%;
+  font-family: "SFMono-Regular", "Consolas", "Menlo", monospace; }
+.doc pre { background: #f6f8fa; border: 1px solid #e5e7eb; border-radius: 10px;
+  padding: 14px 16px; overflow-x: auto; line-height: 1.55; }
+.doc pre code { background: none; padding: 0; font-size: 13px; }
+.doc blockquote { margin: 14px 0; padding: 4px 16px; border-left: 4px solid #a5b4fc;
+  color: #6b7280; background: #f9fafb; border-radius: 0 8px 8px 0; }
+.doc table { border-collapse: collapse; width: 100%; margin: 16px 0; font-size: 14px;
+  display: block; overflow-x: auto; }
+.doc th, .doc td { border: 1px solid #e5e7eb; padding: 8px 12px; text-align: left;
+  vertical-align: top; }
+.doc th { background: #f3f4f6; font-weight: 700; }
+.doc tr:nth-child(even) td { background: #fafbfc; }
+.doc hr { border: none; border-top: 1px solid #e5e7eb; margin: 28px 0; }
+.doc img { max-width: 100%; }
+/* 完全ルール 専用 */
+.doc details.rb { border: 1px solid #e5e7eb; border-radius: 10px; margin: 10px 0;
+  background: #fbfbfc; overflow: hidden; }
+.doc details.rb > summary { cursor: pointer; list-style: none; padding: 12px 16px;
+  font-weight: 700; font-size: 15px; user-select: none; display: flex; align-items: center; gap: 8px; }
+.doc details.rb > summary::-webkit-details-marker { display: none; }
+.doc details.rb > summary::before { content: "▶"; color: #9ca3af; font-size: 11px;
+  transition: transform .15s; }
+.doc details.rb[open] > summary::before { transform: rotate(90deg); }
+.doc details.rb > summary:hover { background: #f3f4f6; }
+.doc .rbbody { padding: 4px 18px 14px; border-top: 1px solid #eceef1; }
+.doc .rbbody > *:first-child { margin-top: 12px; }
+.doc .skill { font-weight: 700; background: #eef2ff; color: #4338ca;
+  padding: 1px 7px; border-radius: 6px; font-size: 92%; }
+.doc .rnote { font-size: 13px; color: #6b7280; margin: 8px 0; }
+.doc .rh3 { font-size: 15px; }
+footer { margin-top: 40px; font-size: 12px; color: #9ca3af; text-align: center; }
+@media (prefers-color-scheme: dark) {
+  body { background: #0f1115; color: #d1d5db; }
+  .top { border-color: #232936; }
+  .top a.back { background: #171a21; border-color: #232936; color: #a5b4fc; }
+  .doc { background: #171a21; border-color: #232936; box-shadow: none; }
+  .doc h1 { border-color: #232936; }
+  .doc h2 { border-color: #1f2530; }
+  .doc h3 { color: #cbd5e1; }
+  .doc h4 { color: #b6bdc8; }
+  .doc code { background: #232936; }
+  .doc pre { background: #12151b; border-color: #232936; }
+  .doc blockquote { background: #12151b; color: #9ca3af; border-color: #4338ca; }
+  .doc th, .doc td { border-color: #232936; }
+  .doc th { background: #1b2028; }
+  .doc tr:nth-child(even) td { background: #12151b; }
+  .doc hr { border-color: #232936; }
+  .doc details.rb { background: #12151b; border-color: #232936; }
+  .doc details.rb > summary:hover { background: #1b2028; }
+  .doc .rbbody { border-color: #232936; }
+  .doc .skill { background: #1e1b3a; color: #c4b5fd; }
+}
+</style></head>
+<body><div class="wrap">
+<div class="top"><a class="back" href="../index.html">← ハブに戻る</a>
+<span class="meta">更新 07-12 ・ 完全ルール（新）</span></div>
+<article class="doc"><h1>ルール文書 完全ルール(新)</h1>
+<h2>定義</h2>
+<details class="rb"><summary><strong>スキル/宣言/効果/発動</strong></summary><div class="rbbody">
+<p><strong>スキル</strong>を<strong>宣言</strong>することで<strong>効果</strong>を<strong>発動</strong>する。</p>
+<p>例）<span class="skill">フラッシュ</span>という<strong>スキル</strong>を『いっせーのーせーフラッシュ！』と<strong>宣言</strong>することで、「自分と相手の上げた指の数が同じだった場合、一発上がりする」という<strong>効果</strong>を<strong>発動</strong>する。</p>
+</div></details>
+<details class="rb"><summary><strong>フェーズ/ターン</strong></summary><div class="rbbody">
+<table><tr><td><strong>フェーズ</strong></td><td>自分がターンをはじめてから相手がターンをはじめるまでの期間</td></tr><tr><td><strong>ターン</strong></td><td>スキルを1回宣言する期間</td></tr></table>
+<p>基本は1フェーズにつき1ターン行動する。</p>
+<p><span class="skill">フェイント</span>等の効果で追加ターンを得た場合、1フェーズ中に2ターン以上行動することになる。</p>
+</div></details>
+<details class="rb"><summary><strong>バフ/デバフ/フィールド効果</strong></summary><div class="rbbody">
+<table><tr><td><strong>バフ</strong></td><td>ガード, クイック, チャージ, ミラー</td></tr><tr><td><strong>デバフ</strong></td><td>セメント, ロック, ドロップ</td></tr><tr><td><strong>フィールド効果</strong></td><td>スキップ, ストック, タイム</td></tr></table>
+<details class="rb"><summary>フィールド効果について</summary><div class="rbbody">
+<p>プレイヤ―に効果が直接適用されているわけではなく、<strong>ゲーム環境（ボードゲームでいうボード上）に効果が適用されている</strong>。プレイヤーは間接的にその効果を受けている。</p>
+</div></details>
+</div></details>
+<h2>ルール</h2>
+<ul><li>スキルを宣言していないプレイヤーがいる間、ゲームに勝利することができない。</li></ul>
+<h2>スキル一覧</h2>
+<details class="rb" open><summary><strong>注</strong></summary><div class="rbbody">
+<ul><li>手を降ろす、およびターンを得る効果について、効果の対象とする者が明記されていない場合、自分を対象とする</li></ul>
+<p>例）「手を1つ降ろす」→「自分の手を1つ降ろす」</p>
+<ul><li>手が1つのときに手を2つ降ろす処理が発生した場合、手を1つ降ろす。</li></ul>
+</div></details>
+<p><strong>通常スキル</strong></p>
+<details class="rb"><summary><strong>数字</strong>（難易度：★☆☆）</summary><div class="rbbody">
+<p>上がった指の数が宣言した数と同じだった場合、手を1つ降ろす。</p>
+</div></details>
+<details class="rb"><summary><strong>フラッシュ</strong>（難易度：★☆☆）</summary><div class="rbbody">
+<p>自分と相手の上げた指の数が同じだった場合、手を2つ降ろす。</p>
+</div></details>
+<details class="rb"><summary><strong>セメント</strong>（難易度：★☆☆）</summary><div class="rbbody">
+<p>上がった指を下げられなくする。ゲーム終了時まで継続。</p>
+</div></details>
+<details class="rb"><summary><strong>ガード</strong>（難易度：★☆☆）</summary><div class="rbbody">
+<p>このスキルの効果は、1フェーズ中に一度だけ発動する。</p>
+<ul><li>次に相手が手を同時に2つ以上降ろすとき、そのターン中、相手は手を降ろせなくなる。次の自分のフェーズのはじめまで継続。</li><li>追加1ターンを得る。</li></ul>
+</div></details>
+<details class="rb"><summary><strong>チャージ</strong>（難易度：★☆☆）</summary><div class="rbbody">
+<p>次に自分が数字を宣言するとき、<span style="color:#ff0000">効果を2回分発動する。</span></p>
+</div></details>
+<details class="rb"><summary><strong>クイック</strong>（難易度：★★☆）</summary><div class="rbbody">
+<ul><li>次の自分のターン中に<span class="skill">クイック</span>の効果を発動した場合、手を2つ降ろす。</li><li>その次の自分のターン中に<span class="skill">クイック</span>の効果を発動した場合、手を1つ降ろす。</li></ul>
+</div></details>
+<details class="rb"><summary><strong>スキップ</strong>（難易度：★★☆）</summary><div class="rbbody">
+<p>相手は次にスキルを宣言できる相手のフェーズ中、スキルを宣言することができない。</p>
+</div></details>
+<details class="rb"><summary><strong>ミラー</strong>（準備）（難易度：★★☆）</summary><div class="rbbody">
+<p>自分は、相手のターン中にミラー（メイン）を宣言できるようになる。</p>
+</div></details>
+<p><span style="color:#ff0000"><strong>相手ターン中スキル</strong></span></p>
+<p><strong>相手のターン中にのみ宣言できるスキル。</strong></p>
+<details class="rb"><summary><span style="color:#ff0000"><strong>カウンター</strong></span>（難易度：★☆☆）</summary><div class="rbbody">
+<p>相手がこのターン中に宣言したスキル（<span style="color:#3a32c3"><strong>対カウンタースキル</strong></span>を除く）の効果を発動する代わりに、自身が以下の処理を行う。</p>
+<table><tr><td><strong>相手が宣言したスキル</strong></td><td><strong>処理</strong></td></tr><tr><td>数字</td><td>当たっていれば手を1つ降ろす。外れていれば相手の手を1つ降ろす。</td></tr><tr><td>フラッシュ</td><td>このスキルの効果を発動する。</td></tr><tr><td><span style="color:#009e25">参照スキル（ドロップを除く）</span></td><td>参照元のスキルに準拠する。</td></tr><tr><td>その他</td><td>何もしない。</td></tr></table>
+</div></details>
+<details class="rb"><summary><span style="color:#ff0000"><strong>ミラー</strong>（メイン）</span>（難易度：★★☆）</summary><div class="rbbody">
+<ul><li>相手が手を降ろす、および自分にデバフが付与されるとき、代わりに自分がその効果を発動する。</li><li>自分は、相手のターン中にミラー（メイン）を宣言できなくなる。</li></ul>
+</div></details>
+<p><span style="color:#3a32c3"><strong>対カウンタースキル</strong></span></p>
+<p><strong>相手が<span class="skill">カウンター</span>を宣言した場合に効果を発動するスキル。相手が<span class="skill">カウンター</span>を宣言しなければ何も起こらない。</strong></p>
+<details class="rb"><summary><strong><span style="color:#3a32c3">フェイント</span></strong>（難易度：★☆☆）</summary><div class="rbbody">
+<p>手を1つ降ろし、追加1ターンを得る。</p>
+</div></details>
+<details class="rb"><summary><strong><span style="color:#3a32c3">ロック</span></strong>（難易度：★☆☆）</summary><div class="rbbody">
+<p>次の自分のターン中、相手は<span style="color:#ff0000"><span class="skill">相手ターン中能力</span></span>を宣言できなくなる。</p>
+</div></details>
+<p><span style="color:#009e25"><strong>参照スキル</strong></span></p>
+<p><strong>直前に宣言された通常スキル/<span style="color:#3a32c3">対カウンタースキル</span>を参照するスキル。<span style="color:#009e25">参照スキル</span>/<span style="color:#782069">必殺スキル</span>は参照できない。</strong></p>
+<details class="rb"><summary><strong><span style="color:#009e25">コピー</span></strong>（難易度：★★☆）</summary><div class="rbbody">
+<p>直前に宣言されたスキルの効果を2回分発動する。</p>
+<details class="rb"><summary><strong>影響のあるスキル</strong></summary><div class="rbbody">
+<table><tr><td>数字</td><td>当たっていれば手を<strong><span class="skill">2つ</span></strong>降ろす。カウンターされた場合、<strong><span class="skill">カウンターの効果も2回発動する</span></strong>。</td></tr><tr><td>フェイント</td><td>手を<strong><span class="skill">2つ</span></strong>降ろし、<strong><span class="skill">追加2ターン</span></strong>を得る。</td></tr><tr><td>スキップ</td><td>相手は次<strong><span class="skill">＆その次</span></strong>にスキルを宣言できる相手のフェーズ中、スキルを宣言することができない。</td></tr></table>
+</div></details>
+</div></details>
+<details class="rb"><summary><strong><span style="color:#009e25">ストック+α</span></strong>（難易度：★★★）</summary><div class="rbbody">
+<p>直前に宣言されたスキル（数字を除く）をストックする。</p>
+<p class="rnote">※すでにストックしているスキルは不可</p>
+<h3 class="rh3"><strong>α</strong></h3>
+<p>以下のスキルは、1フェーズ中に1度だけいずれかを宣言することができる。</p>
+<table><tr><td><strong>チョイス</strong></td><td>自分がストックしているスキルの中から1つを選び、その効果を発動する。</td></tr><tr><td><strong>オール</strong></td><td>自分がストックしているすべてのスキルの効果を、好きな順番で発動する。その後、自分のストックをすべて失う。</td></tr><tr><td><strong>ドロップ</strong></td><td>次の相手のフェーズ中、自分がストックしたすべてのスキルを宣言できなくする。さらに、追加1ターンを得る。</td></tr></table>
+</div></details>
+<p><span style="color:#782069"><strong>必殺スキル</strong></span></p>
+<p><strong>各プレイヤーがゲーム中にそれぞれ1度だけ宣言できるスキル。</strong></p>
+<details class="rb"><summary><strong><span style="color:#782069">ブースト</span></strong>（難易度：★☆☆）</summary><div class="rbbody">
+<p>追加3ターンを得る。</p>
+</div></details>
+<details class="rb"><summary><span style="color:#782069"><strong>ブロック</strong></span>（<span style="color:#ff0000"><strong>相手ターン中スキル</strong></span>）（難易度：★☆☆）</summary><div class="rbbody">
+<p>相手は、このターン中に宣言したスキル（スキップを除く）の効果を発動できない。</p>
+</div></details>
+<details class="rb"><summary><span style="color:#782069"><strong>タイム</strong></span>&amp;color(#ff0000)（難易度：★★★）</summary><div class="rbbody">
+<ul><li>次に相手が2回続けてスキルを宣言しようとした時、代わりに自分がスキルを宣言する。</li><li>追加1ターンを得る。</li></ul>
+<details class="rb"><summary><strong>影響のあるスキル</strong>（タイムを解除可能）</summary><div class="rbbody">
+<table><tr><td>ガード, フェイント, ブースト</td><td>「nターン得る」が発動しない。</td></tr><tr><td>スキップ</td><td>通常の処理を行った後、本来はスキップ宣言側のターンになるところ、代わりに宣言された側がターンを行う。</td></tr></table>
+</div></details>
+</div></details>
+<details class="rb"><summary><span style="color:#782069"><strong>リバーシ</strong></span>&amp;color(#ff0000)（難易度：★★★）</summary><div class="rbbody">
+<p>自分と相手の手の数、およびバフ・デバフを入れ替える。</p>
+</div></details>
+</article>
+<footer>results/docs/ — <code>python -m complete_ai.build_report_hub</code> で再生成</footer>
+</div></body></html>

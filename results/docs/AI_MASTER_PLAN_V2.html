@@ -1,0 +1,333 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>計画書 AI_MASTER_PLAN_V2</title>
+<style>
+:root { color-scheme: light dark; }
+* { box-sizing: border-box; }
+body { margin: 0; font-family: -apple-system, "Segoe UI", "Hiragino Kaku Gothic ProN",
+  "Yu Gothic", Meiryo, sans-serif; line-height: 1.75; color: #1f2328;
+  background: #f6f7f9; }
+.wrap { max-width: 820px; margin: 0 auto; padding: 32px 24px 96px; }
+.top { display: flex; align-items: center; gap: 12px; margin-bottom: 22px;
+  padding-bottom: 16px; border-bottom: 1px solid #e5e7eb; }
+.top a.back { font-size: 13px; color: #4f46e5; text-decoration: none; font-weight: 600;
+  padding: 6px 12px; border: 1px solid #e5e7eb; border-radius: 8px; background: #fff; }
+.top a.back:hover { border-color: #a5b4fc; }
+.top .meta { font-size: 12px; color: #9ca3af; margin-left: auto; }
+.doc { background: #fff; border: 1px solid #e5e7eb; border-radius: 14px;
+  padding: 36px 40px; box-shadow: 0 1px 3px rgba(0,0,0,.04); }
+.doc h1 { font-size: 26px; font-weight: 700; margin: 0 0 18px; padding-bottom: 12px;
+  border-bottom: 2px solid #e5e7eb; letter-spacing: .01em; }
+.doc h2 { font-size: 20px; font-weight: 700; margin: 34px 0 12px; padding-bottom: 8px;
+  border-bottom: 1px solid #eceef1; }
+.doc h3 { font-size: 16px; font-weight: 700; margin: 26px 0 10px; color: #374151; }
+.doc h4 { font-size: 14px; font-weight: 700; margin: 20px 0 8px; color: #4b5563; }
+.doc p { margin: 12px 0; }
+.doc ul, .doc ol { margin: 12px 0; padding-left: 26px; }
+.doc li { margin: 5px 0; }
+.doc a { color: #4f46e5; text-decoration: none; }
+.doc a:hover { text-decoration: underline; }
+.doc code { background: #f3f4f6; padding: 2px 6px; border-radius: 5px; font-size: 90%;
+  font-family: "SFMono-Regular", "Consolas", "Menlo", monospace; }
+.doc pre { background: #f6f8fa; border: 1px solid #e5e7eb; border-radius: 10px;
+  padding: 14px 16px; overflow-x: auto; line-height: 1.55; }
+.doc pre code { background: none; padding: 0; font-size: 13px; }
+.doc blockquote { margin: 14px 0; padding: 4px 16px; border-left: 4px solid #a5b4fc;
+  color: #6b7280; background: #f9fafb; border-radius: 0 8px 8px 0; }
+.doc table { border-collapse: collapse; width: 100%; margin: 16px 0; font-size: 14px;
+  display: block; overflow-x: auto; }
+.doc th, .doc td { border: 1px solid #e5e7eb; padding: 8px 12px; text-align: left;
+  vertical-align: top; }
+.doc th { background: #f3f4f6; font-weight: 700; }
+.doc tr:nth-child(even) td { background: #fafbfc; }
+.doc hr { border: none; border-top: 1px solid #e5e7eb; margin: 28px 0; }
+.doc img { max-width: 100%; }
+/* 完全ルール 専用 */
+.doc details.rb { border: 1px solid #e5e7eb; border-radius: 10px; margin: 10px 0;
+  background: #fbfbfc; overflow: hidden; }
+.doc details.rb > summary { cursor: pointer; list-style: none; padding: 12px 16px;
+  font-weight: 700; font-size: 15px; user-select: none; display: flex; align-items: center; gap: 8px; }
+.doc details.rb > summary::-webkit-details-marker { display: none; }
+.doc details.rb > summary::before { content: "▶"; color: #9ca3af; font-size: 11px;
+  transition: transform .15s; }
+.doc details.rb[open] > summary::before { transform: rotate(90deg); }
+.doc details.rb > summary:hover { background: #f3f4f6; }
+.doc .rbbody { padding: 4px 18px 14px; border-top: 1px solid #eceef1; }
+.doc .rbbody > *:first-child { margin-top: 12px; }
+.doc .skill { font-weight: 700; background: #eef2ff; color: #4338ca;
+  padding: 1px 7px; border-radius: 6px; font-size: 92%; }
+.doc .rnote { font-size: 13px; color: #6b7280; margin: 8px 0; }
+.doc .rh3 { font-size: 15px; }
+footer { margin-top: 40px; font-size: 12px; color: #9ca3af; text-align: center; }
+@media (prefers-color-scheme: dark) {
+  body { background: #0f1115; color: #d1d5db; }
+  .top { border-color: #232936; }
+  .top a.back { background: #171a21; border-color: #232936; color: #a5b4fc; }
+  .doc { background: #171a21; border-color: #232936; box-shadow: none; }
+  .doc h1 { border-color: #232936; }
+  .doc h2 { border-color: #1f2530; }
+  .doc h3 { color: #cbd5e1; }
+  .doc h4 { color: #b6bdc8; }
+  .doc code { background: #232936; }
+  .doc pre { background: #12151b; border-color: #232936; }
+  .doc blockquote { background: #12151b; color: #9ca3af; border-color: #4338ca; }
+  .doc th, .doc td { border-color: #232936; }
+  .doc th { background: #1b2028; }
+  .doc tr:nth-child(even) td { background: #12151b; }
+  .doc hr { border-color: #232936; }
+  .doc details.rb { background: #12151b; border-color: #232936; }
+  .doc details.rb > summary:hover { background: #1b2028; }
+  .doc .rbbody { border-color: #232936; }
+  .doc .skill { background: #1e1b3a; color: #c4b5fd; }
+}
+</style></head>
+<body><div class="wrap">
+<div class="top"><a class="back" href="../index.html">← ハブに戻る</a>
+<span class="meta">更新 07-13 ・ AI_MASTER_PLAN_V2.md</span></div>
+<article class="doc"><h1>計画書 AI_MASTER_PLAN_V2</h1>
+<h1 id="complete-ai-v2-off-ai">Complete AI マスタープラン V2 — ミラー・リバーシ OFF 最強 AI</h1>
+<p>作成日: 2026-07-12
+作成方法: 旧計画(complete_ai_plan.html / AI_PROGRESS_CHECKLIST.md)を前提にせず、コード・ルール・状態空間をゼロベースで再調査して策定
+対象設定: <code>RulesConfig(enable_mirror=False, enable_reversi=False)</code> に固定(ミラー・リバーシ OFF)
+運用: <code>AI_WORKFLOW_RULES.md</code> に完全準拠(各フェーズ末に確認成果物を提示し、ユーザー承認まで次工程に進まない)</p>
+<hr />
+<h2 id="1">1. 目的と「最強」の定義</h2>
+<p>目的はミラー・リバーシ OFF の Complete ルールで最強の AI を作ること。</p>
+<p>このゲームは <strong>完全情報・決定論・同時手番・二人ゼロ和のマルコフゲーム</strong> である(<code>complete_solver/transition.py</code> で確認済み。乱数なし、隠れ情報なし、同時宣言のみ)。この構造のゲームには一意のゲーム値と定常マルコフ完全均衡(マキシミン戦略)が存在し、各状態の最適混合戦略は「子状態の値を並べた行列ゲームを LP で解く」ことで厳密に求まる。</p>
+<p>したがって「最強」を次の3条件で定義する。</p>
+<ol>
+<li><strong>非搾取性(近似ナッシュ)</strong>: どんな相手戦略にも期待値で大きく負けない。混合戦略を含む均衡プレイ。</li>
+<li><strong>搾取性</strong>: 弱い相手(none/random 等の固定方策、旧モデル)には最短手数で確実に勝つ。</li>
+<li><strong>人間妥当性</strong>: 行動分布・初手・スキル使用が人間視点で説明可能(AI_WORKFLOW_RULES の目視ゲート)。</li>
+</ol>
+<p>測定方法は §6 の採用ゲートで固定する。勝率単独では判定しない。</p>
+<hr />
+<h2 id="2-2026-07-12">2. ゼロベース調査で確立した事実(2026-07-12 計測)</h2>
+<p>計画の根拠となる一次データ。すべて本日実測・実読した。</p>
+<ol>
+<li>
+<p><strong>ルールエンジンは高品質で再利用可能。</strong>
+   <code>complete_solver/</code>(state / actions / transition / matrix_game / finite_horizon / state_space)は純粋関数・immutable 設計で、132 テストが PASS。視点交代の符号処理(<code>same_turn_player</code>)も遷移層で正しく扱われている。<strong>これはプロジェクトの中核資産であり全面的に残す。</strong></p>
+</li>
+<li>
+<p><strong>全状態列挙(=全域厳密解)は不可能。</strong>
+   ミラー・リバーシ OFF で初期状態から BFS 列挙を実測した結果、8 分で到達 54.1 万状態・未展開フロンティア 43.3 万・拡張 1 回あたり新規状態 4〜7 個のまま減速せず。ストックの部分集合(2^8)× セメント × バフ類 × 両者分の組合せで、到達可能空間は少なくとも 10^7 オーダー以上と推定される。<strong>「小さいゲームだから値反復で終わり」は成立しない。</strong> 旧計画の <code>max_states=400〜500</code> の値反復は全体のごく一部を leaf=0 で打ち切った近似であり、そこから作った BC 教師(zero leaf)が数字偏重の根本原因だったことと整合する。</p>
+</li>
+<li>
+<p><strong>深さ制限 LP 探索は既に存在するが遅い。</strong>
+   <code>FiniteHorizonSolver</code> は「LP バックアップ付き深さ制限探索」そのもの(=本計画の実戦エンジンの原型)。ただし素の Python で初期局面(TP 45 手 × NTP 9 手)の depth=3 が 15.7 秒、depth=4 が 121 秒。<strong>高速化が第一級の課題。</strong></p>
+</li>
+<li>
+<p><strong>GPU 環境あり。</strong> Python 3.10 / torch 2.6.0+cu124 / CUDA 利用可。価値ネット学習は問題なし。</p>
+</li>
+<li>
+<p><strong>旧路線(BC + MaskablePPO)の失敗は偶発ではなく構造的。</strong>
+   - zero-leaf VI 教師 → 数字 100% 偏重(境界アーティファクト)
+   - 反応履歴 16 次元の観測 → 状態が非マルコフ化し、均衡概念と評価指標(exploitability)が壊れた
+   - 決定論的初手(フェイント固定・スキップ固定)→ 同時手番ゲームでは決定的方策は原理的に搾取可能。ent_coef 調整では解決しなかった(item 42)
+   - none 相手の無限ループ打ち切り → モデルフリー RL が「勝ち筋の発見」を報酬信号だけで行う限界
+   これらは PPO の調整不足ではなく、<strong>モデルフリー・方策ネット中心のアプローチがこのゲームの既知構造(完全情報・厳密遷移・LP で解ける局所均衡)を捨てていること</strong>に起因する。</p>
+</li>
+</ol>
+<hr />
+<h2 id="3-lp">3. 新方針: 探索中心アーキテクチャ(LP バックアップ探索 + 価値ネット + 終盤厳密テーブル)</h2>
+<p>AlphaZero の構図を同時手番ゼロ和ゲーム用に置き換えたもの。方策ネットを主役にせず、<strong>探索を主役</strong>にする。</p>
+<h3 id="_1">実戦時(プレイ)</h3>
+<pre><code>着手 = 深さ制限探索(depth 2〜4, 適応)
+        ├─ 各ノード: 子の値を並べた行列ゲームを LP で解き、値と混合戦略を得る
+        ├─ 葉: 学習済み価値ネット V(s)(107 次元特徴量)
+        ├─ 終盤・低複雑度状態: 厳密テーブルの値を直接参照
+        └─ ルートの LP 混合戦略から実際に「サンプリング」して着手(決定論にしない)
+</code></pre>
+<ul>
+<li><strong>混合戦略サンプリングが仕様の中心。</strong> 同時手番ゲームの均衡は本質的に混合であり、これが旧モデルの「初手固定を突かれる」問題を原理レベルで消す。</li>
+<li>none のような受動的相手には探索が数手先の強制勝ちを直接発見する。γ&lt;1 により最短勝利が選好されるため、無限ループ打ち切りは起こり得ない。</li>
+</ul>
+<h3 id="fitted-nash-value-iteration">学習時(fitted Nash value iteration)</h3>
+<pre><code>繰り返し:
+  1. 自己対戦で状態を収集(双方が現行探索方策、LP 混合からサンプル + ε ランダム注入)
+  2. 収集した各状態に「depth-d LP バックアップ値(葉=現行ネット)」を教師値として付与
+  3. 終端値・終盤厳密テーブル値をアンカーとして混ぜ、V(s) を回帰学習
+  4. 新旧ネットで世代対戦・テーブル一致度を測り、改善していれば採用
+</code></pre>
+<p>これはマルコフゲームに対する fitted Nash-VI(minimax-Q の関数近似版)であり、完全情報ゼロ和では値が一意なので、方策の非定常性・忘却(PPO で起きた catastrophic forgetting)の問題構造がそもそも生じない。<strong>学習対象は「値」だけ</strong>で、方策は常に探索+LP が現場で導出する。</p>
+<h3 id="_2">旧路線の問題がどう消えるか(対応表)</h3>
+<table>
+<thead>
+<tr>
+<th>旧問題</th>
+<th>本アーキテクチャでの帰結</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>zero-leaf 教師の数字偏重</td>
+<td>葉は学習済み V + 終端/テーブルアンカー。leaf=0 境界が存在しない</td>
+</tr>
+<tr>
+<td>初手決定論(フェイント/スキップ固定)</td>
+<td>LP 混合戦略からサンプリング。均衡混合が仕様として保証</td>
+</tr>
+<tr>
+<td>none 相手の無限ループ</td>
+<td>探索が強制勝ちを直接読む。γ&lt;1 で最短勝利選好</td>
+</tr>
+<tr>
+<td>反応履歴で非マルコフ化</td>
+<td>状態は完全観測でマルコフ。履歴特徴量は不要(廃止)</td>
+</tr>
+<tr>
+<td>exploitability 指標の破綻</td>
+<td>BR 攻撃エージェントによる実測搾取率に置換(§6)</td>
+</tr>
+<tr>
+<td>PPO の視点符号バグ類</td>
+<td>solver の遷移層(検証済みコード)だけを使う</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="4">4. 既存資産の取捨</h2>
+<h3 id="_3">残す(そのまま/軽微修正)</h3>
+<ul>
+<li><code>complete_solver/</code> 全部 + テスト 132 件(中核エンジン)</li>
+<li><code>complete_rl/obs.py</code> の先頭 107 次元(= solver <code>State</code> の Markov エンコード)→ 価値ネット特徴量。<strong>反応履歴 16 次元は廃止</strong></li>
+<li><code>complete_rl/env.py</code> + named NTP policies(none/counter/block/random/分離系)→ <strong>評価ハーネス</strong>および BR 攻撃者の訓練環境として</li>
+<li><code>separated_policy_report.py</code> / <code>start_side_policy_diagnostics.py</code> → 行動目視ゲートに再利用</li>
+<li><code>AI_WORKFLOW_RULES.md</code>(運用ルール)</li>
+</ul>
+<h3 id="_4">主軸から外す(アーカイブ。削除はしない)</h3>
+<ul>
+<li>BC 事前学習路線(<code>bc_pretrain.py</code>、depth 教師、leaf mode 一式)</li>
+<li>MaskablePPO / PerspectiveMaskablePPO を「本体」とする路線 — ただし <strong>§6 の BR 攻撃者として再利用する</strong></li>
+<li>episode NTP 切り替え学習方式、反応履歴観測、curriculum / fine-tune 路線</li>
+<li><code>exploitability.py</code> の空履歴 BR 指標(限界確認済み)</li>
+<li>旧学習済みモデル群 — <strong>評価用対戦相手としてのみ残す</strong></li>
+</ul>
+<h3 id="_5">凍結</h3>
+<ul>
+<li><code>AI_PROGRESS_CHECKLIST.md</code> は歴史記録として凍結し、進捗管理は本ファイル §8 のチェックリストに一本化する。</li>
+</ul>
+<hr />
+<h2 id="5">5. フェーズ計画</h2>
+<p>各フェーズの末尾に確認成果物(HTML/表)+ AI の解釈を提示し、<strong>ユーザー承認後に次へ進む</strong>。</p>
+<h3 id="n1">N1. 高速探索基盤(最優先・計画全体の律速)</h3>
+<ul>
+<li>内容:</li>
+<li>遷移・合法手生成の結果キャッシュ、状態の安定ハッシュ、<strong>探索間で持続するトランスポジションテーブル</strong></li>
+<li><strong>純粋鞍点チェック</strong>(行列に純粋均衡があれば LP を呼ばない — 大半のノードで LP 回避見込み)</li>
+<li><strong>ノード内ダブルオラクル</strong>(45×9 の全子展開をやめ、ベストレスポンスを交互に追加して小さい部分行列で均衡を得る)</li>
+<li>明白劣位行動の枝刈り(例: 合計 0〜4 の数字宣言のうち文脈上無意味なもの)</li>
+<li>完了条件: 既存 132 テスト PASS のまま、初期局面 depth=3 ≤ 1 秒・depth=4 ≤ 10 秒(現状 15.7s / 121s)。</li>
+<li>確認成果物: 高速化前後の値・方策の一致検証表、速度ベンチ HTML。</li>
+<li>判断点: 目標未達なら Numba / Rust コア化をここで見積もる(先送りしない)。</li>
+</ul>
+<h3 id="n2">N2. 終盤・低複雑度厳密テーブル</h3>
+<ul>
+<li>内容: 「ストック空 or 小」「hands 合計が少ない」等の部分空間を実測列挙し、規模が許す範囲(目安 10^5〜10^6 状態)を厳密値反復で解いてディスク保存。探索から O(1) プローブ。</li>
+<li>完了条件: テーブル規模・値分布・代表局面の妥当性レポート。探索接続テスト PASS。</li>
+<li>意義: (a) 実戦で終盤は文字通り最適、(b) 価値ネットの正解アンカー、(c) ネット精度の恒久的な検証基準。</li>
+</ul>
+<h3 id="n3-v0">N3. 価値ネット v0</h3>
+<ul>
+<li>内容: 107 次元 → MLP(目安 2〜3 層 × 512)。初期教師データ: ランダム/浅い探索プレイアウトで収集した状態への depth-2〜3 バックアップ値 + N2 テーブル値。</li>
+<li>完了条件: N2 テーブル上での MSE・順位相関レポートで <code>material_leaf_evaluator</code> を明確に上回る。</li>
+<li>確認成果物: 代表局面の V(s) と厳密値の比較表。</li>
+</ul>
+<h3 id="n4-fitted-nash-vi">N4. fitted Nash-VI 自己対戦ループ(本体)</h3>
+<ul>
+<li>内容: §3 の学習ループを世代制で回す。世代ごとに (a) 新旧ネット世代対戦、(b) テーブル一致度、(c) 教師値の分散・発散チェック。ε ランダム状態注入で分布カバレッジを確保。</li>
+<li>完了条件: 3 世代以上連続で世代対戦・テーブル一致度が悪化しないこと。行動分布 HTML の人間確認。</li>
+<li>リスク対応: 発散したらターゲットネット固定・学習率調整・アンカー比率増で戻す(その時点で停止して報告)。</li>
+</ul>
+<h3 id="n5">N5. 実戦エージェント確定</h3>
+<ul>
+<li>内容: 時間予算に応じた適応深度、テーブルプローブ、混合サンプリング(検証用に決定論モードも用意)、人間対戦用 CLI。</li>
+<li>完了条件: 対戦 CLI で人間がプレイ可能。挙動レポート承認。</li>
+</ul>
+<h3 id="n6-6">N6. 評価ゲート(§6 を実施)</h3>
+<ul>
+<li>内容: named NTP 方策一式・旧ベスト PPO 2 モデルとの対戦、<strong>BR 攻撃</strong>(既存 MaskablePPO 基盤を攻撃者として凍結エージェントに 250k steps × 複数 seed 訓練)、行動レポート。</li>
+<li>完了条件: §6 の全ゲート通過 + ユーザー最終承認。</li>
+</ul>
+<h3 id="n7">N7. 反復強化(継続・任意)</h3>
+<ul>
+<li>depth 引き上げ、データ増、ネット拡大、コアの Rust 化、γ 感度(0.997〜0.999)最終確定、弱点局面の的当て学習。</li>
+</ul>
+<p>想定順序は N1 → N2 → N3 → N4 → N5 → N6(→ N7 反復)。N2 と N3 は一部並行可。</p>
+<hr />
+<h2 id="6">6. 採用ゲート(最終合格条件)</h2>
+<ol>
+<li><strong>固定方策制圧</strong>: none / counter_first / block_first / random / 分離系(none_uniform 等)すべてに勝率 ≥ 99%、打ち切り 0(none 含む)。</li>
+<li><strong>旧世代超え</strong>: 旧ベスト PPO(<code>maskable_ppo_bc_standard_episode_mixed</code>、<code>maskable_ppo_bc_depth4_standard_proper</code>)との直接対戦で勝率 ≥ 70%。</li>
+<li><strong>実測非搾取性</strong>: 凍結した本エージェントに対し BR-PPO 攻撃者(250k steps × 3 seeds)を訓練しても、本エージェント側勝率 ≥ 55% を維持。</li>
+<li><strong>人間妥当性</strong>: 初手分布・スキル使用率・開始側手順レポートで警告 0 + ユーザー目視承認。</li>
+<li>上記すべてを <strong>開始側/後手側の両視点</strong>で集計する(旧レポートの視点混同バグの教訓)。</li>
+</ol>
+<hr />
+<h2 id="7">7. リスクと対策</h2>
+<table>
+<thead>
+<tr>
+<th>リスク</th>
+<th>対策</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>N1 の速度目標未達</td>
+<td>ダブルオラクル・キャッシュ・並列自己対戦 → それでも不足なら Numba/Rust コア化を N1 末で即断(計画の律速なので先送りしない)</td>
+</tr>
+<tr>
+<td>価値ネットがストック組合せに汎化しない</td>
+<td>ストックはスキル別 bit で特徴量化済み。N2 テーブルをアンカー・検証基準に常用。ランダム局面注入で分布拡張</td>
+</tr>
+<tr>
+<td>ブートストラップ学習の発散</td>
+<td>終端値+テーブルの固定アンカー、ターゲットネット、世代ゲートで退行検出したら停止・報告</td>
+</tr>
+<tr>
+<td>LP 縮退・タイ</td>
+<td>既存 tolerance 処理を維持。値タイは「短手数勝ち優先」でタイブレーク</td>
+</tr>
+<tr>
+<td>γ の恣意性</td>
+<td>旧 gamma sweep で感度小を確認済み。N7 で 0.997/0.999 比較を最終確認</td>
+</tr>
+<tr>
+<td>「探索が読み切る前提」の穴(超長期戦術)</td>
+<td>depth 不足分は V が吸収する設計。N6 の BR 攻撃が最終的な安全網</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="8">8. チェックリスト</h2>
+<ul>
+<li>[x] N0: 本計画のユーザー承認(2026-07-12。付帯条件: ①作業ごとに WORK_LOG.md へ記録 ②専門解説+平易解説の二重解説 ③タスクごとの所要時間見積もり提示)</li>
+<li>[x] N1: 高速探索基盤 — 実装完了(2026-07-12)。値一致検証済み・ベンチ HTML 生成済み。コールド速度は d3=1.7s / d4=12.7s で目標(1s/10s)まで約2倍残り(warm 再解決は 0.3ms)。残り2倍にはコンパイル化が必要 → 案A(N2/N3先行、実測後判断)/案B(即コンパイル化)をユーザーに提示中</li>
+<li>[x] N1 承認(2026-07-12 案Aで承認: コンパイル化は N4 前に実測スループットで判断。コールド d3=1.7s/d4=12.7s を暫定合格とし N2 へ)</li>
+<li>[x] N2: 終盤厳密DB — 機構完成(2026-07-12)。閉集合列挙+厳密VI+永続化+探索プローブ、参照実装との一致テスト済み(全171テストPASS)。計測の結果、(1,1)終盤の閉集合はすべて巨大(空ストックで140万超)で、オンデマンド方式ではなく「(1,1)宇宙の一括バッチ解決」が本命と判明 → コンパイル化が前提</li>
+<li>[x] N2 承認(2026-07-12 案C改で承認: ストック重要組限定の縮小(1,1)テーブル → 除外スキルの自動重要度検証(逸脱利得スキャン)→ 必要ならアルファベット拡張。初期重要組: フェイント・ロック・フラッシュ・ガード・スキップ。クイックは検証で自動判定。コンパイル化はテーブルの前提から外れ N4 前に実施)</li>
+<li>[x] N2b: 終了(2026-07-12)。成果: コンパイル核(packed_engine/packed_vi、差分テスト検証済み、列挙 Python比約1000倍)+ A0(ストック禁止)宇宙38.3万状態の厳密解。結論: <strong>網羅的終盤テーブルは構造的に不可能</strong>(A4でも3000万超、フルは推定250億)。「保持1個」抽象化はユーザー指摘(ストックは2個以上で真価を発揮)により破棄。終盤の正確さは探索の終端読み切り+価値ネットで担保する設計に一本化し、N3 へ</li>
+<li>[x] N2b 承認(ユーザーの方針確認「ディープラーニングが必要では」→ その通りで N3/N4 が当初から主軸、と整理して合意形成)</li>
+<li>[x] N3: 価値ネット v0 — 完了(2026-07-12)。material_leaf 超えを3ものさし全てで達成(検証MSE 137倍差、深さ3順位相関 0.947 vs 0.598、A0厳密スライス 0.919 vs 0.338)。ドメイン知識を特徴量に反映。成果物 results/n3_value_net_v0_report.html</li>
+<li>[x] N3 承認(2026-07-12「N4進めてください」で確認)</li>
+<li>[x] N4(v1): fitted Nash-VI 世代ループ — 12世代完走(2026-07-12)。機構健全(クラッシュ0・警報0・打切り0.3%以下)。<strong>ネット寄与は明確(vs material 66%)だが世代の積み上げは横ばい(vs v0 51.7%)</strong>。原因3点特定(分布狭窄・教師浅い・錨なし)→ N4b で対処。成果物 results/n4_generation_loop_report.html</li>
+<li>[x] N4 確認・承認(2026-07-12 案Eで承認: N5・評価基盤を先行、N4b はものさし確立後)</li>
+<li>[x] N4b: ルール3訂正(フェイント参照/ガード1フェーズ1回/真スキップ)を経て、多様化+錨リプレイ+<strong>深さ3教師</strong>で再構築(2026-07-13)。世代の積み上げが機能(vs v0 55.3%、A0相関単調改善→0.827)。長期スキルはロック/ストックが終盤から芽吹き(「序盤セメント&gt;終盤」のリトマスは未達 — 深さ増強が将来課題)</li>
+<li>[x] N6(ゲート④): BR攻撃テスト(2026-07-13)— 攻撃者3seed×250k、勝率47.3〜48.0%(プール47.7%±3.3)。<strong>非搾取性PASS</strong>(基準を理論値に較正: ナッシュ完全体でも攻撃者はゲーム値≈50%に届くため「50%を超えられない」が正しい合格線)</li>
+<li>[x] N5a: 実戦エージェント+ベースライン評価+対戦CLI(2026-07-13)。LP混合が「none無限ループ」病理を完治させる実証を獲得(決定論177/300打切 vs 混合0)。ベースライン勝率75〜89%、material対照に全面優位。<strong>発見: 旧「99%」ゲートは旧評価仕様の産物で公正な両席分離評価では不成立 → §6ゲートの再定義を提案中</strong></li>
+<li>[x] N5b: 旧PPOベストとの直接対戦(2026-07-13)— 旧best1に63〜75%、旧best2に54.5〜56.5%で<strong>両方に有意な勝ち越し</strong>(新ゲート③クリア。旧best2への差は薄く N4b の動機)</li>
+<li>[x] N5 承認(2026-07-13 ゲート再定義込みで承認済み)</li>
+<li>[ ] N6: 評価ゲート全通過(§6)</li>
+<li>[ ] N6 最終承認 = ミラー・リバーシ OFF 最強 AI v1 完成</li>
+<li>[ ] N7: 反復強化(継続)</li>
+</ul>
+<h2 id="9">9. 記録</h2>
+<ul>
+<li>2026-07-12: ゼロベース再調査(状態空間実測 54.1 万+/8 分・フロンティア拡大継続で全列挙不能と判定、depth3=15.7s/depth4=121s 実測、torch+CUDA 確認)に基づき本計画を作成。旧チェックリストは凍結。</li>
+</ul>
+</article>
+<footer>results/docs/ — <code>python -m complete_ai.build_report_hub</code> で再生成</footer>
+</div></body></html>

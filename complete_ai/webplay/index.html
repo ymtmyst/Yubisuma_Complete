@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>ユビスマ AI たいせん</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- 右上トグル(こども/おとな・説明ポップアップ) -->
+<div id="toggles">
+  <button class="tg" id="tg-mode" data-mode="adult"><span class="tg-emoji">🧑</span><span id="tg-mode-label">おとな</span></button>
+  <button class="tg on" id="tg-tip"><span class="tg-emoji">💬</span><span id="tg-tip-label">説明ON</span></button>
+  <button class="tg on" id="tg-sound"><span class="tg-emoji">🔊</span><span id="tg-sound-label">音ON</span></button>
+  <a class="tg" href="rulebook.html" target="_blank"><span class="tg-emoji">📖</span>ルール</a>
+</div>
+
+<div id="app">
+
+  <!-- スタート画面 -->
+  <section id="start" class="screen">
+    <div class="hero">
+      <div class="hero-emoji">🤟</div>
+      <h1 id="start-title">ユビスマ AI 対戦</h1>
+      <p class="sub" id="start-sub"></p>
+
+      <div class="diff-block">
+        <div class="diff-title" id="diff-title"></div>
+        <div class="diff-seg" id="diff-seg">
+          <button data-diff="easy" id="diff-easy"></button>
+          <button data-diff="normal" id="diff-normal"></button>
+          <button data-diff="hard" id="diff-hard"></button>
+        </div>
+      </div>
+
+      <div class="start-buttons">
+        <button class="big-btn primary" data-first="true" id="start-btn1"></button>
+        <button class="big-btn" data-first="false" id="start-btn2"></button>
+        <a class="big-btn" id="start-rule" href="rulebook.html" target="_blank" style="text-decoration:none;display:block;"></a>
+      </div>
+      <div class="record" id="start-record"></div>
+      <details class="rules-help">
+        <summary id="start-help-summary"></summary>
+        <div class="help-body" id="start-help-body"></div>
+      </details>
+    </div>
+  </section>
+
+  <!-- 対戦画面: 左=履歴 / 中央=盤面 / 右=操作 -->
+  <section id="game" class="screen hidden">
+    <!-- 左: 履歴 -->
+    <aside class="col-log">
+      <div class="log-title">📜 履歴</div>
+      <div class="log-list" id="log-list"></div>
+    </aside>
+
+    <!-- 中央: 盤面だけ -->
+    <div class="col-board">
+      <div class="meter" id="meter">
+        <div class="meter-title" id="meter-title"></div>
+        <div class="meter-bar">
+          <div class="mb-you" id="mb-you"><span id="mb-you-txt"></span></div>
+          <div class="mb-ai" id="mb-ai"><span id="mb-ai-txt"></span></div>
+        </div>
+      </div>
+      <div class="player-panel ai">
+        <div class="panel-head"><span class="who">🤖 AI</span><span class="badge" id="ai-badge"></span></div>
+        <div class="hands" id="ai-hands"></div>
+        <div class="meta" id="ai-meta"></div>
+      </div>
+      <div class="exchange" id="last-exchange"><div class="ex-empty">ゲーム開始！</div></div>
+      <div class="player-panel human">
+        <div class="panel-head"><span class="who">🙂 あなた</span><span class="badge" id="human-badge"></span></div>
+        <div class="hands" id="human-hands"></div>
+        <div class="meta" id="human-meta"></div>
+      </div>
+      <button id="surrender" class="surrender-btn"></button>
+    </div>
+
+    <!-- 右: 操作ボード -->
+    <aside class="col-controls" id="controls"></aside>
+  </section>
+
+  <!-- 結果画面 -->
+  <section id="result" class="screen hidden">
+    <div class="hero">
+      <div class="hero-emoji" id="result-emoji">🎉</div>
+      <h1 id="result-text"></h1>
+      <div class="record" id="result-record"></div>
+      <button class="big-btn primary" id="again">もう一度 あそぶ</button>
+    </div>
+  </section>
+
+</div>
+
+<!-- ホバー説明ポップアップ -->
+<div id="tip" class="tip-pop hidden"></div>
+
+<script src="skills_data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

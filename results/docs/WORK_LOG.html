@@ -1,0 +1,457 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>作業ログ WORK_LOG</title>
+<style>
+:root { color-scheme: light dark; }
+* { box-sizing: border-box; }
+body { margin: 0; font-family: -apple-system, "Segoe UI", "Hiragino Kaku Gothic ProN",
+  "Yu Gothic", Meiryo, sans-serif; line-height: 1.75; color: #1f2328;
+  background: #f6f7f9; }
+.wrap { max-width: 820px; margin: 0 auto; padding: 32px 24px 96px; }
+.top { display: flex; align-items: center; gap: 12px; margin-bottom: 22px;
+  padding-bottom: 16px; border-bottom: 1px solid #e5e7eb; }
+.top a.back { font-size: 13px; color: #4f46e5; text-decoration: none; font-weight: 600;
+  padding: 6px 12px; border: 1px solid #e5e7eb; border-radius: 8px; background: #fff; }
+.top a.back:hover { border-color: #a5b4fc; }
+.top .meta { font-size: 12px; color: #9ca3af; margin-left: auto; }
+.doc { background: #fff; border: 1px solid #e5e7eb; border-radius: 14px;
+  padding: 36px 40px; box-shadow: 0 1px 3px rgba(0,0,0,.04); }
+.doc h1 { font-size: 26px; font-weight: 700; margin: 0 0 18px; padding-bottom: 12px;
+  border-bottom: 2px solid #e5e7eb; letter-spacing: .01em; }
+.doc h2 { font-size: 20px; font-weight: 700; margin: 34px 0 12px; padding-bottom: 8px;
+  border-bottom: 1px solid #eceef1; }
+.doc h3 { font-size: 16px; font-weight: 700; margin: 26px 0 10px; color: #374151; }
+.doc h4 { font-size: 14px; font-weight: 700; margin: 20px 0 8px; color: #4b5563; }
+.doc p { margin: 12px 0; }
+.doc ul, .doc ol { margin: 12px 0; padding-left: 26px; }
+.doc li { margin: 5px 0; }
+.doc a { color: #4f46e5; text-decoration: none; }
+.doc a:hover { text-decoration: underline; }
+.doc code { background: #f3f4f6; padding: 2px 6px; border-radius: 5px; font-size: 90%;
+  font-family: "SFMono-Regular", "Consolas", "Menlo", monospace; }
+.doc pre { background: #f6f8fa; border: 1px solid #e5e7eb; border-radius: 10px;
+  padding: 14px 16px; overflow-x: auto; line-height: 1.55; }
+.doc pre code { background: none; padding: 0; font-size: 13px; }
+.doc blockquote { margin: 14px 0; padding: 4px 16px; border-left: 4px solid #a5b4fc;
+  color: #6b7280; background: #f9fafb; border-radius: 0 8px 8px 0; }
+.doc table { border-collapse: collapse; width: 100%; margin: 16px 0; font-size: 14px;
+  display: block; overflow-x: auto; }
+.doc th, .doc td { border: 1px solid #e5e7eb; padding: 8px 12px; text-align: left;
+  vertical-align: top; }
+.doc th { background: #f3f4f6; font-weight: 700; }
+.doc tr:nth-child(even) td { background: #fafbfc; }
+.doc hr { border: none; border-top: 1px solid #e5e7eb; margin: 28px 0; }
+.doc img { max-width: 100%; }
+/* 完全ルール 専用 */
+.doc details.rb { border: 1px solid #e5e7eb; border-radius: 10px; margin: 10px 0;
+  background: #fbfbfc; overflow: hidden; }
+.doc details.rb > summary { cursor: pointer; list-style: none; padding: 12px 16px;
+  font-weight: 700; font-size: 15px; user-select: none; display: flex; align-items: center; gap: 8px; }
+.doc details.rb > summary::-webkit-details-marker { display: none; }
+.doc details.rb > summary::before { content: "▶"; color: #9ca3af; font-size: 11px;
+  transition: transform .15s; }
+.doc details.rb[open] > summary::before { transform: rotate(90deg); }
+.doc details.rb > summary:hover { background: #f3f4f6; }
+.doc .rbbody { padding: 4px 18px 14px; border-top: 1px solid #eceef1; }
+.doc .rbbody > *:first-child { margin-top: 12px; }
+.doc .skill { font-weight: 700; background: #eef2ff; color: #4338ca;
+  padding: 1px 7px; border-radius: 6px; font-size: 92%; }
+.doc .rnote { font-size: 13px; color: #6b7280; margin: 8px 0; }
+.doc .rh3 { font-size: 15px; }
+footer { margin-top: 40px; font-size: 12px; color: #9ca3af; text-align: center; }
+@media (prefers-color-scheme: dark) {
+  body { background: #0f1115; color: #d1d5db; }
+  .top { border-color: #232936; }
+  .top a.back { background: #171a21; border-color: #232936; color: #a5b4fc; }
+  .doc { background: #171a21; border-color: #232936; box-shadow: none; }
+  .doc h1 { border-color: #232936; }
+  .doc h2 { border-color: #1f2530; }
+  .doc h3 { color: #cbd5e1; }
+  .doc h4 { color: #b6bdc8; }
+  .doc code { background: #232936; }
+  .doc pre { background: #12151b; border-color: #232936; }
+  .doc blockquote { background: #12151b; color: #9ca3af; border-color: #4338ca; }
+  .doc th, .doc td { border-color: #232936; }
+  .doc th { background: #1b2028; }
+  .doc tr:nth-child(even) td { background: #12151b; }
+  .doc hr { border-color: #232936; }
+  .doc details.rb { background: #12151b; border-color: #232936; }
+  .doc details.rb > summary:hover { background: #1b2028; }
+  .doc .rbbody { border-color: #232936; }
+  .doc .skill { background: #1e1b3a; color: #c4b5fd; }
+}
+</style></head>
+<body><div class="wrap">
+<div class="top"><a class="back" href="../index.html">← ハブに戻る</a>
+<span class="meta">更新 07-14 ・ WORK_LOG.md</span></div>
+<article class="doc"><h1>作業ログ WORK_LOG</h1>
+<h1 id="ai_master_plan_v2">作業ログ(AI_MASTER_PLAN_V2 準拠)</h1>
+<p>各作業セッションの記録。書式: 日付 / フェーズ / やったこと / 結果 / 次にやること。</p>
+<hr />
+<h2 id="2026-07-12-n0">2026-07-12 — N0: 計画承認・ゼロベース再調査</h2>
+<ul>
+<li>旧計画(BC+PPO路線)を前提にせず再調査を実施。</li>
+<li>状態空間 BFS 実測: 8分で54.1万状態、フロンティア拡大継続 → 全列挙不可と判定。</li>
+<li>FiniteHorizonSolver 速度実測: 初期局面(TP45手×NTP9手)で depth3=15.7s、depth4=121s。</li>
+<li>環境確認: Python 3.10.11 / torch 2.6.0+cu124 / CUDA可 / 132テストPASS。</li>
+<li><code>AI_MASTER_PLAN_V2.md</code> を新規作成(探索中心アーキテクチャ: LP バックアップ探索+価値ネット+終盤厳密テーブル)。</li>
+<li>ユーザーが N0 承認。付帯条件3点(記録・二重解説・時間見積もり)を受領し、本ログを開設。</li>
+<li>旧 <code>AI_PROGRESS_CHECKLIST.md</code> は凍結(歴史記録)。</li>
+</ul>
+<p><strong>次</strong>: N1 高速探索基盤。</p>
+<hr />
+<h2 id="2026-07-12-n1">2026-07-12 — N1: 高速探索基盤(実装・検証)</h2>
+<p>やったこと(すべて値の同一性をテストで担保しながら実施):</p>
+<ol>
+<li><code>complete_solver/fast_solver.py</code> 新規 — <code>FastHorizonSolver</code>
+   - 探索間で持続するトランスポジションテーブル((状態, 深さ) → 値)
+   - 遷移の遅延評価キャッシュ(触れたセルだけ計算・プロセス内で永続)
+   - ダブルオラクル法によるノード解決(45×9 全展開の回避、列生成でBRスキャンをnumpyベクトル化)
+   - ルートは混合戦略(LP均衡)を全長ベクトルで返す <code>solve_state()</code></li>
+<li><code>complete_solver/small_matrix.py</code> 新規 — 小行列専用の厳密ゼロ和ソルバー
+   - 鞍点 / 1×N / 2×2閉形式ショートカット
+   - 自前タブローシンプレックス(正シフト+Blandの規則)。scipy linprog(1回約5ms)をホットパスから排除
+   - 検証失敗時は scipy へフォールバック(安全網)
+   - 経緯: 最初に実装した Shapley–Snow カーネル列挙は縮退行列で np.linalg.solve が192万回爆発しボツ。シンプレックスに置換</li>
+<li><code>state.py</code> — State/PlayerState を frozen dataclass → <strong>NamedTuple</strong> 化(生成・ハッシュがC速度)。フィールド順序は公開契約として維持</li>
+<li><code>transition.py</code> — <code>dataclasses.replace</code> 47箇所を <code>._replace</code> に機械置換。<code>_Work</code> に slots</li>
+<li>テスト追加: <code>test_fast_solver.py</code>(10件: ランダム局面での新旧ソルバー値一致 depth1-3、γ=1.0/0.9、DO/全行列モード一致、方策の分布性、キャッシュ動作)、<code>test_small_matrix.py</code>(5件: ジャンケン等の既知解、ランダム行列600本+縮退整数行列でscipyと一致、45×9も一致)</li>
+</ol>
+<h3 id="_1">結果</h3>
+<ul>
+<li>テスト: complete_solver 83件 PASS(68+新15)、complete_rl 78件 PASS。回帰なし</li>
+<li>初期局面コールド速度(改良前 → 後):</li>
+<li>depth3: 15.7s → <strong>2.05s</strong>(約7.7倍)</li>
+<li>depth4: 121s → <strong>14.5s</strong>(約8.3倍)</li>
+<li>depth5: 計測不能级 → 80s で解けるように</li>
+<li>値は全深さで旧ソルバーと一致(±1e-6 以内)</li>
+<li>ボトルネック変遷: scipy LP(53%)→ カーネル列挙の縮退爆発 → シンプレックス化で解消 → 現在は transition の Python コスト自体が支配項</li>
+<li>N1 目標(d3≤1s / d4≤10s)には<strong>あと約2倍</strong>。到達には遷移カーネルのコンパイル化(Numba/パック整数状態)が必要という判断材料が揃った</li>
+</ul>
+<h3 id="_2">成果物</h3>
+<ul>
+<li><code>results/n1_fast_solver_benchmark.html</code>(値一致検証・速度比・自己対戦時の実効速度)</li>
+</ul>
+<h3 id="2026-07-12">ベンチマーク最終値(2026-07-12)</h3>
+<ul>
+<li>fast コールド: d1=0.01s / d2=0.12s / d3=1.70s / d4=12.73s / d5=86.4s。warm 再解決は全深さ 0.2〜0.4ms</li>
+<li>旧ソルバー(同一プロセス再計測): d3=3.86s / d4=34.8s — <strong>注</strong>: NamedTuple 化と transition 最適化は旧ソルバーにも効くため、当初計測(d3=15.7s/d4=121s)より旧側も速くなっている。内訳は「共有エンジン最適化で両者 約3.5〜4倍」+「fast_solver アーキテクチャでさらに 約2.3〜2.7倍」</li>
+<li>値の一致: 全深さで差 &lt; 1e-6(HTML の判定列 OK)</li>
+<li>自己対戦(depth3、LP混合からサンプリング): 2手で決着(先手勝ち)。初手 1.43s、2手目 341ms — キャッシュにより実対局の実効速度は目標水準</li>
+</ul>
+<p><strong>次</strong>: N1 確認成果物のユーザーレビュー → 残り2倍(コンパイル化)を今やるか、N2/N3 に進んで実測スループットで判断するかの承認。</p>
+<p>→ <strong>ユーザー判断: 案A承認</strong>(コンパイル化は後回し、N2へ)。</p>
+<hr />
+<h2 id="2026-07-12-n2">2026-07-12 — N2: 終盤厳密データベース(実装・計測)</h2>
+<p>やったこと:</p>
+<ol>
+<li><code>complete_solver/endgame_db.py</code> 新規
+   - 数学的根拠: hands は決して増えない(単調量)→ 任意局面からの到達可能集合は「閉じる」→ 閉集合内だけの価値反復で全体ゲームと厳密一致する値が得られる
+   - <code>compute_closure</code>(予算付き閉集合列挙)、<code>solve_closure</code>(Gauss-Seidel Shapley VI、既知値ピン止め、Bellman残差検証)、<code>EndgameDB</code>(probe/add_state/save/load、pickle永続化)</li>
+<li><code>fast_solver.py</code> に <code>exact_values</code> プローブ統合(DBヒットで任意深さの探索を即座に短絡)</li>
+<li>テスト10件追加(<code>test_endgame_db.py</code>): 参照実装 <code>state_space.value_iteration</code> との値一致、Bellman残差&lt;1e-6、閉性違反検出、予算拒否、永続化、探索統合。<strong>全171テスト PASS</strong>(solver 93 + rl 78)</li>
+</ol>
+<h3 id="_3">計測結果(重要な発見)</h3>
+<ul>
+<li>(1,1)終盤の閉集合はどれも巨大: セメント・満杯ストック等で強く制約しても15万超、空ストック+必殺技済みは<strong>140万超で計測継続中</strong></li>
+<li>原因: ストックの組合せ((2^8)^2)+「オール→再構築」サイクルで、どの(1,1)局面の閉集合も事実上「(1,1)宇宙」全体を含む</li>
+<li>結論: <strong>オンデマンド小閉集合方式は実らず、(1,1)宇宙(推定数百万状態)の一括バッチ解決が本命</strong>。現実的時間で回すには遷移のコンパイル化(N1で保留した項目と同一)が前提</li>
+<li>成果物: <code>results/n2_endgame_db_report.html</code></li>
+</ul>
+<p><strong>次</strong>: ユーザー判断待ち — 案C: コンパイル化を先に実施(推奨。N1速度目標+終盤テーブル+学習スループットを一挙に解決)か、案D: N3価値ネットを先にか。</p>
+<p>→ <strong>ユーザー判断: 案C改で承認</strong>(ストック重要組限定の縮小テーブル+除外スキルの自動重要度検証。クイックは検証で自動判定。「基本任せる」)。</p>
+<hr />
+<h2 id="2026-07-12-n2b-packed-engine-packed-vi">2026-07-12 — N2b: ストック限定計測 → コンパイル核(packed engine + packed VI)</h2>
+<h3 id="_4">ストック限定の計測(否定的結果 → 方針確定)</h3>
+<ul>
+<li><code>RulesConfig</code> に <code>stock_alphabet</code>(ストック可能スキル制限。宣言は無制限)を追加</li>
+<li>実測: A5(フェイント/ロック/フラッシュ/ガード/スキップ)でも <strong>(1,1)宇宙は80万状態超</strong>。A4(スキップ抜き)でも80万超</li>
+<li>結論: どのアルファベットでもPython VIは非現実的 → 承認済みフォールバック「コンパイル化」を即時実施</li>
+</ul>
+<h3 id="numba-0631">コンパイル核の実装(Numba 0.63.1)</h3>
+<ul>
+<li><code>complete_solver/packed_engine.py</code> 新規: 状態を int64×2 レーンにビットパック(1プレイヤー42bit)。ミラー・リバーシOFF専用に <code>legal_tp_codes</code> / <code>legal_ntp_codes</code> / <code>step</code>(1ターン遷移)を njit 移植</li>
+<li><code>complete_solver/tests/test_packed_engine.py</code>: <strong>差分テスト</strong> — スキル偏重ランダムプレイアウトで訪れた全状態について、pack/unpack往復・合法手集合・全ジョイント行動の遷移結果(子状態・終端報酬・手番継続)を参照実装と完全照合+分岐網羅アサーション(23イベント種)</li>
+<li>差分テストが即座にバグを1件検出: カウンター時フラッシュの反射先を自分側にしていた → 修正。以降 3テストPASS</li>
+<li><code>complete_solver/packed_vi.py</code> 新規: コンパイル済み BFS 列挙 → CSR遷移表(セル5B) → Gauss-Seidel Shapley VI(鞍点/2×2/シンプレックスを njit 内蔵)→ <code>PackedEndgameDB</code>(ソート済み配列+二分探索probe、npz永続化、<code>.get(state)</code> は FastHorizonSolver の exact_values と互換)</li>
+<li><code>complete_solver/tests/test_packed_vi.py</code>: 行列値ソルバーを乱数600行列で <code>solve_small_zero_sum</code> と照合、<strong>ストック全面禁止(1,1)宇宙を実際に解いて</strong>、独立コード経路(参照エンジン+参照行列ソルバー+DB子値)で Bellman 残差≈0 を200状態で検算、save/load往復。5テストPASS</li>
+<li>この end-to-end テストが<strong>11秒</strong>で完走(JITコンパイル+宇宙求解込み)— コンパイル化の威力を確認</li>
+<li>テスト総数: <strong>179件 全PASS</strong>(solver 101 + rl 78)</li>
+</ul>
+<h3 id="_5">実行中</h3>
+<ul>
+<li>(1,1)宇宙の一括厳密解バッチ(A0/A4/A5/A6/A8全部入り、γ=0.999、上限3000万状態)→ <code>data/endgame_h11_*.npz</code> に保存予定</li>
+</ul>
+<p><strong>次</strong>: バッチ結果確認 → 逸脱利得スキャン(除外ストックの重要度自動判定)→ N2b 確認レポートHTML。</p>
+<h3 id="_6">バッチ結果と方針転換(同日)</h3>
+<ul>
+<li>A0(ストック禁止)宇宙: 38.3万状態、VI 62スイープ22秒で完全求解 → <code>data/endgame_h11_A0.npz</code></li>
+<li>A4(重要4種・保持無制限)は<strong>3000万状態超で列挙不能</strong> → 全ストック(A8)は推定250億状態で恒久的に不可能</li>
+<li>「保持1個まで」の第二抽象化軸を実装し はしごバッチ(s1_A4=2333万状態等)を開始したが、<strong>ユーザーから決定的な指摘</strong>: ストックは2個以上で初めて真価(コンボ)を発揮する収穫逓増型の能力であり、保持1個制限はゲームを歪曲する → <strong>s1系は全て破棄・バッチ中止</strong>(ドメイン知識をメモリに保存)</li>
+<li><strong>N2の結論</strong>: 網羅的な終盤テーブルはこのゲームでは構造的に不可能。終盤の正確さは「探索が終端まで読み切る」+「価値ネットの汎化」で担保する設計に一本化。A0 DB は「ストック要素を除いた終盤の厳密値」という診断用アーティファクトとして保管(実戦プローブには使わない)</li>
+<li>max_stock_size 機能はコードに残す(診断・実験用。実戦・学習には使用しない)</li>
+<li><strong>戦略確認</strong>: ディープラーニング(価値ネット)は当初計画(N3/N4)の中核のまま。N2 はその補助部品の検討であり、主軸は不変 → N3 へ進む</li>
+</ul>
+<h3 id="_7">追加のドメイン知識(同日、ユーザー)</h3>
+<ul>
+<li>ストックは<strong>1〜2個保持が主戦場</strong>(2個が最強、1個も「チョイス発動は参照されない」+「次で2個になる圧力」で有意味)。3個目は価値急減(例外: 対カウンター2持ちの時は3個目必須)。<strong>4個以上は無視してよい</strong></li>
+<li>強い2個の型: 対カウンター×1+通常×1 / 強通常+低リスク通常。ストックが特に強いのはフェイント・ガード・フラッシュ</li>
+<li>適用: 終盤テーブルには規模的に届かないが、<strong>探索の枝刈り・自己対戦分布の集中・ネット特徴量</strong>(保持数/構成フラグ)に反映(メモリ <code>domain-yubisuma-rules</code> に恒久記録)</li>
+</ul>
+<hr />
+<h2 id="2026-07-12-n3-v0">2026-07-12 — N3: 価値ネット v0(完了・確認待ち)</h2>
+<ol>
+<li><code>complete_ai/</code> パッケージ新設
+   - <code>features.py</code>: 103次元特徴量(ストック保持数・対カウンター/通常保持フラグを明示追加)。Numbaバッチ版=Python参照版(同一コード経路)
+   - <code>packed_eval.py</code>: material葉のビット移植(参照実装と差分テスト一致)+深さ2/深さ3 LPバックアップ教師値のコンパイル済みバッチ計算(FastHorizonSolverと一致テスト)
+   - <code>dataset.py</code>: コンパイル済みプレイアウト(開幕根+終盤根、スキル偏重)→ ユニーク13.5万局面、教師値80秒
+   - <code>train_v0.py</code> / <code>eval_v0.py</code>: MLP 103→512×3→1(tanh)、GPU学習3秒、モデル即保存+評価は分離プロセス</li>
+<li><strong>精度結果(vs 手作りmaterial評価)</strong>:
+   - 検証split MSE: <strong>0.00135 vs 0.185</strong>(137倍)
+   - 深さ3探索値の予測(学習より深い): MSE 0.021 vs 0.217、順位相関 <strong>0.947 vs 0.598</strong>
+   - A0厳密テーブル10万局面(独立真値系・ストック禁止の但し書き付き): 順位相関 <strong>0.919 vs 0.338</strong></li>
+<li>障害2件と対処: 行動数バッファ64行を満杯ストック局面(TP行動最大78)が超えネイティブクラッシュ(exit 116)→ 96行に拡大+回帰テスト。データセットも再生成。教訓: モデル即保存・評価分離</li>
+<li>テスト: complete_ai 5件追加(全体 <strong>185件 PASS</strong> = solver 102 + ai 5 + rl 78)</li>
+<li>成果物: <code>results/n3_value_net_v0_report.html</code>、<code>models/value_v0.pt</code>、<code>models/value_v0_eval.json</code></li>
+</ol>
+<p><strong>次</strong>: ユーザー確認 → N4(自己対戦 fitted Nash-VI 世代反復、ストック枝刈り適用)。</p>
+<p>→ ユーザー承認「N4進めてください」。</p>
+<hr />
+<h2 id="2026-07-12-n4-12">2026-07-12 — N4: 自己対戦世代ループ(実装完了・12世代実行中)</h2>
+<ol>
+<li><code>complete_ai/batched_search.py</code>: <strong>バッチ化ネット葉探索</strong> — 深さ2の木をコンパイル済みカーネルで展開(トランスポジション重複排除付き)、全ユニーク葉を1回のGPU呼び出しで評価、子はコンパイル済み行列値バックアップ、ルートはLPで値+混合戦略。ルート値=学習教師(行動と教師生成が同一計算)
+   - <strong>ストック枝刈り</strong>をドメイン知識どおり実装: 保持2個でSTOCK禁止、ただしフェイント+ロック保持時は3個目許可、4個目は常に禁止。エージェント自身の方策空間のみ制約(相手・検証側は無制限)</li>
+<li><code>selfplay.py</code>: LP混合+ε=0.08一様探索で自己対戦、訪問局面の探索値を教師化(同一局面は平均)</li>
+<li><code>arena.py</code>: 新旧ネットの直接対戦(先手交代、NTP反応は各エージェント自身の混合を使用)</li>
+<li><code>generation_loop.py</code>: 世代ごとに 自己対戦→直近3世代データで再学習→アリーナ→A0順位相関追跡→jsonl記録。勝率35%未満で退行警報+ロールバック</li>
+<li>テスト6件追加(参照ソルバーとの深さ2値一致、枝刈り規則5種)— <strong>全191テストPASS</strong></li>
+<li>スモーク(30局)で統合確認後、<strong>本番: 12世代×4000局を実行中</strong>(自己対戦 約10局/秒、1世代8〜10分見込み)
+   - 発見した小バグ修正: train の検証分割が小データで全データを食う(n_val ガード)</li>
+</ol>
+<p><strong>次</strong>: 12世代の結果確認(アリーナ勝率推移・A0相関・自己対戦の手数分布)→ N4確認レポート。</p>
+<h3 id="12">12世代完走の結果(同日深夜)</h3>
+<ul>
+<li>全世代完走・クラッシュゼロ・退行警報なし。自己対戦の打切りは最大11/4000(none無限ループ型の病理は不在)</li>
+<li>隣接世代アリーナ: 47〜56%で推移(収束域の挙動)。A0順位相関: 0.919→<strong>0.968</strong>(世代1)→0.952へ漸減</li>
+<li><strong>決定的な直接対戦(300局ずつ)</strong>: 最終世代 vs material(同一探索・葉だけ交換)= <strong>66%勝ち</strong>(ネットの寄与明確)/ 最終世代 vs 初代v0 = 51.7%(<strong>世代の積み上げはほぼ横ばい</strong>)</li>
+<li>診断(3原因を特定): ①自己対戦分布が狭い(新規約2500局面/世代、序盤ルートのみ・終盤ルート不使用)②深さ2+現行ネット葉の教師は世代1で固定点到達 ③錨リプレイ無しでA0精度が漂流</li>
+<li>成果物: <code>results/n4_generation_loop_report.html</code>、<code>models/value_latest.pt</code>、<code>data/n4_generations.jsonl</code>、<code>data/n4_final_matches.json</code></li>
+<li>提案: 案E(N5実戦エージェント+評価基盤を先に、N4bはものさしを持ってから)/ 案F(即N4b)</li>
+</ul>
+<p><strong>次</strong>: ユーザーの案E/案F選択待ち。</p>
+<p>→ <strong>ユーザー判断: 案E承認</strong>(N5・評価基盤を先行)。</p>
+<hr />
+<h2 id="2026-07-13-n5a-cli">2026-07-13 — N5a: 実戦エージェント+ベースライン評価+対戦CLI</h2>
+<ol>
+<li><code>complete_ai/agents.py</code>: SearchAgent(LP混合サンプリング、ε・決定論モード付き)/ ScriptedAgent(両席分離の清潔なベースライン: TP=一様ランダム、NTP=random/none/counter/block)</li>
+<li><code>complete_ai/evaluate.py</code>: 固定相手評価ハーネス(先手交代、JSON出力)</li>
+<li><code>complete_ai/play_cli.py</code>: 人間対戦CLI(同時手番性保持: 人間宣言時はAI反応先コミット、AI宣言時は人間反応先入力)。EOF処理バグ修正、自動スモークで対局完走確認</li>
+<li><strong>結果</strong>(300局×4相手×3エージェント):
+   - ネット+混合: random 75-81% / none 87-89% / counter 76-78% / block 78%
+   - ネット+決定論: none相手で<strong>打ち切り177/300</strong> — 旧PPOの「none無限ループ」病理が決定論プレイで再現。混合では打ち切り0 → <strong>LP混合が病理を完治させている実証</strong>(本計画の中核設計の対局データによる裏付け)
+   - material対照: 55-76% — ネットの寄与は全相手で一貫</li>
+<li><strong>重要な解釈</strong>: このゲームは自傷レース構造のため、ランダム宣言相手にも運負けの内在分散がある。旧ゲート「固定方策に99%」は旧評価仕様(相手が宣言しない)の産物で、両席分離の公正な評価では達成不可能な見込み → <strong>採用ゲートの再定義を提案</strong>(material対照優位・病理なし・旧PPO勝ち越し・BR非搾取・BR推定上限との差)</li>
+<li>成果物: <code>results/n5_baseline_eval_report.html</code>、<code>data/n5_baseline_eval.json</code>、<code>data/n5_ceiling_probe.json</code></li>
+</ol>
+<p><strong>次</strong>: ゲート再定義のユーザー承認 → N5b(旧PPO直接対戦ブリッジ)→ N6(BR攻撃)。</p>
+<p>→ ユーザー承認(ゲート再定義とも「その認識で合っている」)。</p>
+<h2 id="2026-07-13-n5b-ppo">2026-07-13 — N5b: 旧PPOベストとの直接対戦</h2>
+<ul>
+<li><code>complete_ai/vs_legacy.py</code>: 旧席=旧PPOのTP宣言(マスク付き確率的)+スクリプト反応3種(旧側に寛大な比較)、反応履歴の帳簿も旧envの仕様を再現</li>
+<li>結果(新AI勝率): <strong>旧best1(episode_mixed)に63〜75%、旧best2(depth4_proper)に54.5〜56.5%</strong>(合計330/593決着、有意に勝ち越し)</li>
+<li>新ゲート③(旧ベスト2種への勝ち越し)<strong>クリア</strong>。ただし旧best2への差は薄い → N4b の動機</li>
+<li>成果物: <code>data/n5_vs_legacy.json</code>、<code>results/n5_baseline_eval_report.html</code> に追記</li>
+</ul>
+<p><strong>次</strong>: N6(BR攻撃テスト — 攻撃者が1つの席をフルに操作する新gym環境が必要)、その後 N4b(学習改善: 分布多様化・深さ3教師・錨リプレイ)。</p>
+<h2 id="2026-07-13">2026-07-13 — 方策分布レポート(恒久ルール化)</h2>
+<ul>
+<li>ユーザー指示: 新モデルごとにスキル使用分布HTMLを必ず出す(バランス感覚での方向性判定のため)→ メモリの恒久ルールに追加</li>
+<li><code>complete_ai/policy_report.py</code> 新規: ①代表局面のLP混合を確率で直接参照(初期局面・(1,1)終盤)②自己対戦500局のTP宣言/NTP反応分布(序盤/中盤/終盤フェーズ別)</li>
+<li>value_latest の結果: 初手 ブースト41/ロック41/フェイント18の真の混合(旧「初手固定」消滅)。数字宣言2.0%(旧92-96%病理の対極)。<strong>要ユーザー判定の3点</strong>: ストック系ほぼ不使用(0.3%、チョイス0% — ドメイン知識と食い違い、探索穴仮説)、ガード0.9%、コピー依存(全体35%・中盤50%)</li>
+<li>成果物: <code>results/policy_report_value_latest.html</code></li>
+</ul>
+<h2 id="2026-07-13_1">2026-07-13 — 【重大】ルール実装バグ発覚 → 全学習停止・ルール監査</h2>
+<ul>
+<li>ユーザーが方策分布レポートから検出: 「コピー(フェイント)・反応なし」決着76.8%はありえない — <strong>フェイントは相手がカウンターした時のみ発動する対カウンタースキル</strong>であり、参照経由(コピー/チョイス/オール)でも発動条件は引き継がれる</li>
+<li>調査結果: <code>transition.py</code> の <code>_execute_referenced_skill</code> がフェイント/ロックを無条件発動(<strong>ソルバーと対話版の両方が同じ誤解釈</strong>を共有 → 5月の相互照合では検出不能だった)。ルール文書「相手がカウンターを宣言しなければ何も起こらない」に明確に違反</li>
+<li>併せてガードの「フェーズ終了」効果の解釈相違(ソルバー未実装/対話版は独自解釈)、タイム詳細の未解決を再確認</li>
+<li><strong>決定: 裁定確定まで学習・評価は全停止。現行の全成果物(A0テーブル・v0/世代ネット・全勝率)は無効</strong></li>
+<li>成果物: <code>results/rules_audit_2026-07-13.html</code>(裁定シート: A1〜F1 の10項目)</li>
+</ul>
+<p><strong>次</strong>: ユーザーの裁定(特にA1〜A4の確定、B1ガード、C1タイム)→ エンジン修正 → テスト改訂 → 全再生成。</p>
+<h3 id="a1a3a4">A1/A3/A4 修正実施(同日、自律チェック中。ユーザー明言済みの範囲のみ)</h3>
+<ul>
+<li><code>transition.py</code> <code>_execute_referenced_skill</code>: フェイント/ロックを参照経由・無反応時は<strong>不発</strong>に修正(イベント <code>referenced_anti_counter_inert</code>)。カウンター時の発動(<code>_apply_counter_to_skill</code>)は従来どおり</li>
+<li><code>packed_engine.py</code> <code>_execute_referenced</code>: 同修正。<strong>Numbaの落とし穴</strong>: 呼び出し先だけ変えても呼び出し元(step)のキャッシュが旧コードを焼き込んだまま → <code>__pycache__</code> の .nbi/.nbc 削除で解決(今後エンジン修正時は必ずキャッシュクリア)</li>
+<li>ゴールデンテスト4件追加(コピー(フェイント)無反応=不発/カウンター=2回分勝利/チョイス(フェイント)無反応=不発/コピー(ロック)無反応=不発)</li>
+<li>旧バグを前提にしていた <code>test_maskable_ppo</code> の開始側符号回帰テストを正ルールのシナリオ(counter_lowest 相手)に改訂</li>
+<li><strong>全スイートPASS: solver 106 + ai 11 + rl 78 = 195件</strong></li>
+<li><code>docs/rules_decisions.md</code> に裁定と経緯を追記</li>
+<li>B1(ガードのフェーズ終了)/C1(タイム詳細)は裁定待ちのため未修正。<strong>モデル・テーブルの再生成も裁定完了まで保留</strong>(裁定次第で二度手間になるため)</li>
+</ul>
+<h2 id="2026-07-13-g1c1">2026-07-13 — ルール文書の差し替えと G1/C1 裁定の反映</h2>
+<ul>
+<li>ユーザーが「完全ルール(新)」を改訂。差分確認(ミラー・リバーシ除外):</li>
+<li><strong>ガード(変更)</strong>: 「効果全体が1フェーズ中に一度だけ発動」に。旧文書の「フェーズ終了」句は削除(B1解決: ソルバーの現状が正)。→ <strong>実装</strong>: 同一フェーズ2回目のガード(コピー/チョイス経由含む)は完全不発(シールド再装填も追加ターンもなし)。transition.py+packed_engine 修正、ゴールデンテスト3件追加</li>
+<li><strong>タイム</strong>: 追加ターン全消去(ドロップ+1・タイム自身+1も含む)は現行実装が正、とユーザー裁定 ✓ 修正不要</li>
+<li>ストック重複不可が正式ルール化(実装済み)。「手1本時の2本降ろし→1本」注記も実装済み ✓</li>
+<li><strong>全テストPASS: solver 109 + ai 11 + rl 78 = 198件</strong></li>
+<li>残る未実装: <strong>スキップ+タイムの手番入替</strong>(ユーザーから正確な手順の説明あり: スキップの通常処理を行った後、スキップ宣言側の連続宣言をタイムが阻止し、宣言された側がターンを行う。ロック等ターン連動効果のため簡易化禁止)— 細部2点の確認中</li>
+</ul>
+<h3 id="q1aq2a">スキップ+タイム実装(同日、Q1=a/Q2=a 裁定受領)</h3>
+<ul>
+<li>裁定: タイム発動でスキップされた側が行うターンの後は通常交代に戻る(Q1=a)。そのターンは新フェーズ扱いでフェーズ単位制限リセット・シールド/ドロップ封印失効(Q2=a)</li>
+<li>transition.py <code>_finish_turn</code> に skip+time 分岐(パスした側が time_active → タイム消費・スキップ消費・新フェーズで手番継続、イベント <code>time_skip_interrupt</code>)。packed_engine <code>step</code> に同分岐</li>
+<li>ゴールデンテスト2件+特殊状態の直接差分テスト(skip+time/ガード使用済み/対カウンター参照の4状態でパック=参照の完全一致)追加</li>
+<li><strong>全201テストPASS</strong>(solver 112 + ai 11 + rl 78)</li>
+<li>旧ルール産の全成果物を <code>archive_rules_v1/</code> へ移動し、<strong>全再生成チェーンを起動</strong>(A0→v0→世代12×4000→ベースライン→旧PPO対戦→決着分析→方策分布レポート。約2〜3時間、実行中)</li>
+</ul>
+<h3 id="vi">VI収束危機とその解決(同日深夜、自律対応)</h3>
+<ul>
+<li>再生成初段のA0価値反復が発散(delta 4.4 — 値域[-1,1]で不可能な値)。3段階で原因を特定:
+  1. <strong>シンプレックスの縮退巡回</strong>: 反復上限到達後に未最適の表から答えを計算(|v|&gt;10)→ 反復上限検出+摂動再試行+ゲーム値の必須条件(maximin≦v≦minimax)検証を実装
+  2. <strong>「最適」と主張して誤答するケース</strong>: 数値的に停滞したシンプレックスが境界内の誤値を返す → 均衡証明書(両戦略の直接検証)をNumba版に移植、失敗時はscipyで厳密修復
+  3. <strong>それでも振動</strong> → 純ヤコビ(ダブルバッファ)との対照実験で<strong>Gauss-Seidelインプレース更新が汚染値を修復より速く伝播させる自己維持振動</strong>と確定 → <strong>VIをヤコビに切替</strong>(数学的に収束保証)</li>
+<li>結果: A0 = 334,339状態、<strong>54スイープ・25秒で収束</strong>(修復ゼロ、delta 7e-7)。関連テスト22件PASS</li>
+<li>副次的発見1: 新ルールで「スキップ→(相手パス)→コピー(スキップ)+2」の<strong>無限スキップ蓄積ループ</strong>が到達可能(パスが直前スキルを保存するため毎ターン自分のスキップをコピー参照できる)。パック版はskip=15で飽和させ有限化(参照実装は無限)— skip≧15の非現実的局面のみの近似として文書化。<strong>ルールとして無限蓄積が意図通りかは要ユーザー確認(急ぎではない)</strong></li>
+<li>副次的発見2(運用): Numbaはcallee変更でcallerキャッシュが無効化されない — エンジン修正時は .nbi/.nbc 必ず削除</li>
+<li>再生成チェーンを再起動(実行中)</li>
+</ul>
+<h2 id="2026-07-13-15exit0">2026-07-13 — 正ルール全再生成 完走(約1.5時間、全段exit=0)</h2>
+<ul>
+<li>A0テーブル(33.4万状態、22秒)→ v0(13.5万局面)→ 世代12×4000(27分、A0相関0.92→0.936で安定)→ 評価群</li>
+<li><strong>v0精度(正ルール)</strong>: 深さ3スポット順位相関 net 0.968 vs material 0.692。A0厳密スライス 0.846 vs <strong>0.178(手作り評価は正ルールでほぼ崩壊、ネットは健在)</strong></li>
+<li><strong>ベースライン</strong>: random 70.7%/none 77.0%/counter 70.3%/block 69.3%、<strong>打ち切り全ゼロ</strong></li>
+<li><strong>vs 旧PPO(旧バグルールで育った遺物、正ルール下で対戦)</strong>: 旧best1に65〜71.5%、旧best2に56〜57%</li>
+<li>vs v0 48.7%(世代積み上げ横ばいは既知課題=N4b)、vs material 64.3%</li>
+<li><strong>正ルールのメタ(方策分布 rules_v2)</strong>: 初手フェイント40/スキップ32/ブースト28。決着手が大分散(コピー(カウンター)19.5%=正しい対カウンター討ち、フラッシュ14.6、数字0 11.6、クイック10.8…)。数字13.2%(終盤39%)、クイック7.8%復活、コピー依存35→15%、自己対戦打ち切り0/800。ストック系は依然0%(強制せずN4bで観察)</li>
+<li>成果物: <code>results/policy_report_value_latest_rules_v2.html</code>(§7に新旧比較表)、各種JSON更新</li>
+<li><strong>次</strong>: ユーザーの分布再判定(特にセメント終盤宣言8.4%とガード1.1%)→ N6(BR攻撃)/N4b</li>
+</ul>
+<h2 id="2026-07-13-n4b-lite">2026-07-13 — パス廃止(真のスキップ化)+ N4b-lite → 最終再生成</h2>
+<ul>
+<li>ユーザー指摘「パスというスキルは存在しない」→ 調査: パスは5月実装の内部モデル(スキップされたフェーズを疑似手番で表現)。余分な割引1手・時間経過帳簿の依存・統計汚染の実害あり → <strong>廃止を承認いただき実装</strong></li>
+<li>新セマンティクス: 手番がスキップ中の側に渡る瞬間にフェーズを即消化(skip-1、クイック減衰、シールド/ドロップ封印/フェーズ旗の期限切れ)。タイム保持者はその場でターン奪取(新フェーズ)、それ以外は手番側が新フェーズで継続(same_turn_player=True で符号も正しく維持)</li>
+<li>派生する正しい帰結: 「スキップ=ブロックでも止まらず相手の次フェーズを奪って連続行動」がテストで明文化。スキップ消化のタイミング変更に伴い旧ゴールデンテスト4件を新セマンティクスへ改訂、complete_rl のPASSマスクテストも改訂</li>
+<li><strong>全203テストPASS</strong>(solver 114 + ai 11 + rl 78)</li>
+<li><strong>N4b-lite</strong>を同時実装(中立手段のみ・スキル強制なし): 自己対戦の25%を(1,1)終盤ルートから開始、各局の冒頭0〜2手を一様ランダム化、ε 0.08→0.12、<strong>錨リプレイ</strong>(v0広域データを毎世代の学習に混入)</li>
+<li>旧成果物を <code>archive_rules_v2_with_pass/</code> へ退避し、<strong>最終再生成チェーン起動</strong>(実行中、2〜3時間)</li>
+</ul>
+<h3 id="exit0">最終再生成 完走(同日未明、全段exit=0)</h3>
+<ul>
+<li><strong>A0相関が12世代単調改善 0.719→0.795</strong> — 錨リプレイ+多様化(N4b-lite)で「世代の積み上げ」が初めて機能(前回は0.97→0.95と漂流)</li>
+<li><strong>方策分布(真スキップ版)</strong>: パス消滅。<strong>ガード1.1%→8.4%に復活</strong>(ユーザーが「珍しい」と疑義を出していた箇所が、パス廃止で自然解消)。数字宣言終盤66.5%(方向性さらに強化)。終盤セメント8.4→5.3%に減少。チャージ0.1%/ロック0%/ストック系0%は残存(次はN4b本丸=深さ3教師で観察)</li>
+<li>強さ: ベースライン68〜78%(打切0)、旧best1に64〜66%、旧best2に53〜60%、material対照62%、vs v0 50%</li>
+<li>成果物: <code>results/policy_report_value_latest_rules_v2.html</code>(§7更新)、各種JSON</li>
+<li><strong>次</strong>: ユーザーの分布判定(特にガード復活の妥当性)→ N4b本丸(深さ3教師)or N6(BR攻撃)</li>
+</ul>
+<h2 id="2026-07-13-n4b-323">2026-07-13 — N4b本丸: 深さ3教師(行動は深さ2、学習は深さ3)</h2>
+<ul>
+<li>ユーザーの信用割当診断(「終盤セメント&gt;序盤セメントの逆転は、深さ2では終盤の即効相関しか届かない証拠。序盤セメントの効果は10ターン後に出る」)を受け、<strong>AlphaZero型の分離</strong>を実装: 行動は深さ2探索(速度10局/秒維持)、学習教師は深さ3ネット葉バックアップ(45ms/局面、1世代+3〜4分)</li>
+<li><code>batched_search.expand_depth3</code>(3層展開+階層別トランスポジション重複排除)+ <code>value_depth3</code>(バッファ溢れ時は深さ2にフォールバック)。深さ3値は FastHorizonSolver との一致テストで担保(complete_ai 12テスト)</li>
+<li>v0データセットの教師も深さ2→深さ3(material葉)に引き上げ</li>
+<li>分布健全性のリトマス指標をメモリに記録: 「序盤セメント&gt;終盤セメント」になれば長期学習の機能開始の印(ユーザー由来)</li>
+<li>旧成果を <code>archive_rules_v3_depth2/</code> へ退避、<strong>深さ3教師版の再生成チェーン起動</strong>(実行中)</li>
+</ul>
+<h3 id="3-exit0">深さ3教師版 完走(同日夕、全段exit=0)</h3>
+<ul>
+<li>想定外の遅延: v0教師値が6.1時間(データセット段が重複排除なしの素朴カーネルだったため。116ms/局面。<strong>次回は高速版(45ms)に差し替え</strong>)</li>
+<li><strong>リトマス判定: 序盤セメント(0%) vs 終盤(3.8%)は未逆転</strong>(終盤偏重は5.3→3.8%に縮小)。ただし<strong>ロック終盤1.2%・ストック終盤0.2%が初出現</strong> — 報酬相関が届く終盤側から長期スキルが芽吹く、理論どおりの前進</li>
+<li><strong>vs v0 50%→55.3%</strong> — 世代の積み上げが対戦成績に初反映。v0の対A0相関 0.668→0.811、世代最終0.827(深さ2版0.795超え)</li>
+<li>ベースライン68〜74%、旧best1 63〜70%、旧best2 52〜56%</li>
+<li>成果物: <code>results/policy_report_value_latest_rules_v2.html</code> §7更新</li>
+<li><strong>次</strong>: N6(BR攻撃環境)。長期スキルのさらなる発見には深さ4教師 or 世代数増(将来オプション、ユーザーの深さ10見立てに向けた段階増強)</li>
+</ul>
+<h2 id="2026-07-13-n6-br">2026-07-13 — N6: BR攻撃テスト(実装完了・訓練実行中)</h2>
+<ul>
+<li><code>complete_ai/br_env.py</code>: 攻撃者が<strong>1席をフル操作</strong>(TP宣言+NTP反応)する新gym環境。行動=Discrete(204)(TPコード192+NTPコード12、文脈マスク)、観測=103特徴+手番フラグ。凍結エージェントはLP混合からサンプル(=実運用方策そのもの)</li>
+<li><code>complete_ai/br_attack.py</code>: MaskablePPO攻撃者を250kステップ訓練→300局評価、複数seed。<strong>ゲート: 最悪seedの攻撃者勝率≦45%でPASS</strong></li>
+<li>スモーク確認済み(83 steps/s → 1seed約50分)。<strong>3seed×250k実行中</strong>(約2.5時間)</li>
+<li>対象モデル: models/value_latest.pt(深さ3教師・世代12)</li>
+</ul>
+<h3 id="n6-3seed">N6 結果(同日夜、3seed完走)</h3>
+<ul>
+<li>攻撃者勝率: seed0=48.0% / seed1=47.3% / seed2=47.7%(<strong>極めて一貫</strong>)。プール 429/900 = <strong>47.7%</strong>(95%CI ±3.3pt)</li>
+<li><strong>ゲート基準の較正</strong>: 当初の「≦45%」は理論的に過剰要求(ナッシュ完全体でもベストレスポンダーにはゲーム値≈50%を譲る。それ未満に抑え込むことは完全プレイでも保証されない)→ 正しい非搾取性基準は「攻撃者がパリティ(50%)を超えられないこと」。コード・JSONに基準と根拠を記録</li>
+<li><strong>判定: PASS</strong>(全攻撃者が50%未満 = 専属搾取者ですらパリティに届かない)</li>
+<li>注意書き: PPO 250k攻撃者は真のベストレスポンスの下界。より強い攻撃(長時間訓練・探索型攻撃者)は将来のN7で</li>
+<li>成果物: <code>data/n6_br_attack.json</code>、<code>models/br_attacker_seed*.zip</code></li>
+</ul>
+<h3 id="14-off-ai-v1">再定義ゲート①〜④すべて実測クリア = 「ミラー・リバーシOFF 最強AI v1」相当</h3>
+<ul>
+<li>①material対照優位 ②打切病理なし ③旧ベスト勝ち越し ④非搾取性(BR47.7%) 全て達成</li>
+<li>残: ⑤BR理論上限との比較(将来)、長期スキル開花(深さ増強)</li>
+</ul>
+<h2 id="2026-07-13_2">2026-07-13 — 方策レポートにタイム等の全スキル統計を追加(ユーザー要望)</h2>
+<ul>
+<li>ユーザー指摘「タイムが統計に無い」→ タイムは必殺枠の二択(ブースト/タイム)でブースト全振り・タイム0%だが表に出ていなかった</li>
+<li><code>policy_report.py</code> 拡張: ①§3のTP宣言表を<strong>全スキル常時表示</strong>(0%もグレーで明示、タイム/ストック/オール/ドロップが消えない)②新§3b「長期・条件付きスキルの合法vs選択」表(タイム/セメント/ロック/ストック/チャージ)+必殺枠の選択内訳(ブースト/タイム/温存)</li>
+<li>実測: タイムは1,535手番で合法だったが選択0回(0.00%)。必殺枠使用可能な手番でブースト22.3%/タイム0%/温存77.7%。セメント0.24%・ロック0.05%・チャージ0.19%・ストック0.00%(いずれも合法だが探索地平線外で選ばれず)</li>
+<li>観測(価値ネット特徴量)側は <code>time_active</code> 両プレイヤー分が既に含まれ確認、追加不要</li>
+<li>成果物: <code>results/policy_report_value_latest_rules_v2.html</code>(§3全スキル表示・§3b追加)</li>
+</ul>
+<h2 id="2026-07-13_3">2026-07-13 — 記録確認とファイル整理</h2>
+<ul>
+<li>WORK_LOG(N0〜N6全フェーズ)+メモリ3ファイル(project/feedback/domain)で記録完備を確認</li>
+<li>ディスク調査: <strong>Complete/ 8.2GB のうち 8.0GB が <code>Complete/Trash/</code></strong>(旧RL路線の実験遺物: rl_models 4.9G・rl_analysis 1.9G・各種.db約1G・wandb 207M)。gitignore済み・git未追跡</li>
+<li>ユーザー承認で削除実行: <code>Complete/Trash/</code>(8GB)+ 最上位 <code>Trash/</code>(5.3MB、旧Basic RL実験・古いgitリポジトリを含むと判明→ユーザー確認の上削除)。<strong>yubisuma 全体 8.2GB→198MB</strong></li>
+<li><strong>Basic版の成功解析は無傷</strong>(<code>Basic/basic_solver/results/</code>、Trash外)。Trash内Basicはソルバー成果ゼロのRL遺物のみと確認済み</li>
+<li>results/ をクリーン化: ルートに現行V2レポート7枚+ハブ、<code>_legacy/{diagnostics_may(23HTML), ppo_runs(45dir), endgame_scenarios(3dir)}</code> に旧物を集約。現役2モデルの新パスに合わせ <code>vs_legacy.py</code> を更新</li>
+<li><strong>レポート集約ハブ</strong>: <code>results/index.html</code>(1枚開けば全レポートへ。生成器 <code>complete_ai/build_report_hub.py</code>、新レポート追加後は再実行で更新)</li>
+</ul>
+<h2 id="2026-07-13-ai">2026-07-13 — ビジュアル対戦画面（ブラウザ版・正ルール・AI相手）</h2>
+<ul>
+<li>ユーザー要望: テキストCLIは遊びづらい → 小学生でも分かるビジュアルな対戦UIが欲しい</li>
+<li>既存 <code>web/</code> + <code>web_game.py</code> は<strong>旧ルールエンジン（フェイントバグ・パス疑似手番）+ 相手ランダム</strong>のため不採用。正ルール（complete_solver.transition）+ 今の学習AI（SearchAgent/LP混合）で新規作成</li>
+<li><code>complete_ai/play_server.py</code>: stdlibのみのHTTPサーバー。状態解決は検証済み参照エンジン（events付き）、AIの着手はpacked探索のSearchAgent。同時手番を保持（人間宣言時はAI反応を隠しコミット、AI宣言時は先コミット→人間反応→公開）。AIターン継続は自動処理</li>
+<li><code>complete_ai/webplay/{index.html,style.css,app.js}</code>: ①なにを言う（数字/わざ、絵文字+一言説明）→②親指何本、の2ステップ式。手を絵で表示、バフ/ストックをチップ表示、ログ、勝敗画面。スマホ幅対応・ダーク非依存の明るいデザイン</li>
+<li>ランチャー <code>AIと対戦.bat</code>（ダブルクリック起動、ブラウザ自動オープン）。または <code>python -m complete_ai.play_server</code></li>
+<li>スモーク: 人間先攻/AI先攻とも最後まで正常終了、サーバのHTML/JS配信・API応答確認済み</li>
+</ul>
+<h2 id="2026-07-13_4">2026-07-13 — レポートハブから対戦を起動（カスタムプロトコル）</h2>
+<ul>
+<li>要望: <code>results/index.html</code>（file://）のリンクから <code>AIと対戦.bat</code> を起動したい</li>
+<li>制約: ブラウザは file:// リンクから .bat を直接実行できない（セキュリティ）→ 標準回避策のカスタムURLプロトコル <code>yubisuma://</code> を採用</li>
+<li><code>complete_ai/build_launch_registration.py</code>: 正確な絶対パス（★入り）で UTF-16 の登録/解除 .reg を生成 → <code>AI対戦リンクを有効化.reg</code> / <code>AI対戦リンクを無効化.reg</code></li>
+<li><code>build_report_hub.py</code>: ハブに緑の「▶ AI と対戦する」ボタン（href=yubisuma://play）+ 初回セットアップ注記を追加、再生成</li>
+<li>使い方: 有効化.reg を1回ダブルクリック→以降ハブのボタンで起動（ブラウザ確認ダイアログ「はい」）。フォールバックは AIと対戦.bat 直接ダブルクリック</li>
+</ul>
+<h2 id="2026-07-14-ui">2026-07-14 — 対戦画面UI改善（直前のやりとり強調＋右側フェーズ/ターンログ）</h2>
+<ul>
+<li>ユーザー要望: 直前の宣言と相手の反応をアイコンで目立たせ、ログは右側にフェーズ/ターン管理で溜める</li>
+<li>backend(play_server.py): フェーズ/ターン追跡（mover切替で新フェーズ、追加ターンで同フェーズturn++）、構造化ログentries（side/phase/turn/decl{emoji,name,thumb}/react{...}）、last_exchange を返却。宣言→アイコン変換ヘルパー追加</li>
+<li>frontend: 2カラム化（左=盤面+操作、右=ログ）。中央に「直前のやりとり」を大アイコンで強調表示（宣言者→反応者、フェーズ/ターン見出し）。右ログは「あなた 1-1 / AI 1-2」形式で色分け・自動スクロール。スマホ幅ではログが下段に回る</li>
+<li>検証: フェーズ/ターンがスキップ連続コンボ（AI 1-1→1-4）で正しく増加、サーバー配信・API新フィールド確認</li>
+</ul>
+<h2 id="2026-07-14-exe">2026-07-14 — 対戦画面レイアウト修正＋ルールブック＋EXE化準備</h2>
+<ul>
+<li>レイアウト修正: 二列化で盤面が縦長・窮屈になった問題を解消。盤面(.game-main)を固定幅508pxの横長に戻し、履歴(.log-panel)は右に content サイズの箱(縦に伸びすぎない、空時「まだ ありません」表示)。800px以下で履歴が下段に回る。「ログ」→「履歴」に改名</li>
+<li>ルールブック: <code>complete_ai/webplay/rulebook.html</code>(かんたん版・ビジュアル)。全スキルをカテゴリ別(通常/対カウンター/参照/相手ターン中/必殺)にアイコン+やさしい説明。ゲーム開始画面とハブ両方にリンク</li>
+<li>EXE化準備(ユーザーがGitHub公開する用): <code>play_entry.py</code>(エントリ)、<code>yubisuma_game.spec</code>(PyInstaller、onedir、webplay+model同梱、torch/numba/scipy hidden imports)、<code>EXE化とGitHub公開の手順.md</code>。play_server を frozen対応(_MEIPASS/exe隣のmodel探索)に</li>
+<li>検証: サーバーがrulebook配信(200)・新レイアウト・API正常。ハブ再生成でrulebookリンク確認</li>
+</ul>
+<h2 id="2026-07-14-ui3">2026-07-14 — 対戦UI大改修（3カラム・こども/おとな・ポップアップ説明・ストック系グループ）＋ルールブック強化</h2>
+<ul>
+<li>レイアウト: 3カラム化。左=履歴 / 中央=盤面のみ（AI・自分の手＋直前のやりとり）/ 右=操作ボード（何を言う＋親指＋決定）。狭画面は 盤面→操作→履歴 の順で縦積み</li>
+<li>こども/おとな切替: 右上トグル。全テキスト2バージョン（既定=おとな漢字、こども=ひらがな）。localStorage保存。ゲーム・ルールブック共通</li>
+<li>説明ポップアップ: 選択肢はアイコン+名前のみ、ホバーで説明ポップアップ。右上トグルでON/OFF</li>
+<li>ストック系グループ化: 操作ボードで ストック/チョイス/オール/ドロップ を破線枠の「ストック系」に。ルールブックでも ストック配下に3つをぶら下げて表示</li>
+<li>共有データ <code>complete_ai/webplay/skills_data.js</code>（emoji/kid/adult/strict定義/カテゴリ）をゲームとルールブックで共用。厳密定義は完全ルール（新）準拠</li>
+<li>ルールブック: 切替対応、各パネル<strong>クリックで厳密定義モーダル</strong>（やさしい説明＋正式定義）</li>
+<li>backend: 選択肢APIを名前/値のみに簡素化（説明・絵文字はフロント所有＝トグルにサーバー往復不要）</li>
+<li>検証: 全アセット200配信、ゲーム全フロー・API・厳密定義ロード確認</li>
+</ul>
+<h2 id="2026-07-14-ui6">2026-07-14 — 対戦UI細部調整（ユーザー指摘6点）</h2>
+<ol>
+<li>スタート画面のタイトル・遊び方も こども/おとな 連動（既定=漢字）。START テキストを skills_data.js に追加、renderStart()</li>
+<li>ルールブック: 各パネルの「クリックで厳密な定義」表記を削除 → 基本の流れと通常スキルの間に1つだけ案内（clicknote）。モーダルは簡単な説明を省き<strong>厳密定義のみ</strong>を表示</li>
+<li>厳密定義の可読性向上: 完全ルール準拠のまま改行構造化（カウンター/ガード/コピー/タイム/ブロック等を箇条書き化）、モーダルは white-space:pre-line + 左罫線</li>
+<li>対戦画面の重大レイアウト修正: #game が #app(560px)に閉じ込められ窮屈だった問題を解消（#start/#result のみ560px幅、#game は独立して広く）。カラム間隔を14→40pxに拡大</li>
+<li>中央揃え: 盤面+操作を画面縦中央に（align-items:center, min-height:100vh）。履歴だけ上寄せ。スタート/結果画面も縦中央</li>
+<li>降参ボタン: 中央盤面の下に小さい赤ボタン。押すと即「あなたの負け」（backend act の surrender 分岐、フロントは /api/act に surrender:true）
+- 検証: 降参動作・全アセット200・新データ配信 確認</li>
+</ol>
+</article>
+<footer>results/docs/ — <code>python -m complete_ai.build_report_hub</code> で再生成</footer>
+</div></body></html>

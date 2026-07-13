@@ -2,3 +2,5 @@ Trash/
 __pycache__/
 *.pyc
 *.db
+dist/
+build/

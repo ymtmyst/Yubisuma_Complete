@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ユビスマ ルールブック</title>
+<style>
+  :root{--ink:#223;--muted:#7a86a1;--card:#fff;--line:#e3e8f2;--human:#2f80ed;
+    --accent:#7c3aed;--good:#16a34a;--ai:#eb5757;--shadow:0 6px 20px rgba(40,60,120,.12);}
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:-apple-system,"Segoe UI","Hiragino Maru Gothic ProN","Yu Gothic",Meiryo,sans-serif;
+    color:var(--ink);background:linear-gradient(160deg,#eef3fb,#e7ecfa);line-height:1.7;}
+  .wrap{max-width:780px;margin:0 auto;padding:26px 16px 70px;}
+  h1{text-align:center;font-size:28px;margin:6px 0 2px;}
+  .lead{text-align:center;color:var(--muted);margin:0 0 16px;}
+  #toggles{position:fixed;top:10px;right:12px;display:flex;gap:8px;z-index:50;}
+  .tg{display:inline-flex;align-items:center;gap:5px;font-size:13px;font-weight:700;border:1px solid var(--line);
+    background:#fff;color:#445;border-radius:999px;padding:7px 12px;cursor:pointer;text-decoration:none;
+    box-shadow:var(--shadow);font-family:inherit;}
+  .tg[data-mode="kid"]{background:#f59e0b;color:#fff;border-color:#f59e0b;}
+  .goal{background:linear-gradient(135deg,#16a34a,#059669);color:#fff;border-radius:18px;padding:16px 20px;
+    box-shadow:var(--shadow);text-align:center;margin-bottom:16px;}
+  .goal .big{font-size:20px;font-weight:800;}
+  .howto{background:var(--card);border-radius:16px;box-shadow:var(--shadow);padding:16px 18px;margin-bottom:22px;}
+  .howto h2{font-size:16px;margin:0 0 8px;color:var(--accent);}
+  .howto b{color:var(--human);}
+  h2.cat{font-size:16px;margin:24px 0 12px;padding:8px 14px;border-radius:12px;color:#fff;}
+  .cat.normal{background:#3b82f6;}.cat.anti{background:#3a32c3;}.cat.ref{background:#059669;}
+  .cat.react{background:#ef4444;}.cat.ult{background:#782069;}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  @media(max-width:560px){.grid{grid-template-columns:1fr;}}
+  .skill{background:var(--card);border-radius:14px;box-shadow:var(--shadow);padding:12px 14px;
+    display:flex;gap:12px;align-items:flex-start;border:1px solid var(--line);cursor:pointer;transition:all .12s;}
+  .skill:hover{border-color:var(--accent);transform:translateY(-1px);}
+  .skill .ico{font-size:34px;line-height:1;flex:0 0 auto;}
+  .skill .nm{font-weight:800;font-size:15px;}
+  .skill .ds{font-size:13px;color:#445;margin-top:2px;}
+  .clicknote{background:#eef2ff;border:1px solid #c7d2fe;border-radius:12px;padding:11px 14px;
+    font-size:13px;color:#4338ca;font-weight:700;text-align:center;margin:0 0 18px;}
+  .stock-wrap{border:1.5px dashed #e6c877;border-radius:14px;padding:10px;margin-top:4px;background:#fffdf6;}
+  .stock-head{font-weight:800;color:#8a6d1a;margin-bottom:8px;font-size:14px;}
+  .tip{background:#fff7e6;border-left:4px solid #f59e0b;border-radius:10px;padding:12px 14px;font-size:13px;
+    margin-top:14px;color:#6b5416;}
+  footer{text-align:center;color:var(--muted);font-size:12px;margin-top:30px;}
+  /* modal */
+  .backdrop{position:fixed;inset:0;background:rgba(20,25,40,.5);display:flex;align-items:center;
+    justify-content:center;z-index:100;padding:20px;}
+  .backdrop.hidden{display:none;}
+  .modal{background:#fff;border-radius:18px;max-width:520px;width:100%;padding:22px;box-shadow:0 20px 60px rgba(0,0,0,.3);}
+  .modal .mh{display:flex;align-items:center;gap:12px;margin-bottom:12px;}
+  .modal .mh .ico{font-size:40px;}
+  .modal .mh .nm{font-size:20px;font-weight:800;}
+  .modal .mh .tag{font-size:11px;color:#fff;border-radius:999px;padding:2px 9px;font-weight:800;}
+  .modal .sec{font-size:12px;font-weight:800;color:var(--muted);margin:14px 0 6px;}
+  .modal .strict{font-size:14px;color:#233;background:#f6f8fc;border-radius:12px;padding:14px 16px;
+    line-height:1.85;white-space:pre-line;border-left:4px solid #94a3b8;}
+  .modal .close{margin-top:16px;width:100%;border:none;border-radius:12px;padding:12px;font-size:15px;
+    font-weight:800;color:#fff;background:var(--human);cursor:pointer;font-family:inherit;}
+</style>
+</head>
+<body>
+<div id="toggles">
+  <button class="tg" id="tg-mode" data-mode="adult"><span id="me">🧑</span><span id="ml">おとな</span></button>
+  <a class="tg" href="index.html"><span>🎮</span>対戦へ</a>
+</div>
+<div class="wrap">
+  <h1>🤟 ユビスマ ルールブック</h1>
+  <p class="lead" id="lead"></p>
+  <div class="goal"><div id="goal1"></div><div class="big" id="goal2"></div></div>
+  <div class="howto"><h2 id="howto-h"></h2><ol id="howto-list"></ol></div>
+  <div class="clicknote" id="clicknote"></div>
+  <div id="cats"></div>
+  <div class="tip" id="cointip"></div>
+  <footer>くわしい正式ルールは「完全ルール（新）」を見てね。各パネルを<b>クリック</b>すると厳密な定義が出ます。</footer>
+</div>
+
+<div class="backdrop hidden" id="backdrop"><div class="modal" id="modal"></div></div>
+
+<script src="skills_data.js"></script>
+<script>
+"use strict";
+let mode = localStorage.getItem("ys_mode") || "adult";
+const T = (o)=> o ? (o[mode] ?? o.adult ?? "") : "";
+const $ = (id)=>document.getElementById(id);
+const CAT_CLS = {normal:"normal",anti:"anti",ref:"ref",react:"react",ult:"ult"};
+const CAT_ORDER = ["normal","anti","ref","ult"];
+
+const TEXT = {
+  lead:{kid:"むずかしい ことば ぬきで、わざの こうかを やさしく せつめい！",adult:"スキルの効果をわかりやすく説明します。パネルを押すと厳密な定義も見られます。"},
+  goal1:{kid:"🖐️ おたがい 手が 2つ",adult:"🖐️ おたがい 手が 2つ"},
+  goal2:{kid:"じぶんの手を さきに 0 にしたら かち！",adult:"自分の手を先に 0 にしたら勝ち"},
+  howtoH:{kid:"あそびかたの きほん",adult:"基本の流れ"},
+  howto:{kid:[
+    "じぶんの番では ①なにを言うか（数字 か わざ）→②親指を何本あげるか を えらぶ。",
+    "あいての番では あいての わざに どう反応するか（なし／カウンター／ブロック）を えらぶ。",
+    "数字は 2人の親指の合計が 言った数と 同じなら 手を1つ おろせる。",
+    "フラッシュは 2人の親指が同じ数なら 手を2つ おろせる。"],
+   adult:[
+    "自分の番：①宣言（数字 or スキル）→②上げる親指の本数 を選ぶ。",
+    "相手の番：相手のスキルへの反応（なし／カウンター／ブロック）を選ぶ。",
+    "数字は 2人の親指の合計が宣言値と一致すれば 手を1つ降ろす。",
+    "フラッシュは 2人の親指が同数なら 手を2つ降ろす。"]},
+  cointip:{kid:"🎓 コツ：数字は おわりのほうで つよい。フェイントは カウンターまちの ワナ。ストックは 2つで つよい！",
+    adult:"🎓 コツ：数字は終盤で強い。フェイントはカウンター待ちの罠。ストックは2つ以上で強力。"},
+  clickMore:{kid:"タップで くわしく",adult:"クリックで厳密な定義"},
+};
+const TAG_COLOR = {normal:"#3b82f6",anti:"#3a32c3",ref:"#059669",react:"#ef4444",ult:"#782069"};
+
+function skillCard(name){
+  const s = SKILLS[name];
+  return `<div class="skill" data-skill="${name}">
+    <div class="ico">${s.emoji}</div>
+    <div><div class="nm">${name}</div><div class="ds">${T(s)}</div></div></div>`;
+}
+
+function render(){
+  $("tg-mode").dataset.mode = mode;
+  $("me").textContent = mode==="kid"?"🧒":"🧑";
+  $("ml").textContent = mode==="kid"?"こども":"おとな";
+  $("lead").textContent = T(TEXT.lead);
+  $("goal1").textContent = T(TEXT.goal1);
+  $("goal2").textContent = T(TEXT.goal2);
+  $("howto-h").textContent = T(TEXT.howtoH);
+  $("howto-list").innerHTML = T(TEXT.howto).map(x=>`<li>${x}</li>`).join("");
+  $("clicknote").textContent = T(START.ruleNotice);
+  $("cointip").textContent = T(TEXT.cointip);
+
+  // reference: split stock family
+  let html = "";
+  for (const cat of CAT_ORDER){
+    const names = Object.keys(SKILLS).filter(n=>SKILLS[n].cat===cat && !SKILLS[n].child_of);
+    if (cat==="react") continue;
+    html += `<h2 class="cat ${CAT_CLS[cat]}">${T(CAT[cat].label)}</h2>`;
+    if (cat==="ref"){
+      // コピー and ストック(親); チョイス/オール/ドロップ are children of ストック
+      const standalone = names.filter(n=>n!=="ストック");
+      html += `<div class="grid">${standalone.map(skillCard).join("")}</div>`;
+      const kids = Object.keys(SKILLS).filter(n=>SKILLS[n].child_of==="ストック");
+      html += `<div class="stock-wrap"><div class="stock-head">📦 ストック（ためて使うセット）</div>
+        <div class="grid">${skillCard("ストック")}${kids.map(skillCard).join("")}</div></div>`;
+    } else {
+      html += `<div class="grid">${names.map(skillCard).join("")}</div>`;
+    }
+  }
+  // reaction category (relevant during opponent's turn)
+  html += `<h2 class="cat react">${T(CAT.react.label)}</h2><div class="grid">` +
+    Object.keys(REACTIONS).filter(r=>r!=="なし").map(r=>{
+      const s=REACTIONS[r];
+      return `<div class="skill" data-react="${r}"><div class="ico">${s.emoji}</div>
+        <div><div class="nm">${r}</div><div class="ds">${T(s)}</div></div></div>`;
+    }).join("") + `</div>`;
+  $("cats").innerHTML = html;
+  wire();
+}
+
+function openModal(name, data, catCls){
+  const color = TAG_COLOR[data.cat] || "#7c3aed";
+  const catLabel = data.cat ? T(CAT[data.cat].label) : (mode==="kid"?"はんのう":"反応");
+  $("modal").innerHTML = `
+    <div class="mh"><span class="ico">${data.emoji}</span><span class="nm">${name}</span>
+      <span class="tag" style="background:${color}">${catLabel}</span></div>
+    <div class="sec">📖 正式な定義（完全ルール）</div>
+    <div class="strict">${data.strict}</div>
+    <button class="close" id="mclose">${mode==="kid"?"とじる":"閉じる"}</button>`;
+  $("backdrop").classList.remove("hidden");
+  $("mclose").onclick = ()=>$("backdrop").classList.add("hidden");
+}
+$("backdrop").onclick = (e)=>{ if(e.target===$("backdrop")) $("backdrop").classList.add("hidden"); };
+
+function wire(){
+  for (const el of document.querySelectorAll(".skill")){
+    el.onclick = ()=>{
+      if (el.dataset.skill) openModal(el.dataset.skill, SKILLS[el.dataset.skill]);
+      else if (el.dataset.react) openModal(el.dataset.react, REACTIONS[el.dataset.react]);
+    };
+  }
+}
+$("tg-mode").onclick = ()=>{ mode = mode==="kid"?"adult":"kid"; localStorage.setItem("ys_mode",mode); render(); };
+render();
+</script>
+</body>
+</html>

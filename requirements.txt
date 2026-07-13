@@ -17,6 +17,9 @@ numpy>=1.24.0
 # Exact matrix-game solving
 scipy>=1.10.0
 
+# Numba: compiled rules engine + search (必須。対戦・学習の両方で使用)
+numba>=0.58
+
 # TensorBoard (optional)
 tensorboard>=2.15.0
 

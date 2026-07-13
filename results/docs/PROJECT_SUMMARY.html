@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>全体像 PROJECT_SUMMARY</title>
+<style>
+:root { color-scheme: light dark; }
+* { box-sizing: border-box; }
+body { margin: 0; font-family: -apple-system, "Segoe UI", "Hiragino Kaku Gothic ProN",
+  "Yu Gothic", Meiryo, sans-serif; line-height: 1.75; color: #1f2328;
+  background: #f6f7f9; }
+.wrap { max-width: 820px; margin: 0 auto; padding: 32px 24px 96px; }
+.top { display: flex; align-items: center; gap: 12px; margin-bottom: 22px;
+  padding-bottom: 16px; border-bottom: 1px solid #e5e7eb; }
+.top a.back { font-size: 13px; color: #4f46e5; text-decoration: none; font-weight: 600;
+  padding: 6px 12px; border: 1px solid #e5e7eb; border-radius: 8px; background: #fff; }
+.top a.back:hover { border-color: #a5b4fc; }
+.top .meta { font-size: 12px; color: #9ca3af; margin-left: auto; }
+.doc { background: #fff; border: 1px solid #e5e7eb; border-radius: 14px;
+  padding: 36px 40px; box-shadow: 0 1px 3px rgba(0,0,0,.04); }
+.doc h1 { font-size: 26px; font-weight: 700; margin: 0 0 18px; padding-bottom: 12px;
+  border-bottom: 2px solid #e5e7eb; letter-spacing: .01em; }
+.doc h2 { font-size: 20px; font-weight: 700; margin: 34px 0 12px; padding-bottom: 8px;
+  border-bottom: 1px solid #eceef1; }
+.doc h3 { font-size: 16px; font-weight: 700; margin: 26px 0 10px; color: #374151; }
+.doc h4 { font-size: 14px; font-weight: 700; margin: 20px 0 8px; color: #4b5563; }
+.doc p { margin: 12px 0; }
+.doc ul, .doc ol { margin: 12px 0; padding-left: 26px; }
+.doc li { margin: 5px 0; }
+.doc a { color: #4f46e5; text-decoration: none; }
+.doc a:hover { text-decoration: underline; }
+.doc code { background: #f3f4f6; padding: 2px 6px; border-radius: 5px; font-size: 90%;
+  font-family: "SFMono-Regular", "Consolas", "Menlo", monospace; }
+.doc pre { background: #f6f8fa; border: 1px solid #e5e7eb; border-radius: 10px;
+  padding: 14px 16px; overflow-x: auto; line-height: 1.55; }
+.doc pre code { background: none; padding: 0; font-size: 13px; }
+.doc blockquote { margin: 14px 0; padding: 4px 16px; border-left: 4px solid #a5b4fc;
+  color: #6b7280; background: #f9fafb; border-radius: 0 8px 8px 0; }
+.doc table { border-collapse: collapse; width: 100%; margin: 16px 0; font-size: 14px;
+  display: block; overflow-x: auto; }
+.doc th, .doc td { border: 1px solid #e5e7eb; padding: 8px 12px; text-align: left;
+  vertical-align: top; }
+.doc th { background: #f3f4f6; font-weight: 700; }
+.doc tr:nth-child(even) td { background: #fafbfc; }
+.doc hr { border: none; border-top: 1px solid #e5e7eb; margin: 28px 0; }
+.doc img { max-width: 100%; }
+/* 完全ルール 専用 */
+.doc details.rb { border: 1px solid #e5e7eb; border-radius: 10px; margin: 10px 0;
+  background: #fbfbfc; overflow: hidden; }
+.doc details.rb > summary { cursor: pointer; list-style: none; padding: 12px 16px;
+  font-weight: 700; font-size: 15px; user-select: none; display: flex; align-items: center; gap: 8px; }
+.doc details.rb > summary::-webkit-details-marker { display: none; }
+.doc details.rb > summary::before { content: "▶"; color: #9ca3af; font-size: 11px;
+  transition: transform .15s; }
+.doc details.rb[open] > summary::before { transform: rotate(90deg); }
+.doc details.rb > summary:hover { background: #f3f4f6; }
+.doc .rbbody { padding: 4px 18px 14px; border-top: 1px solid #eceef1; }
+.doc .rbbody > *:first-child { margin-top: 12px; }
+.doc .skill { font-weight: 700; background: #eef2ff; color: #4338ca;
+  padding: 1px 7px; border-radius: 6px; font-size: 92%; }
+.doc .rnote { font-size: 13px; color: #6b7280; margin: 8px 0; }
+.doc .rh3 { font-size: 15px; }
+footer { margin-top: 40px; font-size: 12px; color: #9ca3af; text-align: center; }
+@media (prefers-color-scheme: dark) {
+  body { background: #0f1115; color: #d1d5db; }
+  .top { border-color: #232936; }
+  .top a.back { background: #171a21; border-color: #232936; color: #a5b4fc; }
+  .doc { background: #171a21; border-color: #232936; box-shadow: none; }
+  .doc h1 { border-color: #232936; }
+  .doc h2 { border-color: #1f2530; }
+  .doc h3 { color: #cbd5e1; }
+  .doc h4 { color: #b6bdc8; }
+  .doc code { background: #232936; }
+  .doc pre { background: #12151b; border-color: #232936; }
+  .doc blockquote { background: #12151b; color: #9ca3af; border-color: #4338ca; }
+  .doc th, .doc td { border-color: #232936; }
+  .doc th { background: #1b2028; }
+  .doc tr:nth-child(even) td { background: #12151b; }
+  .doc hr { border-color: #232936; }
+  .doc details.rb { background: #12151b; border-color: #232936; }
+  .doc details.rb > summary:hover { background: #1b2028; }
+  .doc .rbbody { border-color: #232936; }
+  .doc .skill { background: #1e1b3a; color: #c4b5fd; }
+}
+</style></head>
+<body><div class="wrap">
+<div class="top"><a class="back" href="../index.html">← ハブに戻る</a>
+<span class="meta">更新 07-14 ・ PROJECT_SUMMARY.md</span></div>
+<article class="doc"><h1>全体像 PROJECT_SUMMARY</h1>
+<h1 id="yubisuma-complete-ai-2026-07-13">Yubisuma Complete AI — 全体像まとめ（2026-07-13）</h1>
+<h2 id="_1">一言でいうと</h2>
+<p><strong>7週間止まっていた「BC+強化学習」路線を一度捨て、ゼロから探索中心の設計で作り直し、途中で発覚した根本的なルール実装バグも直しきって、「ミラー・リバーシOFF版の最強AI v1」に相当する状態まで到達しました。</strong></p>
+<hr />
+<h2 id="1">1. スタート地点（あなたが戻ってきた時点）</h2>
+<p>前任の下位モデルが作った旧AIは、勝率は出るものの「数字を92〜96%連打する」「none相手に無限ループで打ち切る」といった不自然な病理を抱え、採用保留のまま止まっていました。あなたの「手段は問わない、ゼロベースで考え直してほしい」という依頼から始まりました。</p>
+<h2 id="2-n0">2. 方針の再設計（N0）</h2>
+<p>ゲームの性質を調べ直しました — <strong>完全情報・決定論・同時手番・ゼロ和</strong>。この構造では各局面の最適な「混ぜ方（混合戦略）」はLP（線形計画）で厳密に計算できます。旧路線の失敗は「AIに混ぜ方まで学習させようとした」ことにあると突き止め、<strong>混ぜ方は毎手LPで厳密計算し、ニューラルネットには局面の点数だけを学ばせる</strong>将棋AI（AlphaZero）型の設計に切り替えました。これが初手固定・無限ループといった病理を原理から消す狙いです。</p>
+<h2 id="3-n1n6">3. 段階的に構築（N1〜N6）</h2>
+<table>
+<thead>
+<tr>
+<th>段階</th>
+<th>やったこと</th>
+<th>平易に言うと</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>N1</td>
+<td>深さ制限LP探索を約8倍高速化</td>
+<td>AIの「読み」を速くした</td>
+</tr>
+<tr>
+<td>N2</td>
+<td>ルールエンジンをNumbaで約1000倍高速化、終盤厳密テーブル</td>
+<td>「詰みデータベース」の基盤+超高速化</td>
+</tr>
+<tr>
+<td>N3</td>
+<td>103次元特徴の価値ネット学習</td>
+<td>AIの「大局観」の初代を作り、手作り評価に圧勝</td>
+</tr>
+<tr>
+<td>N4</td>
+<td>自己対戦の世代反復</td>
+<td>AI同士を戦わせて大局観を鍛える工場</td>
+</tr>
+<tr>
+<td>N5</td>
+<td>実戦エージェント+対戦CLI+評価台</td>
+<td>あなたが遊べる形+実力測定</td>
+</tr>
+<tr>
+<td>N6</td>
+<td>BR攻撃テスト</td>
+<td>弱点を突く専属攻撃者に耐えるか検証</td>
+</tr>
+</tbody>
+</table>
+<h2 id="4">4. 途中の大事件：ルール実装バグの発覚</h2>
+<p><strong>あなたが方策分布レポートを見て「コピー（フェイント）が反応なしで決着76.8%はありえない」と指摘したのが決定打</strong>でした。調べると、5月から<strong>ソルバーと対話版の両方が同じ誤解釈</strong>を共有していて（だから相互照合では見つからなかった）、「フェイントは相手がカウンターした時だけ発動する」というルールを無視して無条件発動させていました。</p>
+<p>これで全成果物が無効に。そこから、あなたの裁定を仰ぎながら次々と修正しました：
+- 参照経由のフェイント/ロックを正しく（カウンター時のみ発動）
+- ガードを「効果全体が1フェーズ1回」に（ルール文書の改訂に対応）
+- タイム、スキップ+タイムの手番奪取
+- <strong>「パスというスキルは存在しない」</strong>というあなたの指摘で、疑似パス手番を廃止し真のスキップに</p>
+<p>さらに再構築中に価値反復が発散する数値バグ（3連鎖）も特定・解決しました。ルールを直すたびに全成果物を自動で再生成する仕組みを作ったので、都度きれいに作り直せています。</p>
+<h2 id="5-ai">5. 今のAIの実力（再定義した合格基準を全クリア）</h2>
+<table>
+<thead>
+<tr>
+<th>基準</th>
+<th>結果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>① 手作り評価より強い</td>
+<td>✅ 61〜66%で勝ち越し</td>
+</tr>
+<tr>
+<td>② 病理（無限ループ）なし</td>
+<td>✅ 混合戦略で打ち切りほぼゼロ</td>
+</tr>
+<tr>
+<td>③ 旧最強モデル2種に勝ち越し</td>
+<td>✅ 旧best1に63〜70%、旧best2に53〜57%</td>
+</tr>
+<tr>
+<td>④ 搾取されない</td>
+<td>✅ 専属攻撃者3体すべて勝率48%未満（パリティ超え不可）</td>
+</tr>
+</tbody>
+</table>
+<p>固定相手には68〜77%で勝ち、方策も「初手フェイント/終盤に数字」といった人間的で健全な分布になりました（旧病理は消滅）。</p>
+<h2 id="6">6. 残っている課題（あなたの診断が的中している部分）</h2>
+<p><strong>セメント・ストック・ロック・タイムといった長期スキルは、まだほとんど使えていません。</strong> これはあなたの「深さが浅いと効果が10手先に出る長期スキルの価値が見えない」という信用割当の診断どおりで、証拠に「終盤セメント&gt;序盤セメント」という逆転が残っています。ただし対策（教師の読みを深くする）は効くことが実証済みで、深さ3にしたらロック・ストックが終盤から芽吹き始めました。<strong>「深さを買うほど良くなる」構造</strong>が確認できたので、次はここへの投資判断になります。</p>
+<h2 id="7">7. 副産物：整理とレポートハブ</h2>
+<ul>
+<li>ディスクを <strong>8.2GB → 198MB</strong> に（旧RL遺物8GBを削除、Basic版の成功解析は無傷で保護）</li>
+<li>results/をきれいな階層に再編（現行7枚+旧物は<code>_legacy/</code>に隔離）</li>
+<li><strong><code>Complete/results/index.html</code></strong> — 1枚開けば全レポートに飛べる集約ハブを作成。折りたたみセクション・状態バッジ（🔥進行中/🧱基盤/📚参考）・更新日つき。マークダウンや<code>完全ルール（新）</code>は<code>results/docs/</code>に整形HTMLとして自動生成され、生テキストではなく読みやすい形で開ける。</li>
+</ul>
+<h3 id="_2">📌 今後の運用ルール：新しいレポート／ドキュメントを追加したらハブに登録する</h3>
+<p><strong>新しい成果物（レポートHTML・計画/ログ等の.md）を作ったら、必ずレポートハブに追記すること。</strong> 手順は登録元1ファイルを編集して再生成するだけ：</p>
+<ol>
+<li><strong><code>Complete/complete_ai/build_report_hub.py</code></strong> を開く。</li>
+<li>追加物の種類に応じてリストに1行足す：
+   - フェーズ別レポート（<code>results/</code>内のHTML）→ <code>CURRENT</code> に <code>(タイトル, ファイル名, 説明, バッジ)</code> を追加
+   - 計画・記録・ルール系の<code>.md</code>／独自記法ドキュメント → <code>DOCS</code> に <code>(タイトル, 元ファイル, "md" または "rule", 出力名.html, 説明, バッジ)</code> を追加（<code>docs/</code>に整形HTMLが自動生成される）
+   - 終盤シナリオ → <code>ENDGAME</code>、旧診断は<code>_legacy/diagnostics_may/</code>に置けば自動収集される</li>
+<li><strong>バッジ</strong>は現状に合わせて選ぶ：<code>"hot"</code>=いま動かしている最新／<code>"base"</code>=土台・安定／<code>"ref"</code>=参考・アーカイブ寄り。既存物の重要度が変わったらここの<code>"hot"/"base"/"ref"</code>を書き換える（更新日は各ファイルの更新時刻から自動表示なので手入力不要）。</li>
+<li><strong><code>python -m complete_ai.build_report_hub</code></strong> を実行して<code>index.html</code>と<code>docs/</code>を再生成。</li>
+</ol>
+<p>※ <code>index.html</code>を直接編集しても再生成で上書きされる。編集は必ず<code>build_report_hub.py</code>側で行うこと。</p>
+<h2 id="8">8. この先の選択肢</h2>
+<ol>
+<li><strong>深さ4教師・世代数増</strong> — 長期スキル（セメント/ストック/タイム）を開花させる本命路線</li>
+<li><strong>より強い攻撃者</strong>での非搾取性の追い込み</li>
+<li><strong>あなた自身の対戦</strong>（<code>python -m complete_ai.play_cli</code>）での体感評価</li>
+</ol>
+<hr />
+<p>要するに、<strong>壊れかけた土台を捨てて理論的に正しい設計で建て直し、あなたのゲーム知識で見つかった致命的バグを潰し、実測で「崩されない」レベルまで到達した</strong>、というのが全体像です。唯一残るのは「長期スキルの使いこなし」で、そこは深さへの投資で伸ばせると分かっている状態です。</p>
+</article>
+<footer>results/docs/ — <code>python -m complete_ai.build_report_hub</code> で再生成</footer>
+</div></body></html>
