@@ -385,3 +385,20 @@
 - 将来アイデアを `FUTURE_IDEAS.md` に記録（教育的: ヒント/詰めパズル★厳密解つき/感想戦/勝率グラフ、大がかり: 人vs人/ミラー・リバーシ対応/N7強化/オンライン/性格切替）。ハブDOCSに登録（PROJECT_SUMMARYも追加）
 - **配布依存の修正**: requirements.txt に numba が抜けていた（新コード必須）→ 追加。遊ぶ専用の軽量 `requirements-play.txt`（torch/numba/numpy/scipy）を新設
 - 検証: 難易度3種のepsilon・ai_advantage、全アセット200、新UI要素配信、ハブ再生成 確認
+
+## 2026-07-14 — UI仕上げ調整（メーター/手番色分け/間隔）＋GitHubプッシュ
+
+- 形勢メーター刷新: 「余裕度」表現が不明瞭＋色が地味だった → **パーセンテージ二分割表示**（あなた/AI）に。色を青/赤にはっきり分離。幅は AI・あなたパネルよりわずかに短い横長（max-width ~460px, bar高18px）に調整
+- 手番中パネル: 紫枠が見づらい → 手番側パネルを**淡い色で全体に塗り分け**（あなた=青系 / AI=赤系）、一目で誰の番か分かるように
+- 間隔・降参ボタン: 中央カラムの縦間隔を32pxに拡大、直前のやりとり(exchange)を中央寄せ・~380px幅にコンパクト化、降参ボタンを塗りつぶし赤に
+- GitHubへコミット＋プッシュ済み（commit 07c811b: ゲーム一式・ルールブック・難易度/メーター/戦績/音・exe設定 / commit 8581d62: パネル色分け・メーター%表示）
+
+## 2026-07-14 — 右上トグル整理＋CPU版EXEビルド完成
+
+- 右上トグルを**縦並び**に変更。**音トグルは削除**（音は既定ONのまま、`app.js` の `soundOn` 初期値true・beepの `if(!soundOn)` ガードは維持、`tg-sound` 参照は refreshToggles/onclick から除去）。**ルール(📖)リンクを最上段に約1.2倍拡大**（`.tg.big`）、下に 大人/子供・説明ON/OFF を配置
+- **CPU版EXEビルド完成**: GPU環境（torch cu124）を一切触らず、隔離venv `.venv_build`（Python 3.10.11）に **CPU版torch 2.13.0+cpu**＋numpy2.2.6/scipy1.15.3/numba0.66/pyinstaller を新規インストール
+  - スモークテスト: 隔離venvで モデル読込→numba JIT solve→WebGame まで正常（numpy2.2×numba×torch互換確認）
+  - `pyinstaller yubisuma_game.spec --distpath dist`（onedir）でビルド成功 → `dist/ユビスマ対戦/`、**642MB**（GPU版4.4GBから縮小）。exe＋models/value_latest.pt＋webplay 同梱確認
+  - **exe単体の動作テスト合格**: `ユビスマ対戦.exe --no-browser --port 8391` が11秒でウォームアップ→「準備完了」、index HTTP200・/api/new が正常なゲーム状態JSONを返却。GPU非依存で起動
+- 運用メモ: 隔離venv方式なら GPU学習環境を汚さずCPU配布ビルドを作れる。再ビルドは `.venv_build/Scripts/python.exe -m PyInstaller yubisuma_game.spec --noconfirm --distpath dist --workpath build`
+- 残: dist/ユビスマ対戦 の zip 化 → GitHub Release へアップロード（ユーザー操作）／今回のトグル変更のコミット＋プッシュ

@@ -50,13 +50,7 @@ function refreshToggles() {
   const t = $("tg-tip");
   t.classList.toggle("on", tipOn);
   $("tg-tip-label").textContent = tipOn ? "説明ON" : "説明OFF";
-  const s = $("tg-sound");
-  s.classList.toggle("on", soundOn);
-  s.querySelector(".tg-emoji").textContent = soundOn ? "🔊" : "🔇";
-  $("tg-sound-label").textContent = soundOn ? "音ON" : "音OFF";
 }
-$("tg-sound").onclick = () => { soundOn = !soundOn;
-  localStorage.setItem("ys_sound", soundOn ? "on" : "off"); refreshToggles(); if (soundOn) SND.click(); };
 $("tg-mode").onclick = () => { mode = mode === "kid" ? "adult" : "kid";
   localStorage.setItem("ys_mode", mode); refreshToggles(); renderStart(); if (lastView) render(lastView); };
 $("tg-tip").onclick = () => { tipOn = !tipOn; localStorage.setItem("ys_tip", tipOn ? "on" : "off");

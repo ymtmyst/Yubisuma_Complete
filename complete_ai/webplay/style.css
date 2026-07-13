@@ -21,11 +21,14 @@ body {
 @keyframes pop { from { transform: scale(.85); opacity:.4;} to {transform:scale(1); opacity:1;} }
 
 /* ---- 右上トグル ---- */
-#toggles { position: fixed; top: 10px; right: 12px; display: flex; gap: 8px; z-index: 50; }
+#toggles { position: fixed; top: 10px; right: 12px; display: flex; flex-direction: column;
+  align-items: flex-end; gap: 8px; z-index: 50; }
 .tg { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; font-weight: 700;
   border: 1px solid var(--line); background: #fff; color: #445; border-radius: 999px;
   padding: 7px 12px; cursor: pointer; text-decoration: none; font-family: inherit; box-shadow: var(--shadow); }
 .tg .tg-emoji { font-size: 15px; }
+.tg.big { font-size: 16px; padding: 9px 16px; }
+.tg.big .tg-emoji { font-size: 18px; }
 .tg.on { background: var(--good); color: #fff; border-color: var(--good); }
 .tg[data-mode="kid"] { background: #f59e0b; color: #fff; border-color: #f59e0b; }
 
@@ -67,18 +70,19 @@ body {
 .col-board { flex: 0 0 600px; max-width: 100%; }
 .col-controls { flex: 0 0 320px; }
 
-/* ---- 形勢メーター(どっちが有利か・%表示) ---- */
-.meter { background: var(--card); border-radius: 14px; box-shadow: var(--shadow); padding: 12px 16px; }
-.meter-title { font-size: 12px; font-weight: 800; color: var(--muted); text-align: center; margin-bottom: 8px; }
-.meter-bar { display: flex; height: 30px; border-radius: 999px; overflow: hidden;
+/* ---- 形勢メーター(横長・パネルよりわずかに短い幅) ---- */
+.meter { background: var(--card); border-radius: 12px; box-shadow: var(--shadow); padding: 7px 16px;
+  max-width: 460px; margin: 0 auto; }
+.meter-title { font-size: 10.5px; font-weight: 800; color: var(--muted); text-align: center; margin-bottom: 5px; }
+.meter-bar { display: flex; height: 18px; border-radius: 999px; overflow: hidden;
   box-shadow: inset 0 1px 3px rgba(0,0,0,.12); }
-.mb-you, .mb-ai { display: flex; align-items: center; color: #fff; font-weight: 800; font-size: 13px;
+.mb-you, .mb-ai { display: flex; align-items: center; color: #fff; font-weight: 800; font-size: 11px;
   white-space: nowrap; transition: width .5s cubic-bezier(.3,1.2,.5,1); overflow: hidden; }
-.mb-you { background: linear-gradient(90deg, #2f80ed, #4f9bff); justify-content: flex-start; padding-left: 12px; }
-.mb-ai  { background: linear-gradient(90deg, #ff6b6b, #eb5757); justify-content: flex-end; padding-right: 12px; }
+.mb-you { background: linear-gradient(90deg, #2f80ed, #4f9bff); justify-content: flex-start; padding-left: 9px; }
+.mb-ai  { background: linear-gradient(90deg, #ff6b6b, #eb5757); justify-content: flex-end; padding-right: 9px; }
 
 .player-panel { background: var(--card); border-radius: 18px; box-shadow: var(--shadow);
-  padding: 14px 16px; margin: 22px 0; border: 3px solid transparent;
+  padding: 16px 18px; margin: 32px 0; border: 3px solid transparent;
   transition: background .25s, border-color .25s, box-shadow .25s; }
 .player-panel.drop { animation: shake .4s ease; }
 @keyframes shake { 0%,100%{transform:translateX(0);} 20%{transform:translateX(-6px);}
@@ -99,25 +103,25 @@ body {
   border-radius: 999px; padding: 3px 10px; }
 .badge:empty { display: none; }
 .hands { display: flex; gap: 10px; justify-content: center; padding: 6px 0; }
-.hand { font-size: 40px; filter: drop-shadow(0 3px 4px rgba(0,0,0,.12)); animation: pop .3s ease; }
+.hand { font-size: 48px; filter: drop-shadow(0 3px 4px rgba(0,0,0,.12)); animation: pop .3s ease; }
 .hand.down { opacity: .22; filter: grayscale(1); }
 .meta { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; min-height: 20px; }
 .chip { font-size: 12px; background: #eef1f7; border-radius: 999px; padding: 3px 9px; color: #556; }
 .chip.stock { background: #fff3d6; color: #8a6d1a; }
 
-/* ---- 直前のやりとり ---- */
-.exchange { margin: 24px 0; padding: 14px 12px; border-radius: 18px; background: #fff;
+/* ---- 直前のやりとり ---- 横幅せまめ・中央寄せ・脇役 ---- */
+.exchange { margin: 32px auto; padding: 10px 14px; border-radius: 16px; background: #fff;
   box-shadow: var(--shadow); display: flex; align-items: center; justify-content: center;
-  gap: 10px; min-height: 78px; flex-wrap: wrap; animation: pop .28s ease; }
-.exchange .ex-empty { color: var(--muted); font-weight: 700; }
-.ex-side { font-size: 12px; font-weight: 800; padding: 2px 8px; border-radius: 999px; color:#fff; }
+  gap: 8px; min-height: 58px; max-width: 380px; flex-wrap: wrap; animation: pop .28s ease; }
+.exchange .ex-empty { color: var(--muted); font-weight: 700; font-size: 13px; }
+.ex-side { font-size: 11px; font-weight: 800; padding: 2px 7px; border-radius: 999px; color:#fff; }
 .ex-side.ai { background: var(--ai); } .ex-side.human { background: var(--human); }
-.ex-move { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 78px; }
-.ex-move .big { font-size: 34px; line-height: 1; }
-.ex-move .nm { font-size: 14px; font-weight: 800; }
-.ex-move .tb { font-size: 11px; color: var(--muted); }
-.ex-arrow { font-size: 24px; color: var(--muted); font-weight: 800; }
-.ex-label { width: 100%; text-align: center; font-size: 12px; color: var(--muted); font-weight: 700; margin-bottom: 2px; }
+.ex-move { display: flex; flex-direction: column; align-items: center; gap: 1px; min-width: 62px; }
+.ex-move .big { font-size: 26px; line-height: 1; }
+.ex-move .nm { font-size: 12px; font-weight: 800; }
+.ex-move .tb { font-size: 10px; color: var(--muted); }
+.ex-arrow { font-size: 18px; color: var(--muted); font-weight: 800; }
+.ex-label { width: 100%; text-align: center; font-size: 11px; color: var(--muted); font-weight: 700; margin-bottom: 2px; }
 
 /* ---- 左: 履歴(縦中央) ---- */
 .col-log { background: var(--card); border-radius: 18px; box-shadow: var(--shadow);
@@ -135,11 +139,12 @@ body {
 .log-row.result.win { background: #e7f7ee; color: var(--good); }
 .log-row.result.lose { background: #fdecec; color: var(--ai); }
 
-/* ---- 中央下: 降参ボタン ---- */
-.surrender-btn { display: block; margin: 20px auto 0; border: none; background: transparent;
-  color: var(--ai); font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit;
-  border: 1.5px solid #f3c0c0; border-radius: 999px; padding: 5px 16px; opacity: .85; }
-.surrender-btn:hover { background: #fdecec; opacity: 1; }
+/* ---- 中央下: 降参ボタン(色つき) ---- */
+.surrender-btn { display: block; margin: 30px auto 0; border: 1.5px solid #eb9a9a;
+  background: #ffe0e0; color: #c0392b; font-size: 14px; font-weight: 800; cursor: pointer;
+  font-family: inherit; border-radius: 999px; padding: 8px 22px; box-shadow: 0 3px 10px rgba(235,87,87,.2); }
+.surrender-btn:hover { background: #ffcccc; }
+.surrender-btn:active { transform: scale(.96); }
 
 /* ---- 右: 操作ボード ---- */
 .control-card { background: var(--card); border-radius: 20px; box-shadow: var(--shadow); padding: 14px; }
