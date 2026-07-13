@@ -78,14 +78,19 @@ body {
 .mb-ai  { background: linear-gradient(90deg, #ff6b6b, #eb5757); justify-content: flex-end; padding-right: 12px; }
 
 .player-panel { background: var(--card); border-radius: 18px; box-shadow: var(--shadow);
-  padding: 14px 16px; margin: 22px 0; border: 3px solid transparent; transition: box-shadow .2s; }
+  padding: 14px 16px; margin: 22px 0; border: 3px solid transparent;
+  transition: background .25s, border-color .25s, box-shadow .25s; }
 .player-panel.drop { animation: shake .4s ease; }
 @keyframes shake { 0%,100%{transform:translateX(0);} 20%{transform:translateX(-6px);}
   40%{transform:translateX(6px);} 60%{transform:translateX(-4px);} 80%{transform:translateX(4px);} }
 .hand.dropping { animation: dropAnim .5s ease; }
 @keyframes dropAnim { 0%{transform:translateY(0) rotate(0);} 50%{transform:translateY(10px) rotate(-15deg);opacity:.5;}
   100%{transform:translateY(0) rotate(0);opacity:.22;} }
-.player-panel.turn-active { border-color: var(--accent); }
+/* 手番中は そのプレイヤーの色で パネル全体を薄く塗る(一目で分かる/読みやすい) */
+.player-panel.human.turn-active { background: #e8f1ff; border-color: #9cc3ff;
+  box-shadow: 0 6px 20px rgba(47,128,237,.20); }
+.player-panel.ai.turn-active { background: #ffecec; border-color: #ffb3b3;
+  box-shadow: 0 6px 20px rgba(235,87,87,.20); }
 .panel-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
 .who { font-weight: 800; font-size: 16px; }
 .player-panel.ai .who { color: var(--ai); }
