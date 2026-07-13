@@ -114,7 +114,9 @@ class CompleteTransitionTests(unittest.TestCase):
         self.assertEqual(result.next_state.opp.hands, 2)
         self.assertEqual(result.next_state.me.stock, frozenset({FEINT}))
         self.assertEqual(result.next_state.opp.stock, frozenset({FLASH}))
-        self.assertEqual(result.next_state.opp.skip_phases, 1)
+        # True skip (2026-07-13): skip is consumed when the turn passes
+        # TO the skipped player, not when their own turn ends.
+        self.assertEqual(result.next_state.opp.skip_phases, 2)
         self.assertTrue(result.next_state.opp.time_active)
 
     def test_mirror_legality_follows_config(self) -> None:

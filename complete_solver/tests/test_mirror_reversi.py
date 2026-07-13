@@ -50,12 +50,15 @@ class MirrorReversiGoldenTests(unittest.TestCase):
             RulesConfig(enable_mirror=True),
         )
 
-        self.assertEqual(result.next_state.me.skip_phases, 1)
+        # True skip (2026-07-13): the mirror user's skipped phase is consumed
+        # at the turn switch, so the skipper keeps the turn.
+        self.assertTrue(result.same_turn_player)
         self.assertEqual(result.next_state.opp.skip_phases, 0)
-        self.assertFalse(result.next_state.me.mirror_ready)
+        self.assertFalse(result.next_state.opp.mirror_ready)
         self.assertIn("skip_applied", result.events)
         self.assertIn("mirror_not_reflectable", result.events)
         self.assertIn("mirror_used", result.events)
+        self.assertIn("phase_skipped", result.events)
 
     def test_mirror_does_not_reflect_buffs_or_mirror_preparation(self) -> None:
         state = State(opp=PlayerState(mirror_ready=True))
@@ -141,7 +144,9 @@ class MirrorReversiGoldenTests(unittest.TestCase):
         self.assertTrue(result.next_state.opp.mirror_ready)
         self.assertEqual(result.next_state.me.stock, frozenset({CHARGE}))
         self.assertEqual(result.next_state.opp.stock, frozenset({FLASH}))
-        self.assertEqual(result.next_state.opp.skip_phases, 1)
+        # True skip (2026-07-13): skip is consumed when the turn passes
+        # TO the skipped player, not when their own turn ends.
+        self.assertEqual(result.next_state.opp.skip_phases, 2)
         self.assertTrue(result.next_state.opp.time_active)
         self.assertTrue(result.next_state.opp.used_ultimate)
         self.assertIn("reversi", result.events)

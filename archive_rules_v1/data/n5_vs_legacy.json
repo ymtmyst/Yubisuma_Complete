@@ -1,0 +1,54 @@
+{
+  "episode_mixed(旧best1)": {
+    "random": {
+      "games": 200,
+      "agent_wins": 144,
+      "legacy_wins": 49,
+      "truncations": 7,
+      "agent_winrate": 0.7461139896373057,
+      "seconds": 3.2090738999977475
+    },
+    "counter": {
+      "games": 200,
+      "agent_wins": 133,
+      "legacy_wins": 67,
+      "truncations": 0,
+      "agent_winrate": 0.665,
+      "seconds": 2.01240069999767
+    },
+    "block": {
+      "games": 200,
+      "agent_wins": 126,
+      "legacy_wins": 74,
+      "truncations": 0,
+      "agent_winrate": 0.63,
+      "seconds": 1.9649668999918504
+    }
+  },
+  "depth4_proper(旧best2)": {
+    "random": {
+      "games": 200,
+      "agent_wins": 108,
+      "legacy_wins": 85,
+      "truncations": 7,
+      "agent_winrate": 0.5595854922279793,
+      "seconds": 2.9195067000109702
+    },
+    "counter": {
+      "games": 200,
+      "agent_wins": 113,
+      "legacy_wins": 87,
+      "truncations": 0,
+      "agent_winrate": 0.565,
+      "seconds": 2.144780200003879
+    },
+    "block": {
+      "games": 200,
+      "agent_wins": 109,
+      "legacy_wins": 91,
+      "truncations": 0,
+      "agent_winrate": 0.545,
+      "seconds": 2.315230199994403
+    }
+  }
+}

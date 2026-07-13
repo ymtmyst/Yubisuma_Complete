@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Yubisuma Complete AI — レポート集約</title>
+<style>
+:root { color-scheme: light dark; }
+* { box-sizing: border-box; }
+body { margin: 0; font-family: -apple-system, "Segoe UI", "Hiragino Kaku Gothic ProN",
+  "Yu Gothic", Meiryo, sans-serif; line-height: 1.6; color: #1a1a1a;
+  background: #f6f7f9; }
+.wrap { max-width: 880px; margin: 0 auto; padding: 48px 24px 80px; }
+header h1 { font-size: 28px; font-weight: 700; margin: 0 0 6px; letter-spacing: .01em; }
+header p { margin: 0; color: #6b7280; font-size: 14px; }
+.hero { display: block; margin: 28px 0 40px; padding: 22px 24px; border-radius: 14px;
+  background: linear-gradient(135deg, #4f46e5, #7c3aed); color: #fff;
+  text-decoration: none; box-shadow: 0 8px 24px rgba(79,70,229,.28); transition: transform .12s; }
+.hero:hover { transform: translateY(-2px); }
+.hero .k { font-size: 12px; letter-spacing: .12em; text-transform: uppercase; opacity: .85; }
+.hero .t { font-size: 21px; font-weight: 700; margin: 4px 0 4px; }
+.hero .d { font-size: 14px; opacity: .92; }
+h2 { font-size: 15px; font-weight: 700; color: #374151; margin: 36px 0 14px;
+  padding-bottom: 8px; border-bottom: 2px solid #e5e7eb; letter-spacing: .02em; }
+.grid { display: grid; gap: 12px; }
+a.card { display: block; padding: 15px 18px; border-radius: 11px; background: #fff;
+  border: 1px solid #e5e7eb; text-decoration: none; color: inherit; transition: all .12s; }
+a.card:hover { border-color: #a5b4fc; box-shadow: 0 4px 14px rgba(0,0,0,.06); transform: translateY(-1px); }
+a.card .t { font-weight: 600; font-size: 15px; color: #111827; }
+a.card .d { font-size: 13px; color: #6b7280; margin-top: 3px; }
+.mini { display: flex; flex-wrap: wrap; gap: 8px; }
+.mini a { font-size: 13px; padding: 7px 13px; border-radius: 8px; background: #fff;
+  border: 1px solid #e5e7eb; text-decoration: none; color: #374151; }
+.mini a:hover { border-color: #a5b4fc; color: #4f46e5; }
+details { margin-top: 8px; }
+summary { cursor: pointer; font-size: 13px; color: #6b7280; padding: 6px 0; }
+footer { margin-top: 48px; font-size: 12px; color: #9ca3af; text-align: center; }
+@media (prefers-color-scheme: dark) {
+  body { background: #0f1115; color: #e5e7eb; }
+  header p { color: #9ca3af; }
+  h2 { color: #cbd5e1; border-color: #1f2530; }
+  a.card { background: #171a21; border-color: #232936; }
+  a.card .t { color: #f3f4f6; }
+  a.card:hover { border-color: #6366f1; }
+  .mini a { background: #171a21; border-color: #232936; color: #cbd5e1; }
+}
+</style></head>
+<body><div class="wrap">
+<header>
+  <h1>Yubisuma Complete AI レポート</h1>
+  <p>ミラー・リバーシ OFF / 探索中心アーキテクチャ。このページ1枚から全レポートへ。</p>
+</header>
+<a class="hero" href="policy_report_value_latest_rules_v2.html"><div class="k">最新・まずここ</div><div class="t">現行AIの方策分布(最新)</div><div class="d">使用スキル分布・全スキル統計(タイム等の合法vs選択)・決着分析。まずここ。</div></a>
+<h2>フェーズ別レポート・ルール監査</h2>
+<div class="grid"><a class="card" href="n1_fast_solver_benchmark.html"><div class="t">N1 高速探索基盤ベンチマーク</div><div class="d">深さ制限LP探索の高速化(値の一致検証と速度比)。</div></a><a class="card" href="n2_endgame_db_report.html"><div class="t">N2 終盤厳密データベース</div><div class="d">終盤の厳密解テーブルと状態空間の規模。</div></a><a class="card" href="n3_value_net_v0_report.html"><div class="t">N3 価値ネット v0 精度検証</div><div class="d">手作り評価との精度対決(厳密値・深い探索との相関)。</div></a><a class="card" href="n4_generation_loop_report.html"><div class="t">N4 自己対戦世代ループ</div><div class="d">fitted Nash-VI の世代推移と診断。</div></a><a class="card" href="n5_baseline_eval_report.html"><div class="t">N5 実戦エージェント評価</div><div class="d">固定相手への勝率・旧PPO対戦・対戦CLIの説明。</div></a><a class="card" href="rules_audit_2026-07-13.html"><div class="t">ルール監査・裁定シート</div><div class="d">ルール実装の訂正記録(フェイント参照/ガード/タイム/スキップ)。</div></a></div>
+<h2>計画・記録・ルール</h2>
+<div class="grid"><a class="card" href="../AI_MASTER_PLAN_V2.md"><div class="t">計画書 AI_MASTER_PLAN_V2</div><div class="d">現行アーキテクチャの全体計画とチェックリスト。</div></a><a class="card" href="../WORK_LOG.md"><div class="t">作業ログ WORK_LOG</div><div class="d">N0〜N6 の全作業記録(時系列)。</div></a><a class="card" href="../完全ルール（新）"><div class="t">ルール文書 完全ルール(新)</div><div class="d">ゲームの正式ルール。</div></a></div>
+<h2>終盤シナリオ解析（Complete ソルバー）</h2>
+<div class="mini"><a href="_legacy/endgame_scenarios/complete_lite/index_depth1.html">終盤シナリオ depth1</a><a href="_legacy/endgame_scenarios/complete_lite_depth2/index_depth2.html">終盤シナリオ depth2</a><a href="_legacy/endgame_scenarios/complete_lite_v2/index_depth1.html">終盤シナリオ v2</a></div>
+<h2>アーカイブ</h2>
+<details><summary>過去の診断レポート（5月の旧BC+PPO路線・23件）</summary><div class="mini" style="margin-top:10px"><a href="_legacy/diagnostics_may/bc_depth_scenario_check.html">bc_depth_scenario_check</a><a href="_legacy/diagnostics_may/bc_objective_diagnostics.html">bc_objective_diagnostics</a><a href="_legacy/diagnostics_may/bc_teacher_distribution_check.html">bc_teacher_distribution_check</a><a href="_legacy/diagnostics_may/bc_teacher_fix_proposal.html">bc_teacher_fix_proposal</a><a href="_legacy/diagnostics_may/minimal_ntp_policy_diagnostics.html">minimal_ntp_policy_diagnostics</a><a href="_legacy/diagnostics_may/ntp_policy_separation_check.html">ntp_policy_separation_check</a><a href="_legacy/diagnostics_may/ntp_policy_separation_design.html">ntp_policy_separation_design</a><a href="_legacy/diagnostics_may/number_bias_diagnostic_note.html">number_bias_diagnostic_note</a><a href="_legacy/diagnostics_may/opening_flash_trap_diagnostics.html">opening_flash_trap_diagnostics</a><a href="_legacy/diagnostics_may/opening_teacher_fixed_ntp_diagnostics.html">opening_teacher_fixed_ntp_diagnostics</a><a href="_legacy/diagnostics_may/policy_report_episode_mixed.html">policy_report_episode_mixed</a><a href="_legacy/diagnostics_may/policy_report_value_latest.html">policy_report_value_latest</a><a href="_legacy/diagnostics_may/separated_policy_report_depth4_ent05.html">separated_policy_report_depth4_ent05</a><a href="_legacy/diagnostics_may/separated_policy_report_depth4_proper.html">separated_policy_report_depth4_proper</a><a href="_legacy/diagnostics_may/separated_policy_report_depth4_proper_finetune_episode_separated_quick.html">separated_policy_report_depth4_proper_finetune_episode_separated_quick</a><a href="_legacy/diagnostics_may/separated_policy_report_depth4_quick.html">separated_policy_report_depth4_quick</a><a href="_legacy/diagnostics_may/separated_policy_report_depth4_standard.html">separated_policy_report_depth4_standard</a><a href="_legacy/diagnostics_may/separated_policy_report_episode_mixed.html">separated_policy_report_episode_mixed</a><a href="_legacy/diagnostics_may/start_side_policy_diagnostics_depth4_opening_after_bc.html">start_side_policy_diagnostics_depth4_opening_after_bc</a><a href="_legacy/diagnostics_may/start_side_policy_diagnostics_depth4_opening_after_smoke_ppo.html">start_side_policy_diagnostics_depth4_opening_after_smoke_ppo</a><a href="_legacy/diagnostics_may/start_side_policy_diagnostics_depth4_proper.html">start_side_policy_diagnostics_depth4_proper</a><a href="_legacy/diagnostics_may/start_side_policy_diagnostics_depth4_proper_finetune_episode_separated_quick.html">start_side_policy_diagnostics_depth4_proper_finetune_episode_separated_quick</a><a href="_legacy/diagnostics_may/turn_chain_reward_diagnostics.html">turn_chain_reward_diagnostics</a></div></details>
+<footer>results/index.html — <code>python -m complete_ai.build_report_hub</code> で再生成</footer>
+</div></body></html>

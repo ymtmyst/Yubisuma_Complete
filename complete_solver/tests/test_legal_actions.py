@@ -89,11 +89,13 @@ class LegalActionCompatibilityTests(unittest.TestCase):
         self.assertIn(MIRROR_PREP, solver_skill_set(state, config))
         self.assertIn(REVERSI, solver_skill_set(state, config))
 
-    def test_skip_returns_only_pass_in_solver_and_no_skills_in_legacy(self) -> None:
+    def test_pass_is_never_emitted(self) -> None:
+        # True skip (2026-07-13): skipped phases are consumed inside the turn
+        # switch; PASS is not a real action and mover states with
+        # skip_phases > 0 do not occur in reachable play.
         state = State(me=PlayerState(skip_phases=1))
 
-        self.assertEqual({PASS}, solver_skill_set(state, RulesConfig(), include_pass=True))
-        self.assertEqual(set(), solver_skill_set(state, RulesConfig()))
+        self.assertNotIn(PASS, solver_skill_set(state, RulesConfig(), include_pass=True))
         self.assertEqual(set(), legacy_valid_skill_set(skip_phases=1))
 
     def test_solver_keeps_stock_as_unique_set(self) -> None:

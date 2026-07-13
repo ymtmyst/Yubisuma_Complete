@@ -1,0 +1,104 @@
+{
+  "net_mixed": {
+    "random": {
+      "games": 300,
+      "agent_wins": 214,
+      "opponent_wins": 70,
+      "truncations": 16,
+      "agent_winrate": 0.7535211267605634,
+      "mean_plies": 13.013333333333334
+    },
+    "none": {
+      "games": 300,
+      "agent_wins": 267,
+      "opponent_wins": 33,
+      "truncations": 0,
+      "agent_winrate": 0.89,
+      "mean_plies": 12.416666666666666
+    },
+    "counter": {
+      "games": 300,
+      "agent_wins": 227,
+      "opponent_wins": 73,
+      "truncations": 0,
+      "agent_winrate": 0.7566666666666667,
+      "mean_plies": 6.12
+    },
+    "block": {
+      "games": 300,
+      "agent_wins": 235,
+      "opponent_wins": 65,
+      "truncations": 0,
+      "agent_winrate": 0.7833333333333333,
+      "mean_plies": 5.8966666666666665
+    }
+  },
+  "net_deterministic": {
+    "random": {
+      "games": 300,
+      "agent_wins": 232,
+      "opponent_wins": 44,
+      "truncations": 24,
+      "agent_winrate": 0.8405797101449275,
+      "mean_plies": 16.94333333333333
+    },
+    "none": {
+      "games": 300,
+      "agent_wins": 92,
+      "opponent_wins": 31,
+      "truncations": 177,
+      "agent_winrate": 0.7479674796747967,
+      "mean_plies": 74.59333333333333
+    },
+    "counter": {
+      "games": 300,
+      "agent_wins": 243,
+      "opponent_wins": 57,
+      "truncations": 0,
+      "agent_winrate": 0.81,
+      "mean_plies": 6.486666666666666
+    },
+    "block": {
+      "games": 300,
+      "agent_wins": 241,
+      "opponent_wins": 59,
+      "truncations": 0,
+      "agent_winrate": 0.8033333333333333,
+      "mean_plies": 6.003333333333333
+    }
+  },
+  "material_mixed": {
+    "random": {
+      "games": 300,
+      "agent_wins": 214,
+      "opponent_wins": 86,
+      "truncations": 0,
+      "agent_winrate": 0.7133333333333334,
+      "mean_plies": 9.946666666666667
+    },
+    "none": {
+      "games": 300,
+      "agent_wins": 165,
+      "opponent_wins": 133,
+      "truncations": 2,
+      "agent_winrate": 0.5536912751677853,
+      "mean_plies": 29.966666666666665
+    },
+    "counter": {
+      "games": 300,
+      "agent_wins": 213,
+      "opponent_wins": 87,
+      "truncations": 0,
+      "agent_winrate": 0.71,
+      "mean_plies": 8.856666666666667
+    },
+    "block": {
+      "games": 300,
+      "agent_wins": 227,
+      "opponent_wins": 73,
+      "truncations": 0,
+      "agent_winrate": 0.7566666666666667,
+      "mean_plies": 7.133333333333334
+    }
+  }
+}

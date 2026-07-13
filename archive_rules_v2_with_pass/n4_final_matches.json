@@ -1,0 +1,16 @@
+{
+  "final_vs_v0": {
+    "games": 300,
+    "wins_a": 146,
+    "wins_b": 154,
+    "truncations": 0,
+    "winrate_a": 0.4866666666666667
+  },
+  "final_vs_material": {
+    "games": 300,
+    "wins_a": 193,
+    "wins_b": 107,
+    "truncations": 0,
+    "winrate_a": 0.6433333333333333
+  }
+}

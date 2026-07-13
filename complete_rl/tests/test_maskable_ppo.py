@@ -69,6 +69,16 @@ class MaskablePPOBaselineTests(unittest.TestCase):
             self.assertEqual(payload["hyperparameters"]["max_steps"], 20)
 
     def test_evaluation_scores_terminal_reward_from_start_side(self) -> None:
+        """Terminal rewards must be scored from the START side even when the
+        terminal transition happens on the other side's ply.
+
+        Corrected-rules scenario (designer ruling 2026-07-13: referenced
+        feint is inert without a counter): vs an always-countering opponent,
+        feint then copy(feint) drops the start side to 0 hands; the game
+        only terminates once the opponent has also declared (opening
+        restriction), i.e. on the opponent's ply with mover-reward -1,
+        which must be reported as +1 for the start side.
+        """
         actions = build_canonical_tp_actions(RulesConfig())
         feint_idx = next(i for i, action in enumerate(actions) if action.skill == FEINT)
         copy_idx = next(i for i, action in enumerate(actions) if action.skill == COPY)
@@ -88,12 +98,12 @@ class MaskablePPOBaselineTests(unittest.TestCase):
             seed=9123,
             max_steps=20,
             deterministic=True,
-            ntp_policy="none_lowest",
+            ntp_policy="counter_lowest",
         )
 
-        self.assertEqual(result.wins, 0)
-        self.assertEqual(result.losses, 1)
-        self.assertEqual(result.average_reward, -1.0)
+        self.assertEqual(result.wins, 1)
+        self.assertEqual(result.losses, 0)
+        self.assertEqual(result.average_reward, 1.0)
 
     def test_bc_checkpoint_can_be_saved_before_ppo_training(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

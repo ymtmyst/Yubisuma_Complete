@@ -1,0 +1,19 @@
+<meta charset="utf-8">
+<title>N1 FastHorizonSolver ベンチマーク</title>
+<h1>N1 高速探索基盤ベンチマーク(初期局面, gamma=0.999, ミラー・リバーシOFF)</h1>
+<h2>値の一致検証と速度比(旧ソルバー比)</h2>
+<table border='1' cellpadding='4' cellspacing='0'><tr><th>深さ</th><th>値の差</th><th>判定</th><th>速度比</th></tr><tr><td>1</td><td>6.94e-18</td><td>OK</td><td>x0.8</td></tr><tr><td>2</td><td>2.91e-16</td><td>OK</td><td>x2.0</td></tr><tr><td>3</td><td>3.05e-16</td><td>OK</td><td>x2.3</td></tr><tr><td>4</td><td>4.16e-17</td><td>OK</td><td>x2.7</td></tr></table>
+<h2>旧ソルバー FiniteHorizonSolver(コールドスタート)</h2>
+<table border='1' cellpadding='4' cellspacing='0'><tr><th>深さ</th><th>値</th><th>秒</th></tr><tr><td>1</td><td>+0.039960</td><td>0.01</td></tr><tr><td>2</td><td>+0.028247</td><td>0.24</td></tr><tr><td>3</td><td>+0.098170</td><td>3.86</td></tr><tr><td>4</td><td>+0.048226</td><td>34.82</td></tr></table>
+<h2>新ソルバー FastHorizonSolver(反復深化・キャッシュ持続)</h2>
+<table border='1' cellpadding='4' cellspacing='0'><tr><th>深さ</th><th>値</th><th>秒(コールド)</th><th>再解決(ms)</th><th>行列解決回数</th><th>セル評価数</th><th>TT局面数</th></tr><tr><td>1</td><td>+0.039960</td><td>0.01</td><td>0.2</td><td>9</td><td>522</td><td>1</td></tr><tr><td>2</td><td>+0.028247</td><td>0.12</td><td>0.3</td><td>445</td><td>16126</td><td>60</td></tr><tr><td>3</td><td>+0.098170</td><td>1.70</td><td>0.4</td><td>6901</td><td>209294</td><td>1151</td></tr><tr><td>4</td><td>+0.048226</td><td>12.73</td><td>0.3</td><td>58322</td><td>1661850</td><td>10856</td></tr><tr><td>5</td><td>+0.075313</td><td>86.38</td><td>0.3</td><td>412704</td><td>11156215</td><td>82233</td></tr></table>
+<h2>自己対戦シミュレーション(depth=3, LP混合からサンプリング)</h2>
+<ul>
+<li>手数: 2(結果: terminal reward +1)</li>
+<li>初手の思考時間: 1.43 秒</li>
+<li>2手目以降の平均: 341 ms / 最大: 341 ms</li>
+</ul>
+<h2>AIの解釈</h2>
+<p>速度向上は (1) 探索間で持続するトランスポジションテーブル、(2) 遷移の遅延評価キャッシュ、
+(3) ダブルオラクル法による部分行列解決、(4) 鞍点・閉形式によるLP回避 の複合効果。
+値は旧ソルバーと一致(上表)。N1 の完了条件は depth3 ≤ 1s / depth4 ≤ 10s。</p>

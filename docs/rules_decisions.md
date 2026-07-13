@@ -33,6 +33,19 @@ interactive implementation and from prose that may still be revised.
 - Drop removes only the skills currently in the acting player's stock from the
   opponent's next phase.
 
+## Anti-Counter Skills Via Reference (designer ruling 2026-07-13)
+
+- Feint and Lock only activate when the opponent declares Counter. This
+  condition is INHERITED when they are executed via Copy, Choice, or All:
+  with no counter they do NOTHING (no hand drop, no extra turn, no lock).
+- With a counter, the countered reference resolves per the referenced skill
+  (Copy: twice; Choice/All: once per execution).
+- HISTORY: until 2026-07-13 both the solver and the interactive
+  implementation executed referenced feint/lock unconditionally. Both shared
+  the same misreading, so the May cross-validation could not catch it; the
+  designer spotted it from the policy-distribution report (copy-finishes at
+  76.8%). All models/tables trained before the fix are invalid.
+
 ## Reference And Stock
 
 - Copy can reference a previous number or a previous referenceable skill.

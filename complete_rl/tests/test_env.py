@@ -116,21 +116,26 @@ class ActionMaskTests(unittest.TestCase):
         env.reset()
         self.assertGreater(env.action_masks().sum(), 0)
 
-    def test_pass_mask_only_when_skip_active(self) -> None:
+    def test_pass_is_never_legal(self) -> None:
+        # True skip (2026-07-13): skipped phases are consumed inside the
+        # turn switch, so PASS is not a real action and mover states with
+        # skip_phases > 0 do not occur in reachable play.
         config = RulesConfig()
         canonical = build_canonical_tp_actions(config)
-        pass_idx = next(i for i, a in enumerate(canonical) if a.skill == PASS)
+        pass_idx = next(
+            (i for i, a in enumerate(canonical) if a.skill == PASS), None
+        )
 
-        # Normal initial state: PASS should be illegal
         normal_state = State()
         normal_mask = build_action_mask(canonical, normal_state, config)
-        self.assertFalse(normal_mask[pass_idx])
+        if pass_idx is not None:
+            self.assertFalse(normal_mask[pass_idx])
 
-        # Skip active: PASS should be the only legal action
         skip_state = State(me=PlayerState(skip_phases=1))
         skip_mask = build_action_mask(canonical, skip_state, config)
-        self.assertTrue(skip_mask[pass_idx])
-        self.assertEqual(skip_mask.sum(), 1)
+        if pass_idx is not None:
+            self.assertFalse(skip_mask[pass_idx])
+        self.assertGreater(skip_mask.sum(), 0)
 
 
 class EpisodeTests(unittest.TestCase):

@@ -32,6 +32,17 @@ from .state import SkillRef, State
 class RulesConfig:
     enable_mirror: bool = False
     enable_reversi: bool = False
+    # Restricts which skills may be STOCKED (declaring is never restricted).
+    # None = all stockable skills. Used for endgame abstraction: the stock
+    # combinatorics ((2^8)^2) dominate the endgame state space, and stocks of
+    # low-impact skills contribute negligible value there. Restricting the
+    # stock alphabet shrinks closures ~64x; the abstraction error is measured
+    # by an explicit deviation scan (see endgame tooling), not assumed.
+    stock_alphabet: frozenset[str] | None = None
+    # Caps how many skills a player may HOLD in stock at once (STOCK becomes
+    # illegal at the cap). None = unlimited. Second abstraction axis for the
+    # endgame tablebase; abstraction error is measured, not assumed.
+    max_stock_size: int | None = None
 
 
 @dataclass(frozen=True, order=True)
@@ -66,8 +77,10 @@ def legal_thumb_values(hands: int, cement: int) -> range:
 
 
 def legal_tp_actions(state: State, config: RulesConfig = RulesConfig()) -> tuple[TPAction, ...]:
-    if state.me.skip_phases > 0:
-        return (TPAction(PASS, 0),)
+    # Skip consumes the skipped phase inside the turn switch (see
+    # transition._finish_turn), so a mover with skip_phases > 0 does not
+    # occur in reachable play and PASS is not a real action (designer
+    # confirmation 2026-07-13: パスというスキルは存在しない).
 
     thumbs = tuple(legal_thumb_values(state.me.hands, state.me.cement))
     total_max = state.me.hands + state.opp.hands
@@ -98,6 +111,11 @@ def legal_tp_actions(state: State, config: RulesConfig = RulesConfig()) -> tuple
             if not isinstance(previous, str) or previous not in _stockable_skills(config):
                 continue
             if previous in state.me.stock:
+                continue
+            if (
+                config.max_stock_size is not None
+                and len(state.me.stock) >= config.max_stock_size
+            ):
                 continue
         elif skill in STOCK_ALPHA_SKILLS and state.me.stock_alpha_used_this_phase:
             continue
@@ -138,6 +156,7 @@ def legal_ntp_actions(state: State, config: RulesConfig = RulesConfig()) -> tupl
 
 
 def _stockable_skills(config: RulesConfig) -> frozenset[str]:
-    if config.enable_mirror:
-        return REFERENCEABLE_SKILLS
-    return REFERENCEABLE_SKILLS - {MIRROR_PREP}
+    skills = REFERENCEABLE_SKILLS if config.enable_mirror else REFERENCEABLE_SKILLS - {MIRROR_PREP}
+    if config.stock_alphabet is not None:
+        skills = skills & config.stock_alphabet
+    return skills

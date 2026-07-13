@@ -1,0 +1,41 @@
+{
+  "model": "models/value_latest.pt",
+  "results": {
+    "random": {
+      "games": 300,
+      "agent_wins": 213,
+      "opponent_wins": 87,
+      "truncations": 0,
+      "agent_winrate": 0.71,
+      "mean_plies": 7.633333333333334,
+      "seconds": 6.6718736000184435
+    },
+    "none": {
+      "games": 300,
+      "agent_wins": 218,
+      "opponent_wins": 80,
+      "truncations": 2,
+      "agent_winrate": 0.7315436241610739,
+      "mean_plies": 12.82,
+      "seconds": 11.142634600022575
+    },
+    "counter": {
+      "games": 300,
+      "agent_wins": 221,
+      "opponent_wins": 79,
+      "truncations": 0,
+      "agent_winrate": 0.7366666666666667,
+      "mean_plies": 6.523333333333333,
+      "seconds": 5.654177200020058
+    },
+    "block": {
+      "games": 300,
+      "agent_wins": 203,
+      "opponent_wins": 97,
+      "truncations": 0,
+      "agent_winrate": 0.6766666666666666,
+      "mean_plies": 5.8,
+      "seconds": 4.355787100008456
+    }
+  }
+}

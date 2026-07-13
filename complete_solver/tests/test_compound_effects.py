@@ -115,6 +115,187 @@ class CopyTests(unittest.TestCase):
         self.assertIsNone(result.terminal_reward)
 
 
+class TrueSkipTests(unittest.TestCase):
+    """True skip (designer confirmation 2026-07-13: PASS is not a real
+    action): when the turn would pass to a skipped player, their phase is
+    consumed instantly — time-based effects still tick — and either their
+    Time fires (they take the turn, fresh phase) or the mover continues
+    with a fresh phase of their own."""
+
+    def _state_with_skipped_opponent(self, time_active: bool) -> State:
+        from complete_solver.constants import CHARGE
+
+        return State(
+            me=PlayerState(has_declared_skill=True, guard_active=True,
+                           stock_alpha_used_this_phase=True),
+            opp=PlayerState(
+                has_declared_skill=True,
+                skip_phases=1,
+                time_active=time_active,
+                quick_level=2,                   # decays during skipped phase
+                guard_active=True,               # shield expires at own phase
+                stock_alpha_used_this_phase=True,
+                stock=frozenset({FLASH}),
+            ),
+            me_guard_extra_used_this_phase=True,
+        )
+
+    def test_skipped_phase_consumed_and_mover_continues(self) -> None:
+        from complete_solver.constants import CHARGE
+
+        result = transition(
+            self._state_with_skipped_opponent(time_active=False),
+            TPAction(CHARGE, thumb=0), NTPAction(NONE, thumb=0),
+        )
+        self.assertIn("phase_skipped", result.events)
+        self.assertTrue(result.same_turn_player)      # mover acts again
+        state = result.next_state
+        skipped = state.opp
+        self.assertEqual(skipped.skip_phases, 0)      # phase consumed
+        self.assertEqual(skipped.quick_level, 1)      # time still passes
+        self.assertFalse(skipped.guard_active)        # shield expired
+        self.assertFalse(skipped.stock_alpha_used_this_phase)
+        # Mover starts a FRESH phase: shield/phase flags reset.
+        self.assertFalse(state.me.guard_active)
+        self.assertFalse(state.me.stock_alpha_used_this_phase)
+        self.assertFalse(state.me_guard_extra_used_this_phase)
+        self.assertTrue(state.me.charge_active)       # the declaration held
+
+    def test_skipped_player_with_time_takes_the_turn(self) -> None:
+        from complete_solver.constants import CHARGE
+
+        result = transition(
+            self._state_with_skipped_opponent(time_active=True),
+            TPAction(CHARGE, thumb=0), NTPAction(NONE, thumb=0),
+        )
+        self.assertIn("time_skip_interrupt", result.events)
+        self.assertFalse(result.same_turn_player)     # the OTHER player moves
+        state = result.next_state
+        me = state.me                                  # = the skipped player
+        self.assertFalse(me.time_active)               # time consumed
+        self.assertEqual(me.skip_phases, 0)
+        self.assertEqual(me.quick_level, 1)
+        self.assertFalse(me.guard_active)
+        self.assertFalse(state.me_guard_extra_used_this_phase)
+        # The mover who was cut off sits as opp with their declaration held.
+        self.assertTrue(state.opp.charge_active)
+
+    def test_pass_is_not_a_legal_action_anywhere(self) -> None:
+        from complete_solver.actions import legal_tp_actions
+        from complete_solver.constants import PASS
+
+        state = State(me=PlayerState(skip_phases=1))
+        skills = {a.skill for a in legal_tp_actions(state)}
+        self.assertNotIn(PASS, skills)
+
+
+class GuardOncePerPhaseTests(unittest.TestCase):
+    """New rules 2026-07-13: the WHOLE guard effect (shield + extra turn)
+    fires once per phase; later guards in the same phase are fully inert."""
+
+    def test_second_guard_in_same_phase_is_fully_inert(self) -> None:
+        from complete_solver.constants import GUARD
+
+        state = State(
+            me=PlayerState(has_declared_skill=True),
+            opp=PlayerState(has_declared_skill=True),
+            me_guard_extra_used_this_phase=True,  # guard already fired
+        )
+        result = transition(state, TPAction(GUARD, thumb=0), NTPAction(NONE, thumb=0))
+
+        self.assertIn("guard_inert_this_phase", result.events)
+        self.assertFalse(result.same_turn_player)  # no extra turn
+        # Shield NOT re-armed (former me is opp after the switch).
+        self.assertFalse(result.next_state.opp.guard_active)
+
+    def test_copied_guard_after_guard_fired_is_inert(self) -> None:
+        from complete_solver.constants import GUARD
+
+        state = State(
+            me=PlayerState(has_declared_skill=True),
+            opp=PlayerState(has_declared_skill=True),
+            previous_skill=GUARD,
+            me_guard_extra_used_this_phase=True,
+        )
+        result = transition(state, TPAction(COPY, thumb=0), NTPAction(NONE, thumb=0))
+        self.assertFalse(result.same_turn_player)
+        self.assertFalse(result.next_state.opp.guard_active)
+
+    def test_first_guard_fires_shield_and_extra_turn(self) -> None:
+        from complete_solver.constants import GUARD
+
+        state = State(
+            me=PlayerState(has_declared_skill=True),
+            opp=PlayerState(has_declared_skill=True),
+        )
+        result = transition(state, TPAction(GUARD, thumb=0), NTPAction(NONE, thumb=0))
+        self.assertIn("guard_extra_turn", result.events)
+        self.assertTrue(result.same_turn_player)
+        self.assertTrue(result.next_state.me.guard_active)
+
+
+class ReferencedAntiCounterTests(unittest.TestCase):
+    """Anti-counter skills referenced via Copy/Choice/All (designer ruling
+    2026-07-13): inert without a counter, active (per reference multiplier)
+    when countered."""
+
+    def test_copied_feint_without_counter_does_nothing(self) -> None:
+        from complete_solver.constants import FEINT
+
+        state = State(
+            me=PlayerState(has_declared_skill=True),
+            opp=PlayerState(has_declared_skill=True),
+            previous_skill=FEINT,
+        )
+        result = transition(state, TPAction(COPY, thumb=0), NTPAction(NONE, thumb=0))
+
+        self.assertIsNone(result.terminal_reward)
+        self.assertFalse(result.same_turn_player)  # no extra turns granted
+        self.assertIn("referenced_anti_counter_inert", result.events)
+        # TP's hands unchanged (former TP is opp after the switch).
+        self.assertEqual(result.next_state.opp.hands, 2)
+
+    def test_copied_feint_with_counter_fires_twice_and_wins(self) -> None:
+        from complete_solver.constants import FEINT
+
+        state = State(
+            me=PlayerState(has_declared_skill=True),
+            opp=PlayerState(has_declared_skill=True),
+            previous_skill=FEINT,
+        )
+        result = transition(
+            state, TPAction(COPY, thumb=0), NTPAction(COUNTER, thumb=0)
+        )
+        # Feint fires twice: 2 hands down from 2 → terminal win for TP.
+        self.assertEqual(result.terminal_reward, 1.0)
+
+    def test_choice_feint_without_counter_does_nothing(self) -> None:
+        from complete_solver.constants import CHOICE, FEINT
+
+        state = State(
+            me=PlayerState(has_declared_skill=True, stock=frozenset({FEINT})),
+            opp=PlayerState(has_declared_skill=True),
+        )
+        result = transition(
+            state,
+            TPAction(CHOICE, thumb=0, choice=FEINT),
+            NTPAction(NONE, thumb=0),
+        )
+        self.assertIsNone(result.terminal_reward)
+        self.assertFalse(result.same_turn_player)
+        self.assertEqual(result.next_state.opp.hands, 2)
+
+    def test_copied_lock_without_counter_does_not_lock(self) -> None:
+        state = State(
+            me=PlayerState(has_declared_skill=True),
+            opp=PlayerState(has_declared_skill=True),
+            previous_skill=LOCK,
+        )
+        result = transition(state, TPAction(COPY, thumb=0), NTPAction(NONE, thumb=0))
+        self.assertFalse(result.next_state.me.lock_pending)
+        self.assertFalse(result.next_state.opp.lock_pending)
+
+
 class LockTests(unittest.TestCase):
     def test_lock_success_sets_lock_pending_on_ntp(self) -> None:
         """Lock skill against NTP who counters → lock_pending set on NTP (former NTP is now me)."""

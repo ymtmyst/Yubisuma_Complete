@@ -27,11 +27,14 @@ class UltimateGoldenTests(unittest.TestCase):
     def test_block_does_not_stop_skip_effect(self) -> None:
         result = transition(State(), TPAction(SKIP, thumb=0), NTPAction(BLOCK, thumb=0))
 
-        self.assertFalse(result.same_turn_player)
-        self.assertTrue(result.next_state.me.used_ultimate)
-        self.assertEqual(result.next_state.me.skip_phases, 1)
+        # True skip (2026-07-13): the blocked opponent's next phase is
+        # consumed at the turn switch, so the mover continues immediately.
+        self.assertTrue(result.same_turn_player)
+        self.assertTrue(result.next_state.opp.used_ultimate)
+        self.assertEqual(result.next_state.opp.skip_phases, 0)
         self.assertIn("block_failed_against_skip", result.events)
         self.assertIn("skip_applied", result.events)
+        self.assertIn("phase_skipped", result.events)
 
     def test_time_sets_field_effect_and_interrupts_opponent_extra_turn(self) -> None:
         time_result = transition(State(), TPAction(TIME, thumb=0), NTPAction(NONE, thumb=0))

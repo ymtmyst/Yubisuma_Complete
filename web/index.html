@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#151815">
+  <title>YUBISUMA — 指先の読み合い</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="game-shell">
+    <header class="topbar">
+      <a class="brand" href="#" aria-label="YUBISUMA ホーム">
+        <span class="brand-mark">Y</span>
+        <span><b>YUBISUMA</b><small>指先の読み合い</small></span>
+      </a>
+      <div class="top-actions">
+        <span id="phaseBadge" class="phase-badge">ROUND 01</span>
+        <button class="icon-button" id="soundButton" title="サウンド">♪</button>
+        <button class="text-button" id="rulesButton">遊び方</button>
+        <button class="text-button danger" id="newButton">やり直す</button>
+      </div>
+    </header>
+
+    <section class="table" aria-live="polite">
+      <div class="atmosphere"></div>
+      <section class="player-zone opponent-zone">
+        <div class="identity">
+          <span class="avatar cpu">C</span>
+          <span><small>OPPONENT</small><strong>コンピューター</strong></span>
+          <span id="cpuTurn" class="turn-light">THINKING</span>
+        </div>
+        <div id="cpuEffects" class="effects"></div>
+        <div id="cpuHands" class="hands"></div>
+        <div id="cpuStock" class="stock-line"></div>
+      </section>
+
+      <section class="center-zone">
+        <div id="callout" class="callout"><small>YOUR CALL</small><strong>いくつ上がる？</strong></div>
+        <div class="versus"><span></span><b>VS</b><span></span></div>
+        <section id="controlPanel" class="control-panel">
+          <div id="statusMessage" class="status-message"></div>
+          <div id="attackControls">
+            <div class="control-heading"><span>01</span><div><small>CALL</small><strong>数字を宣言</strong></div></div>
+            <div id="numberChoices" class="choice-row numbers"></div>
+            <button id="skillToggle" class="skill-toggle">スキルを使う <span>＋</span></button>
+            <div id="skillChoices" class="skill-grid collapsed"></div>
+          </div>
+          <div id="defenseControls" hidden>
+            <div class="control-heading"><span>01</span><div><small>REACTION</small><strong>リアクションを選ぶ</strong></div></div>
+            <div id="reactionChoices" class="choice-row reactions"></div>
+          </div>
+          <div id="choiceControls" hidden>
+            <div class="control-heading"><span>01</span><div><small>STOCK</small><strong id="choiceTitle">ストックを選ぶ</strong></div></div>
+            <p id="reactionReveal" class="reaction-reveal"></p>
+            <div id="stockChoices" class="stock-choices"></div>
+          </div>
+          <div id="thumbControls">
+            <div class="control-heading compact"><span>02</span><div><small>HANDS</small><strong>上げる親指</strong></div></div>
+            <div id="thumbChoices" class="choice-row thumbs"></div>
+          </div>
+          <button id="submitButton" class="submit-button" disabled><span>いっせーのーせ！</span><b>宣言する</b></button>
+        </section>
+      </section>
+
+      <section class="player-zone your-zone">
+        <div id="playerStock" class="stock-line"></div>
+        <div id="playerHands" class="hands"></div>
+        <div class="player-footer">
+          <div class="identity">
+            <span class="avatar you">Y</span>
+            <span><small>YOU</small><strong>プレイヤー</strong></span>
+            <span id="playerTurn" class="turn-light">YOUR TURN</span>
+          </div>
+          <div id="playerEffects" class="effects"></div>
+        </div>
+      </section>
+    </section>
+
+    <aside class="log-drawer">
+      <button id="logToggle"><span>実況ログ</span><b>⌃</b></button>
+      <ol id="gameLog"></ol>
+    </aside>
+  </main>
+
+  <dialog id="rulesDialog">
+    <div class="dialog-head"><div><small>HOW TO PLAY</small><h2>遊び方</h2></div><button id="closeRules">×</button></div>
+    <p>お互い同時に親指を0〜2本上げ、ターン側が合計本数を宣言します。当たれば自分の手を1つ降ろせます。先に両手を降ろした方の勝ちです。</p>
+    <div class="rule-grid">
+      <article><b>数字</b><span>合計と一致で手を1つ降ろす</span></article>
+      <article><b>フラッシュ</b><span>互いの本数が同じなら一気に2つ</span></article>
+      <article><b>カウンター</b><span>相手の宣言を利用して形勢逆転</span></article>
+      <article><b>必殺スキル</b><span>1ゲームに1度だけ使える切り札</span></article>
+    </div>
+    <p class="hint">各スキルにカーソルを合わせると効果を確認できます。</p>
+  </dialog>
+  <div id="toast" class="toast"></div>
+  <script src="app.js"></script>
+</body>
+</html>

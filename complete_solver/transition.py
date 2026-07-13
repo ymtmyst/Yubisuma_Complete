@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 
 from .actions import NTPAction, RulesConfig, TPAction
 from .constants import (
@@ -44,7 +44,7 @@ class Transition:
     events: tuple[str, ...] = ()
 
 
-@dataclass
+@dataclass(slots=True)
 class _Work:
     me: PlayerState
     opp: PlayerState
@@ -84,35 +84,29 @@ def transition(
 
     # Lock becomes active for the non-turn player at the start of this turn.
     if work.opp.lock_pending:
-        work.opp = replace(work.opp, lock_pending=False, lock_active=True)
-
-    if tp_action.skill == PASS:
-        work.event("skip_pass")
-        if work.me.quick_level > 0:
-            work.me = replace(work.me, quick_level=max(0, work.me.quick_level - 1))
-        return _finish_turn(work, None)
+        work.opp = work.opp._replace(lock_pending=False, lock_active=True)
 
     skill = tp_action.skill
     previous_skill = state.previous_skill
     quick_before = work.me.quick_level
 
-    work.me = replace(work.me, has_declared_skill=True)
+    work.me = work.me._replace(has_declared_skill=True)
     if isinstance(skill, str) and skill in ULTIMATE_TP_SKILLS:
-        work.me = replace(work.me, used_ultimate=True)
+        work.me = work.me._replace(used_ultimate=True)
     if isinstance(skill, str) and skill in STOCK_ALPHA_SKILLS:
-        work.me = replace(work.me, stock_alpha_used_this_phase=True)
+        work.me = work.me._replace(stock_alpha_used_this_phase=True)
 
     charge_was_active = False
     if isinstance(skill, int) and work.me.charge_active:
         charge_was_active = True
-        work.me = replace(work.me, charge_active=False)
+        work.me = work.me._replace(charge_active=False)
         work.event("charge_consumed")
 
     if ntp_action.reaction == MIRROR_MAIN:
-        work.opp = replace(work.opp, mirror_ready=False)
+        work.opp = work.opp._replace(mirror_ready=False)
         _resolve_mirror(work, tp_action, ntp_action, charge_was_active)
     elif ntp_action.reaction == BLOCK:
-        work.opp = replace(work.opp, used_ultimate=True)
+        work.opp = work.opp._replace(used_ultimate=True)
         if _is_skip_effect(skill, previous_skill):
             work.event("block_failed_against_skip")
             _resolve_skill_effect(work, tp_action, ntp_action, charge_was_active)
@@ -173,7 +167,7 @@ def _resolve_anti_counter(work: _Work, skill: str) -> None:
         _add_extra_turns(work, 1)
         work.event("feint_success")
     elif skill == LOCK:
-        work.opp = replace(work.opp, lock_pending=True)
+        work.opp = work.opp._replace(lock_pending=True)
         work.event("lock_success")
 
 
@@ -211,17 +205,20 @@ def _resolve_skill_effect(
         return
 
     if skill == GUARD:
-        work.me = replace(work.me, guard_active=True)
+        # New rules 2026-07-13: the WHOLE guard effect (shield + extra turn)
+        # fires only once per phase. A second guard in the same phase —
+        # declared directly or via Copy/Choice/All — is fully inert.
         if not work.me_guard_extra_used:
+            work.me = work.me._replace(guard_active=True)
             _add_extra_turns(work, 1)
             work.me_guard_extra_used = True
             work.event("guard_extra_turn")
         else:
-            work.event("guard_no_extra_turn")
+            work.event("guard_inert_this_phase")
         return
 
     if skill == CHARGE:
-        work.me = replace(work.me, charge_active=True)
+        work.me = work.me._replace(charge_active=True)
         work.event("charge_set")
         return
 
@@ -230,12 +227,12 @@ def _resolve_skill_effect(
         return
 
     if skill == SKIP:
-        work.opp = replace(work.opp, skip_phases=work.opp.skip_phases + 1)
+        work.opp = work.opp._replace(skip_phases=work.opp.skip_phases + 1)
         work.event("skip_applied")
         return
 
     if skill == MIRROR_PREP:
-        work.me = replace(work.me, mirror_ready=True)
+        work.me = work.me._replace(mirror_ready=True)
         work.event("mirror_ready")
         return
 
@@ -254,7 +251,7 @@ def _resolve_skill_effect(
     if skill == STOCK:
         previous = work.previous_skill
         if isinstance(previous, str) and previous in REFERENCEABLE_SKILLS:
-            work.me = replace(work.me, stock=frozenset(set(work.me.stock) | {previous}))
+            work.me = work.me._replace(stock=frozenset(set(work.me.stock) | {previous}))
             work.event("stock_added")
         else:
             work.event("stock_failed")
@@ -262,9 +259,7 @@ def _resolve_skill_effect(
 
     if skill == CHOICE:
         if tp_action.choice and tp_action.choice in work.me.stock:
-            work.me = replace(
-                work.me,
-                choice_used_this_phase=frozenset(
+            work.me = work.me._replace(choice_used_this_phase=frozenset(
                     set(work.me.choice_used_this_phase) | {tp_action.choice}
                 ),
             )
@@ -277,12 +272,12 @@ def _resolve_skill_effect(
     if skill == ALL:
         for stock_skill in _all_order(work.me.stock, tp_action.all_order):
             _execute_referenced_skill(work, stock_skill, tp_action, ntp_action)
-        work.me = replace(work.me, stock=frozenset())
+        work.me = work.me._replace(stock=frozenset())
         work.event("all_used")
         return
 
     if skill == DROP:
-        work.opp = replace(work.opp, drop_blocked_skills=work.me.stock)
+        work.opp = work.opp._replace(drop_blocked_skills=work.me.stock)
         _add_extra_turns(work, 1)
         work.event("drop_applied")
         return
@@ -298,7 +293,7 @@ def _resolve_skill_effect(
         return
 
     if skill == TIME:
-        work.me = replace(work.me, time_active=True)
+        work.me = work.me._replace(time_active=True)
         _add_extra_turns(work, 1)
         work.event("time_set")
 
@@ -354,7 +349,7 @@ def _resolve_stock_alpha_countered(
     if tp_action.skill == ALL:
         for stock_skill in _all_order(work.me.stock, tp_action.all_order):
             _apply_counter_to_skill(work, stock_skill, tp_action, ntp_action)
-        work.me = replace(work.me, stock=frozenset())
+        work.me = work.me._replace(stock=frozenset())
         work.event("all_countered")
 
 
@@ -378,23 +373,27 @@ def _execute_referenced_skill(
         work.me = _apply_cement(work.me, tp_action.thumb)
         work.opp = _apply_cement(work.opp, ntp_action.thumb)
     elif skill == GUARD:
-        work.me = replace(work.me, guard_active=True)
+        # Whole effect once per phase (see the direct-declaration branch).
         if not work.me_guard_extra_used:
+            work.me = work.me._replace(guard_active=True)
             _add_extra_turns(work, 1)
             work.me_guard_extra_used = True
     elif skill == CHARGE:
-        work.me = replace(work.me, charge_active=True)
+        work.me = work.me._replace(charge_active=True)
     elif skill == QUICK:
-        work.me = replace(work.me, quick_level=2)
+        work.me = work.me._replace(quick_level=2)
     elif skill == SKIP:
-        work.opp = replace(work.opp, skip_phases=work.opp.skip_phases + 1)
+        work.opp = work.opp._replace(skip_phases=work.opp.skip_phases + 1)
     elif skill == MIRROR_PREP:
-        work.me = replace(work.me, mirror_ready=True)
-    elif skill == FEINT:
-        work.me = _lower_one(work.me, "me", work)
-        _add_extra_turns(work, 1)
-    elif skill == LOCK:
-        work.opp = replace(work.opp, lock_pending=True)
+        work.me = work.me._replace(mirror_ready=True)
+    elif skill in (FEINT, LOCK):
+        # Anti-counter skills only activate when the opponent declares
+        # Counter. Referenced without a counter (Copy/Choice/All resolved
+        # under no reaction), they do NOTHING — no hand drop, no extra turn,
+        # no lock. (Rules doc: 「相手がカウンターを宣言しなければ何も起こらない」;
+        # designer ruling 2026-07-13. The countered paths live in
+        # _apply_counter_to_skill.)
+        work.event("referenced_anti_counter_inert")
 
 
 def _apply_counter_to_skill(
@@ -410,7 +409,7 @@ def _apply_counter_to_skill(
         work.me = _lower_one(work.me, "me", work)
         _add_extra_turns(work, 1)
     elif skill == LOCK:
-        work.opp = replace(work.opp, lock_pending=True)
+        work.opp = work.opp._replace(lock_pending=True)
 
 
 def _resolve_mirror(
@@ -465,7 +464,7 @@ def _try_reflect_skill(
         return True
 
     if skill == DROP:
-        work.me = replace(work.me, drop_blocked_skills=work.opp.stock)
+        work.me = work.me._replace(drop_blocked_skills=work.opp.stock)
         work.opp_extra_turns += 1
         work.event("mirror_drop")
         return True
@@ -504,7 +503,7 @@ def _resolve_stock_under_mirror(
         return
 
     if not _try_reflect_skill(work, previous, tp_action, ntp_action):
-        work.me = replace(work.me, stock=frozenset(set(work.me.stock) | {previous}))
+        work.me = work.me._replace(stock=frozenset(set(work.me.stock) | {previous}))
         work.event("stock_added")
         work.event("mirror_reference_not_reflectable")
 
@@ -518,9 +517,7 @@ def _resolve_choice_under_mirror(
         work.event("choice_failed")
         return
 
-    work.me = replace(
-        work.me,
-        choice_used_this_phase=frozenset(
+    work.me = work.me._replace(choice_used_this_phase=frozenset(
             set(work.me.choice_used_this_phase) | {tp_action.choice}
         ),
     )
@@ -539,7 +536,7 @@ def _resolve_all_under_mirror(
         if not _try_reflect_skill(work, stock_skill, tp_action, ntp_action):
             _execute_referenced_skill(work, stock_skill, tp_action, ntp_action)
             work.event("mirror_reference_not_reflectable")
-    work.me = replace(work.me, stock=frozenset())
+    work.me = work.me._replace(stock=frozenset())
     work.event("all_used")
 
 
@@ -555,23 +552,23 @@ def _resolve_quick_for(
     if player.quick_level == 2:
         _attempt_two_hand_drop(work, target, event_name)
         if state_attr == "me":
-            work.me = replace(work.me, quick_level=0)
+            work.me = work.me._replace(quick_level=0)
         else:
-            work.opp = replace(work.opp, quick_level=0)
+            work.opp = work.opp._replace(quick_level=0)
     elif player.quick_level == 1:
         if target == "me":
             work.me = _lower_one(work.me, "me", work)
         else:
             work.opp = _lower_one(work.opp, "opp", work)
         if state_attr == "me":
-            work.me = replace(work.me, quick_level=0)
+            work.me = work.me._replace(quick_level=0)
         else:
-            work.opp = replace(work.opp, quick_level=0)
+            work.opp = work.opp._replace(quick_level=0)
     else:
         if target == "me":
-            work.me = replace(work.me, quick_level=2)
+            work.me = work.me._replace(quick_level=2)
         else:
-            work.opp = replace(work.opp, quick_level=2)
+            work.opp = work.opp._replace(quick_level=2)
     work.event(event_name)
 
 
@@ -594,7 +591,7 @@ def _attempt_two_hand_drop(work: _Work, target: str, event_name: str) -> None:
         return
 
     if opponent.guard_active:
-        opponent = replace(opponent, guard_active=False)
+        opponent = opponent._replace(guard_active=False)
         if target == "me":
             work.opp = opponent
             work.me_blocked = True
@@ -604,7 +601,7 @@ def _attempt_two_hand_drop(work: _Work, target: str, event_name: str) -> None:
         work.event(f"{event_name}_guarded")
         return
 
-    dropper = replace(dropper, hands=0, cement=0)
+    dropper = dropper._replace(hands=0, cement=0)
     if target == "me":
         work.me = dropper
     else:
@@ -618,13 +615,13 @@ def _lower_one(player: PlayerState, owner: str, work: _Work) -> PlayerState:
     if owner == "opp" and work.opp_blocked:
         return player
     hands = max(0, player.hands - 1)
-    return replace(player, hands=hands, cement=min(player.cement, hands))
+    return player._replace(hands=hands, cement=min(player.cement, hands))
 
 
 def _apply_cement(player: PlayerState, thumb: int) -> PlayerState:
     if thumb <= 0:
         return player
-    return replace(player, cement=max(player.cement, min(thumb, player.hands)))
+    return player._replace(cement=max(player.cement, min(thumb, player.hands)))
 
 
 def _add_extra_turns(work: _Work, count: int) -> None:
@@ -633,9 +630,9 @@ def _add_extra_turns(work: _Work, count: int) -> None:
 
 def _cleanup_end_of_turn(work: _Work, quick_before: int, skill: SkillRef) -> None:
     if quick_before > 0 and skill != QUICK:
-        work.me = replace(work.me, quick_level=max(0, quick_before - 1))
+        work.me = work.me._replace(quick_level=max(0, quick_before - 1))
     if work.opp.lock_active:
-        work.opp = replace(work.opp, lock_active=False)
+        work.opp = work.opp._replace(lock_active=False)
 
 
 def _finish_turn(work: _Work, skill: SkillRef | None) -> Transition:
@@ -648,7 +645,7 @@ def _finish_turn(work: _Work, skill: SkillRef | None) -> Transition:
 
     pending = work.me_extra_turns + work.added_extra_turns
     if work.opp.time_active and pending > 0:
-        work.opp = replace(work.opp, time_active=False)
+        work.opp = work.opp._replace(time_active=False)
         pending = 0
         work.event("time_interrupted_extra_turn")
 
@@ -664,6 +661,54 @@ def _finish_turn(work: _Work, skill: SkillRef | None) -> Transition:
         )
         return Transition(next_state, None, True, tuple(work.events or ()))
 
+    # True skip: when the turn would pass to a player whose next phase is
+    # skipped, that phase is consumed INSTANTLY — no pseudo-turn, no extra
+    # discount ply (designer confirmation 2026-07-13). Time still passes for
+    # the skipped player (quick decays; shield/drop-block/phase flags expire
+    # at their phase boundary). If the skipped player holds Time, they take
+    # the turn instead (fresh phase); otherwise the mover continues with a
+    # fresh phase of their own.
+    incoming = work.opp
+    if incoming.skip_phases > 0:
+        skipped = incoming._replace(
+            skip_phases=incoming.skip_phases - 1,
+            quick_level=max(0, incoming.quick_level - 1),
+            guard_active=False,
+            stock_alpha_used_this_phase=False,
+            choice_used_this_phase=frozenset(),
+            drop_blocked_skills=frozenset(),
+        )
+        work.event("phase_skipped")
+        if skipped.time_active:
+            skipped = skipped._replace(time_active=False)
+            work.event("time_skip_interrupt")
+            next_state = State(
+                me=skipped,
+                opp=work.me,
+                previous_skill=work.previous_skill,
+                me_extra_turns=work.opp_extra_turns,
+                opp_extra_turns=0,
+                me_guard_extra_used_this_phase=False,
+                opp_guard_extra_used_this_phase=work.me_guard_extra_used,
+            )
+            return Transition(next_state, None, False, tuple(work.events or ()))
+        fresh_me = work.me._replace(
+            guard_active=False,
+            stock_alpha_used_this_phase=False,
+            choice_used_this_phase=frozenset(),
+            drop_blocked_skills=frozenset(),
+        )
+        next_state = State(
+            me=fresh_me,
+            opp=skipped,
+            previous_skill=work.previous_skill,
+            me_extra_turns=0,
+            opp_extra_turns=work.opp_extra_turns,
+            me_guard_extra_used_this_phase=False,
+            opp_guard_extra_used_this_phase=False,
+        )
+        return Transition(next_state, None, True, tuple(work.events or ()))
+
     next_state = _switch_perspective(work)
     return Transition(next_state, None, False, tuple(work.events or ()))
 
@@ -672,12 +717,7 @@ def _switch_perspective(work: _Work) -> State:
     ended_me = work.me
     next_me = work.opp
 
-    if ended_me.skip_phases > 0:
-        ended_me = replace(ended_me, skip_phases=ended_me.skip_phases - 1)
-
-    next_me = replace(
-        next_me,
-        guard_active=False,
+    next_me = next_me._replace(guard_active=False,
         stock_alpha_used_this_phase=False,
         choice_used_this_phase=frozenset(),
         drop_blocked_skills=frozenset(),
@@ -695,9 +735,7 @@ def _switch_perspective(work: _Work) -> State:
 
 
 def _swap_reversi_state(a: PlayerState, b: PlayerState) -> tuple[PlayerState, PlayerState]:
-    new_a = replace(
-        a,
-        hands=b.hands,
+    new_a = a._replace(hands=b.hands,
         cement=b.cement,
         guard_active=b.guard_active,
         charge_active=b.charge_active,
@@ -707,9 +745,7 @@ def _swap_reversi_state(a: PlayerState, b: PlayerState) -> tuple[PlayerState, Pl
         lock_active=b.lock_active,
         drop_blocked_skills=b.drop_blocked_skills,
     )
-    new_b = replace(
-        b,
-        hands=a.hands,
+    new_b = b._replace(hands=a.hands,
         cement=a.cement,
         guard_active=a.guard_active,
         charge_active=a.charge_active,
