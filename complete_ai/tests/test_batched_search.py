@@ -71,6 +71,37 @@ class TestDepth3Value(unittest.TestCase):
             )
 
 
+class TestBatchedParity(unittest.TestCase):
+    """Batched/threaded helpers must equal the per-state path exactly."""
+
+    def test_solve_batch_matches_per_state(self):
+        searcher = MaterialLeafSearcher(prune_stock=True)
+        states = random_states(seed=21, count=40)
+        packed = [pack_state(s) for s in states]
+        k0 = np.array([p[0] for p in packed], dtype=np.int64)
+        k1 = np.array([p[1] for p in packed], dtype=np.int64)
+        batched = searcher.solve_batch(k0, k1)
+        for (lane0, lane1), (bv, btp, bntp, btpp, bntpp) in zip(packed, batched):
+            rv, rtp, rntp, rtpp, rntpp = searcher.solve(lane0, lane1)
+            self.assertAlmostEqual(bv, rv, delta=1e-9)
+            self.assertTrue(np.array_equal(btp, rtp))
+            self.assertTrue(np.array_equal(bntp, rntp))
+            self.assertTrue(np.allclose(btpp, rtpp, atol=1e-9))
+            self.assertTrue(np.allclose(bntpp, rntpp, atol=1e-9))
+
+    def test_value_depth3_batch_matches_per_state(self):
+        searcher = MaterialLeafSearcher(prune_stock=True)
+        states = random_states(seed=23, count=24)
+        packed = [pack_state(s) for s in states]
+        k0 = np.array([p[0] for p in packed], dtype=np.int64)
+        k1 = np.array([p[1] for p in packed], dtype=np.int64)
+        batched = searcher.value_depth3_batch(k0, k1, leaf_budget=5000)
+        for (lane0, lane1), bv in zip(packed, batched):
+            self.assertAlmostEqual(
+                bv, searcher.value_depth3(lane0, lane1), delta=1e-9
+            )
+
+
 class TestStockPruning(unittest.TestCase):
     def _tp_codes(self, stock: frozenset, prune: bool = True):
         state = State(

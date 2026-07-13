@@ -31,17 +31,27 @@ def play_match(
     wins = [0, 0]
     truncations = 0
 
+    # Each searcher's model is fixed for the whole match, so solve() is
+    # deterministic per state; cache it (the match revisits states heavily).
+    caches: tuple[dict, dict] = ({}, {})
+
+    def cached_solve(side: int, key: tuple[int, int]):
+        cached = caches[side].get(key)
+        if cached is None:
+            cached = searchers[side].solve(key[0], key[1])
+            caches[side][key] = cached
+        return cached
+
     for game in range(n_games):
         mover = game % 2  # alternate who moves first
         lane0, lane1 = np.int64(init0), np.int64(init1)
         for _ in range(max_plies):
-            value, tp_codes, ntp_codes, tp_policy, ntp_policy = (
-                searchers[mover].solve(int(lane0), int(lane1))
+            key = (int(lane0), int(lane1))
+            value, tp_codes, ntp_codes, tp_policy, ntp_policy = cached_solve(
+                mover, key
             )
             # The NTP reaction belongs to the *other* agent: use their policy.
-            _, _, _, _, opp_ntp_policy = searchers[1 - mover].solve(
-                int(lane0), int(lane1)
-            )
+            _, _, _, _, opp_ntp_policy = cached_solve(1 - mover, key)
             tp_code = tp_codes[_sample(rng, tp_policy, epsilon)]
             ntp_code = ntp_codes[_sample(rng, opp_ntp_policy, epsilon)]
             child0, child1, status, reward = step(

@@ -402,3 +402,40 @@
   - **exe単体の動作テスト合格**: `ユビスマ対戦.exe --no-browser --port 8391` が11秒でウォームアップ→「準備完了」、index HTTP200・/api/new が正常なゲーム状態JSONを返却。GPU非依存で起動
 - 運用メモ: 隔離venv方式なら GPU学習環境を汚さずCPU配布ビルドを作れる。再ビルドは `.venv_build/Scripts/python.exe -m PyInstaller yubisuma_game.spec --noconfirm --distpath dist --workpath build`
 - 残: dist/ユビスマ対戦 の zip 化 → GitHub Release へアップロード（ユーザー操作）／今回のトグル変更のコミット＋プッシュ
+
+## 2026-07-14 — 学習パイプライン高速化（深さ4教師の前準備、①②③）
+
+**目的**: 深さ4教師に進む前に、現行シミュレーション/学習ループを最適化。ユーザー承認のもと夜間に自律実装。全て**値は参照一致（bit-exact/1e-6以内）**を担保し本番モデルは未変更。
+
+**プロファイル（RTX 4070 Ti 実測）で判明した戦略転換**:
+- depth-2 `solve()`（self-play着手）: ネット51% / CPU49%
+- depth-3 `value_depth3()`（教師生成）: ネット**28%** / CPU**72%**（LP backupが支配）
+- → ①のネットバッチ化は深さ3教師には効果薄。真のボトルネックは「self-playの局面重複」と「教師ループのCPU逐次」だった
+
+**実装（complete_ai/）**:
+1. **メモ化 self-play**（selfplay.py）: 世代内はモデル固定＝solve決定的。局面キーでキャッシュ。mean_plies7.4×2500=約1.85万solve→ユニーク約2100（約6.4倍重複）を1回に。値は旧sums/counts平均と数値的に完全同一。**45〜89秒→3.8秒（約15倍）**
+2. **メモ化 arena**（arena.py）: 対戦中も両モデル固定。side別キャッシュ。arena 120局が **約1.0秒**
+3. **スレッド並列 depth-3 教師**（batched_search.py `parallel_depth3_values` + njitに`nogil=True`）: 各スレッド専用searcher（バッファ非共有）でモデル共有。**6スレッドで12秒→3.3〜5.7秒（3.7倍）**、差**0.0（bit-exact）**。generation_loop に `--threads`（既定6）で接続
+4. `solve_batch` / `value_depth3_batch`（batched_search.py）: 局面またぎネットバッチAPI（葉プール＋全体重複除去＋1回フォワード）。solve_batchは単発でも1.3倍。深さ3教師では72%がCPUのためスナップショットコピー増と相殺し逐次では非採用（将来のGPU律速時・深さ4で有効化余地）。**parity回帰テスト2件を追加**
+
+**エンドツーエンド検証（1世代、本番非破壊のスクラッチ計測）**:
+| 工程 | 最適化後 |
+|---|---|
+| self-play(2500) | 3.8s |
+| depth-3教師(6thr) | 5.7s |
+| train | 2.8s |
+| arena(120) | 1.0s |
+| spearman | 1.5s |
+| **合計** | **14.8s**（旧 gen_seconds 73〜121s = **約5〜8倍**）|
+- 健全性: arena勝率0.492（同等・想定内）、a0 spearman 0.8275（過去0.827と一致）、決着分布健全
+
+**テスト**: complete_ai 12→14件、complete_solver 114件、**全PASS**
+**Numba運用注意（既知）**: njitデコレータ変更（nogil追加）時は `complete_ai/__pycache__` の .nbi/.nbc 削除必須（実施済み）
+**次**: 深さ4教師は本インフラ（nogilスレッド＋expand_depth4新設）でそのまま現実的時間に載る見込み
+
+### 追加最適化(同日、深さ4を見据えた第2ラウンド)
+- **教師ループの更なる高速化**: `value_depth3` のルート処理(GILを握るPython二重ループ＋`solve_small_zero_sum`)を **nogil njit `root_value_only`**(値のみ、方策不要)に置換。スレッドが `solve_small_zero_sum` で直列化していた頭打ちを解消 → **6スレッド頭打ち3.7x → 10-12スレッド5.2x**(12.3s→2.36s、bit-exact)。generation_loop 既定 `--threads` を8に
+- **検証で不採用にした2案(実測で判断)**: ①「展開→1回バッチ評価→バックアップ」の3相版 `parallel_depth3_values_batched` は深さ3の巨大セル配列スナップショットコピー代償で**0.4x（遅い）**→削除。②スレッド化self-playは `solve_small_zero_sum` のGIL直列化＋per-threadキャッシュで重複除去が効かず**solve計算2.3倍増**で**0.7x**→不採用（self-playはメモ化で既に最適）
+- **エンドツーエンド 1世代: 14.8s → 10.79s**（selfplay3.5/targets3.3/train2.8/arena0.8/spearman0.5）。旧73〜121s比 **約7〜11倍**。arena0.483・spearman0.827で健全
+- ①②③の最終進度: ①ネットバッチ=API実装済み(solve_batch採用、深さ3は非採用)/②lockstep=不採用（メモ化で代替・実測で優位）/③マルチコア=**教師ループでnogilスレッド5.2xまで到達（本命完了）**
+- 残る最大ピースは train(2.8s, GPU)・selfplay(3.5s, GIL律速)。深さ4ではtargetsが増えるが本インフラ(nogilスレッド+expand_depth4新設)でスケール可能

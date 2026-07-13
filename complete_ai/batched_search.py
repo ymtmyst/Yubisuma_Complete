@@ -42,7 +42,7 @@ MAX_L2 = 60_000
 MAX_L2_CELLS = 8_000_000
 
 
-@njit(cache=True, inline="always")
+@njit(cache=True, nogil=True, inline="always")
 def _prune_stock(lane0, code, prune):
     """True → drop this TP action code under self-play stock pruning."""
     if not prune:
@@ -60,7 +60,7 @@ def _prune_stock(lane0, code, prune):
     return True
 
 
-@njit(cache=True)
+@njit(cache=True, nogil=True)
 def _legal_tp_pruned(lane0, lane1, prune, buf):
     n = legal_tp_codes(lane0, lane1, _FULL_MASK, _NO_CAP, buf)
     if not prune:
@@ -73,7 +73,7 @@ def _legal_tp_pruned(lane0, lane1, prune, buf):
     return kept
 
 
-@njit(cache=True)
+@njit(cache=True, nogil=True)
 def expand_depth2(root0, root1, prune,
                   root_tp, root_ntp,
                   root_const, root_child,
@@ -159,7 +159,7 @@ def expand_depth2(root0, root1, prune,
     return n_tp, n_ntp, n_children, n_leaves
 
 
-@njit(cache=True)
+@njit(cache=True, nogil=True)
 def expand_depth3(root0, root1, prune,
                   root_tp, root_ntp, root_const, root_child,
                   l1_keys0, l1_keys1, l1_tp_n, l1_ntp_n, l1_offset,
@@ -282,7 +282,7 @@ def expand_depth3(root0, root1, prune,
     return n_tp, n_ntp, n_l1, n_l2, n_leaves
 
 
-@njit(cache=True)
+@njit(cache=True, nogil=True)
 def backup_children(n_children, child_tp_n, child_ntp_n, child_offset,
                     cell_const, cell_leaf, leaf_values, gamma,
                     matrix, tableau, basis, out_values):
@@ -300,6 +300,24 @@ def backup_children(n_children, child_tp_n, child_ntp_n, child_offset,
                 pos += 1
         value, _ = _matrix_value(matrix, n_tp, n_ntp, tableau, basis)
         out_values[i] = value
+
+
+@njit(cache=True, nogil=True)
+def root_value_only(n_tp, n_ntp, root_const, root_child, child_values, gamma,
+                    matrix, tableau, basis):
+    """Root game VALUE only (no policies) — used by value_depth3, which needs
+    just the target. Kept nogil so the whole depth-3 backup is GIL-free and
+    the threaded target path scales past the per-state-forward contention."""
+    for a in range(n_tp):
+        for b in range(n_ntp):
+            pos = a * n_ntp + b
+            child = root_child[pos]
+            if child < 0:
+                matrix[a, b] = root_const[pos]
+            else:
+                matrix[a, b] = root_const[pos] * gamma * child_values[child]
+    value, _ = _matrix_value(matrix, n_tp, n_ntp, tableau, basis)
+    return value
 
 
 class BatchedSearcher:
@@ -390,6 +408,136 @@ class BatchedSearcher:
             ntp_policy,
         )
 
+    def _expand_depth2_snapshot(self, lane0: int, lane1: int):
+        """Expand one depth-2 tree and copy out the slices needed to back it
+        up after a deferred, batched net forward. Returns (snapshot,
+        leaf_keys0, leaf_keys1) or (None, None, None) on buffer overflow."""
+        n_tp, n_ntp, n_children, n_leaves = expand_depth2(
+            np.int64(lane0), np.int64(lane1), self.prune_stock,
+            self._root_tp, self._root_ntp,
+            self._root_const, self._root_child,
+            self._child_keys0, self._child_keys1,
+            self._child_tp_n, self._child_ntp_n, self._child_offset,
+            self._cell_const, self._cell_leaf,
+            self._leaf_keys0, self._leaf_keys1,
+        )
+        if n_tp < 0:
+            return None, None, None
+        if n_children > 0:
+            cells = int(self._child_offset[n_children - 1]) + \
+                int(self._child_tp_n[n_children - 1]) * \
+                int(self._child_ntp_n[n_children - 1])
+        else:
+            cells = 0
+        rc = n_tp * n_ntp
+        snap = (
+            n_tp, n_ntp, n_children, n_leaves,
+            self._root_tp[:n_tp].copy(), self._root_ntp[:n_ntp].copy(),
+            self._root_const[:rc].copy(), self._root_child[:rc].copy(),
+            self._child_tp_n[:n_children].copy(),
+            self._child_ntp_n[:n_children].copy(),
+            self._child_offset[:n_children].copy(),
+            self._cell_const[:cells].copy(), self._cell_leaf[:cells].copy(),
+        )
+        return (
+            snap,
+            self._leaf_keys0[:n_leaves].copy(),
+            self._leaf_keys1[:n_leaves].copy(),
+        )
+
+    def _backup_depth2(self, snap, leaf_values: np.ndarray):
+        """Back up a depth-2 snapshot. Returns (value, tp_codes, ntp_codes,
+        tp_policy, ntp_policy) — identical to solve()."""
+        (n_tp, n_ntp, n_children, n_leaves,
+         root_tp, root_ntp, root_const, root_child,
+         child_tp_n, child_ntp_n, child_offset,
+         cell_const, cell_leaf) = snap
+        child_values = np.zeros(max(n_children, 1), dtype=np.float64)
+        if n_children > 0:
+            backup_children(
+                n_children, child_tp_n, child_ntp_n, child_offset,
+                cell_const, cell_leaf, leaf_values, self.gamma,
+                self._matrix, self._tableau, self._basis, child_values,
+            )
+        root_matrix = np.empty((n_tp, n_ntp))
+        for a in range(n_tp):
+            for b in range(n_ntp):
+                pos = a * n_ntp + b
+                child = root_child[pos]
+                if child < 0:
+                    root_matrix[a, b] = root_const[pos]
+                else:
+                    root_matrix[a, b] = root_const[pos] * self.gamma * child_values[child]
+        value, tp_policy, ntp_policy = solve_small_zero_sum(root_matrix)
+        return float(value), root_tp, root_ntp, tp_policy, ntp_policy
+
+    def solve_batch(self, keys0, keys1, leaf_budget: int = 120_000):
+        """Depth-2 net-leaf solve for many states in one shot — identical
+        per-state results to solve(), but each chunk's leaves are pooled into
+        ONE network forward (the net is ~half of solve()'s cost and per-state
+        forwards are overhead-bound). Returns a list of solve()-style tuples
+        (value, tp_codes, ntp_codes, tp_policy, ntp_policy), one per input
+        state, in order. Caller should deduplicate states first when games
+        share positions."""
+        keys0 = np.asarray(keys0, dtype=np.int64)
+        keys1 = np.asarray(keys1, dtype=np.int64)
+        n = len(keys0)
+        results = [None] * n
+
+        pending = []          # (state_index, snapshot)
+        seg0, seg1 = [], []
+        acc = [0]
+
+        def flush():
+            if not pending:
+                return
+            if seg0:
+                cat0 = np.concatenate(seg0)
+                cat1 = np.concatenate(seg1)
+            else:
+                cat0 = np.zeros(0, dtype=np.int64)
+                cat1 = np.zeros(0, dtype=np.int64)
+            if len(cat0) > 0:
+                stacked = np.stack([cat0, cat1], axis=1)
+                uniq, inv = np.unique(stacked, axis=0, return_inverse=True)
+                inv = np.asarray(inv).reshape(-1)
+                gu_vals = self._net_values(
+                    np.ascontiguousarray(uniq[:, 0]),
+                    np.ascontiguousarray(uniq[:, 1]),
+                ).astype(np.float64)
+            else:
+                inv = np.zeros(0, dtype=np.int64)
+                gu_vals = np.zeros(0, dtype=np.float64)
+            pos = 0
+            for j, snap in pending:
+                nl = snap[3]
+                if nl > 0:
+                    leaf_values = gu_vals[inv[pos:pos + nl]]
+                    pos += nl
+                else:
+                    leaf_values = np.zeros(0, dtype=np.float64)
+                results[j] = self._backup_depth2(snap, leaf_values)
+            pending.clear()
+            seg0.clear()
+            seg1.clear()
+            acc[0] = 0
+
+        for j in range(n):
+            snap, lk0, lk1 = self._expand_depth2_snapshot(
+                int(keys0[j]), int(keys1[j])
+            )
+            if snap is None:
+                results[j] = self.solve(int(keys0[j]), int(keys1[j]))
+                continue
+            pending.append((j, snap))
+            seg0.append(lk0)
+            seg1.append(lk1)
+            acc[0] += snap[3]
+            if acc[0] >= leaf_budget:
+                flush()
+        flush()
+        return results
+
     def value_depth3(self, lane0: int, lane1: int) -> float:
         """Depth-3 net-leaf VALUE (training target; acting stays depth-2).
 
@@ -399,16 +547,7 @@ class BatchedSearcher:
         opening cement (the stronger use) was not. Deeper targets extend the
         horizon each generation. Falls back to depth 2 on buffer overflow.
         """
-        if not hasattr(self, "_l2_keys0"):
-            self._l1_const = np.zeros(MAX_CELLS, dtype=np.float64)
-            self._l1_idx = np.zeros(MAX_CELLS, dtype=np.int64)
-            self._l2_keys0 = np.zeros(MAX_L2, dtype=np.int64)
-            self._l2_keys1 = np.zeros(MAX_L2, dtype=np.int64)
-            self._l2_tp_n = np.zeros(MAX_L2, dtype=np.int16)
-            self._l2_ntp_n = np.zeros(MAX_L2, dtype=np.int16)
-            self._l2_offset = np.zeros(MAX_L2, dtype=np.int64)
-            self._l2_const = np.zeros(MAX_L2_CELLS, dtype=np.float64)
-            self._l2_idx = np.zeros(MAX_L2_CELLS, dtype=np.int64)
+        self._ensure_depth3_buffers()
 
         n_tp, n_ntp, n_l1, n_l2, n_leaves = expand_depth3(
             np.int64(lane0), np.int64(lane1), self.prune_stock,
@@ -448,16 +587,202 @@ class BatchedSearcher:
                 self._matrix, self._tableau, self._basis, l1_values,
             )
 
-        root_matrix = np.empty((n_tp, n_ntp))
-        for a in range(n_tp):
-            for b in range(n_ntp):
-                pos = a * n_ntp + b
-                child = self._root_child[pos]
-                if child < 0:
-                    root_matrix[a, b] = self._root_const[pos]
-                else:
-                    root_matrix[a, b] = (
-                        self._root_const[pos] * self.gamma * l1_values[child]
-                    )
-        value, _, _ = solve_small_zero_sum(root_matrix)
+        value = root_value_only(
+            n_tp, n_ntp, self._root_const, self._root_child, l1_values,
+            self.gamma, self._matrix, self._tableau, self._basis,
+        )
         return float(value)
+
+    def _ensure_depth3_buffers(self) -> None:
+        if not hasattr(self, "_l2_keys0"):
+            self._l1_const = np.zeros(MAX_CELLS, dtype=np.float64)
+            self._l1_idx = np.zeros(MAX_CELLS, dtype=np.int64)
+            self._l2_keys0 = np.zeros(MAX_L2, dtype=np.int64)
+            self._l2_keys1 = np.zeros(MAX_L2, dtype=np.int64)
+            self._l2_tp_n = np.zeros(MAX_L2, dtype=np.int16)
+            self._l2_ntp_n = np.zeros(MAX_L2, dtype=np.int16)
+            self._l2_offset = np.zeros(MAX_L2, dtype=np.int64)
+            self._l2_const = np.zeros(MAX_L2_CELLS, dtype=np.float64)
+            self._l2_idx = np.zeros(MAX_L2_CELLS, dtype=np.int64)
+
+    def _expand_depth3_snapshot(self, lane0: int, lane1: int):
+        """Expand one depth-3 tree and copy out the slices needed to back it
+        up later (so the net forward can be deferred and batched across many
+        states). Returns (snapshot, leaf_keys0, leaf_keys1), or (None, None,
+        None) on buffer overflow."""
+        n_tp, n_ntp, n_l1, n_l2, n_leaves = expand_depth3(
+            np.int64(lane0), np.int64(lane1), self.prune_stock,
+            self._root_tp, self._root_ntp, self._root_const, self._root_child,
+            self._child_keys0, self._child_keys1,
+            self._child_tp_n, self._child_ntp_n, self._child_offset,
+            self._l1_const, self._l1_idx,
+            self._l2_keys0, self._l2_keys1,
+            self._l2_tp_n, self._l2_ntp_n, self._l2_offset,
+            self._l2_const, self._l2_idx,
+            self._leaf_keys0, self._leaf_keys1,
+        )
+        if n_tp < 0:
+            return None, None, None
+        # Total cells actually written at each level (offset of last node +
+        # its own tp*ntp block); expand_depth3 fills them contiguously.
+        if n_l1 > 0:
+            l1_cells = int(self._child_offset[n_l1 - 1]) + \
+                int(self._child_tp_n[n_l1 - 1]) * int(self._child_ntp_n[n_l1 - 1])
+        else:
+            l1_cells = 0
+        if n_l2 > 0:
+            l2_cells = int(self._l2_offset[n_l2 - 1]) + \
+                int(self._l2_tp_n[n_l2 - 1]) * int(self._l2_ntp_n[n_l2 - 1])
+        else:
+            l2_cells = 0
+        rc = n_tp * n_ntp
+        snap = (
+            n_tp, n_ntp, n_l1, n_l2, n_leaves,
+            self._root_const[:rc].copy(), self._root_child[:rc].copy(),
+            self._child_tp_n[:n_l1].copy(), self._child_ntp_n[:n_l1].copy(),
+            self._child_offset[:n_l1].copy(),
+            self._l1_const[:l1_cells].copy(), self._l1_idx[:l1_cells].copy(),
+            self._l2_tp_n[:n_l2].copy(), self._l2_ntp_n[:n_l2].copy(),
+            self._l2_offset[:n_l2].copy(),
+            self._l2_const[:l2_cells].copy(), self._l2_idx[:l2_cells].copy(),
+        )
+        return (
+            snap,
+            self._leaf_keys0[:n_leaves].copy(),
+            self._leaf_keys1[:n_leaves].copy(),
+        )
+
+    def _backup_snapshot(self, snap, leaf_values: np.ndarray) -> float:
+        """Back up a snapshot from _expand_depth3_snapshot given its leaf
+        values. Mirrors value_depth3's backup exactly."""
+        (n_tp, n_ntp, n_l1, n_l2, n_leaves,
+         root_const, root_child, child_tp_n, child_ntp_n, child_offset,
+         l1_const, l1_idx, l2_tp_n, l2_ntp_n, l2_offset,
+         l2_const, l2_idx) = snap
+
+        l2_values = np.zeros(max(n_l2, 1), dtype=np.float64)
+        if n_l2 > 0:
+            backup_children(
+                n_l2, l2_tp_n, l2_ntp_n, l2_offset,
+                l2_const, l2_idx, leaf_values, self.gamma,
+                self._matrix, self._tableau, self._basis, l2_values,
+            )
+        l1_values = np.zeros(max(n_l1, 1), dtype=np.float64)
+        if n_l1 > 0:
+            backup_children(
+                n_l1, child_tp_n, child_ntp_n, child_offset,
+                l1_const, l1_idx, l2_values, self.gamma,
+                self._matrix, self._tableau, self._basis, l1_values,
+            )
+        value = root_value_only(
+            n_tp, n_ntp, root_const, root_child, l1_values,
+            self.gamma, self._matrix, self._tableau, self._basis,
+        )
+        return float(value)
+
+    def value_depth3_batch(self, keys0, keys1, leaf_budget: int = 80_000):
+        """Depth-3 net-leaf values for many states — same result as calling
+        value_depth3 per state, but pools each chunk's leaves into ONE network
+        forward (per-state forwards are dominated by launch/transfer overhead:
+        measured ~28x on the net portion, RTX 4070 Ti). States accumulate into
+        a chunk until their combined leaf count reaches leaf_budget, then the
+        chunk's leaves are globally deduplicated, evaluated in one forward, and
+        scattered back for per-state LP backup. Memory stays bounded to roughly
+        one leaf_budget's worth of expansion cells."""
+        self._ensure_depth3_buffers()
+        keys0 = np.asarray(keys0, dtype=np.int64)
+        keys1 = np.asarray(keys1, dtype=np.int64)
+        n = len(keys0)
+        out = np.empty(n, dtype=np.float64)
+
+        pending = []          # (state_index, snapshot)
+        seg0, seg1 = [], []   # per-state leaf key segments (concat order)
+        acc = [0]             # accumulated leaf count (list for closure)
+
+        def flush():
+            if not pending:
+                return
+            if seg0:
+                cat0 = np.concatenate(seg0)
+                cat1 = np.concatenate(seg1)
+            else:
+                cat0 = np.zeros(0, dtype=np.int64)
+                cat1 = np.zeros(0, dtype=np.int64)
+            if len(cat0) > 0:
+                stacked = np.stack([cat0, cat1], axis=1)
+                uniq, inv = np.unique(stacked, axis=0, return_inverse=True)
+                inv = np.asarray(inv).reshape(-1)
+                gu_vals = self._net_values(
+                    np.ascontiguousarray(uniq[:, 0]),
+                    np.ascontiguousarray(uniq[:, 1]),
+                ).astype(np.float64)
+            else:
+                inv = np.zeros(0, dtype=np.int64)
+                gu_vals = np.zeros(0, dtype=np.float64)
+            pos = 0
+            for j, snap in pending:
+                nl = snap[4]
+                if nl > 0:
+                    leaf_values = gu_vals[inv[pos:pos + nl]]
+                    pos += nl
+                else:
+                    leaf_values = np.zeros(0, dtype=np.float64)
+                out[j] = self._backup_snapshot(snap, leaf_values)
+            pending.clear()
+            seg0.clear()
+            seg1.clear()
+            acc[0] = 0
+
+        for j in range(n):
+            snap, lk0, lk1 = self._expand_depth3_snapshot(
+                int(keys0[j]), int(keys1[j])
+            )
+            if snap is None:
+                # Rare buffer overflow: fall back to the single-state path.
+                out[j] = self.value_depth3(int(keys0[j]), int(keys1[j]))
+                continue
+            pending.append((j, snap))
+            seg0.append(lk0)
+            seg1.append(lk1)
+            acc[0] += snap[4]
+            if acc[0] >= leaf_budget:
+                flush()
+        flush()
+        return out
+
+
+def parallel_depth3_values(model, device, keys0, keys1, *,
+                           prune_stock: bool = True, gamma: float = 0.999,
+                           n_threads: int = 6):
+    """Depth-3 net-leaf targets for many states, computed across threads.
+
+    The heavy work per state is compiled (expand_depth3 + LP backups, ~70%)
+    and the net forward releases the GIL during CUDA, so the nogil njit path
+    parallelises cleanly. Each thread owns its own BatchedSearcher (private
+    expansion buffers) but shares the read-only model. Results are identical
+    to a serial value_depth3 loop (verified bit-exact). Measured ~3.7x at 6
+    threads on an RTX 4070 Ti; throughput saturates around 6.
+    """
+    from concurrent.futures import ThreadPoolExecutor
+
+    keys0 = np.asarray(keys0, dtype=np.int64)
+    keys1 = np.asarray(keys1, dtype=np.int64)
+    n = len(keys0)
+    out = np.empty(n, dtype=np.float32)
+    if n == 0:
+        return out
+    n_threads = max(1, min(n_threads, n))
+    searchers = [
+        BatchedSearcher(model, device, gamma=gamma, prune_stock=prune_stock)
+        for _ in range(n_threads)
+    ]
+    chunks = np.array_split(np.arange(n), n_threads)
+
+    def work(t: int) -> None:
+        s = searchers[t]
+        for i in chunks[t]:
+            out[i] = s.value_depth3(int(keys0[i]), int(keys1[i]))
+
+    with ThreadPoolExecutor(max_workers=n_threads) as ex:
+        list(ex.map(work, range(n_threads)))
+    return out

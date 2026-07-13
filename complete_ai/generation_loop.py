@@ -22,7 +22,7 @@ from torch import nn
 from complete_solver.packed_vi import PackedEndgameDB
 
 from .arena import play_match
-from .batched_search import BatchedSearcher
+from .batched_search import BatchedSearcher, parallel_depth3_values
 from .features import FEATURE_SIZE, features_from_lanes
 from .selfplay import run_selfplay, save_generation
 from .train_v0 import ValueNet
@@ -110,6 +110,8 @@ def main() -> None:
     parser.add_argument("--epsilon", type=float, default=0.12)
     parser.add_argument("--start-model", default="models/value_v0.pt")
     parser.add_argument("--start-generation", type=int, default=1)
+    parser.add_argument("--threads", type=int, default=8,
+                        help="threads for depth-3 target generation")
     args = parser.parse_args()
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -129,9 +131,9 @@ def main() -> None:
         # credit-assignment horizon (designer diagnosis 2026-07-13).
         keys0, keys1 = result["keys0"], result["keys1"]
         t_targets = time.perf_counter()
-        deep = np.empty(len(keys0), dtype=np.float32)
-        for i in range(len(keys0)):
-            deep[i] = searcher.value_depth3(int(keys0[i]), int(keys1[i]))
+        deep = parallel_depth3_values(
+            model, device, keys0, keys1, prune_stock=True, n_threads=args.threads
+        )
         result["targets"] = deep
         print(
             f"depth-3 targets: {len(deep)} states "
