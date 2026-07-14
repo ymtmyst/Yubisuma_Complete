@@ -1,0 +1,19 @@
+tablebase size: 209698
+
+=== endgame table OFF (net only) ===
+skill           序盤      中盤      終盤
+フェイント        30.9%   11.1%    5.9%
+数字宣言          4.2%   30.4%   56.1%
+クイック          5.5%    2.7%    5.0%
+スキップ         14.7%   17.6%   11.0%
+ガード           9.3%    9.0%    1.7%
+
+=== endgame table ON (endgame table) ===
+skill           序盤      中盤      終盤
+フェイント        30.9%   11.0%    4.9%
+数字宣言          4.2%   30.4%   59.1%
+クイック          5.6%    2.4%    5.0%
+スキップ         14.6%   17.6%   10.9%
+ガード           9.4%    9.1%    1.8%
+
+play_games  endgame-ON (agent) vs net-only (opponent): winrate_endgame=0.493  {'games': 600, 'agent_wins': 296, 'opponent_wins': 304, 'truncations': 0, 'agent_winrate': 0.49333333333333335, 'mean_plies': 9.17}

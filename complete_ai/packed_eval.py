@@ -64,6 +64,17 @@ def material_leaf_bits(lane0, lane1):
     return value
 
 
+@njit(cache=True, nogil=True)
+def material_leaf_batch(keys0, keys1):
+    """Vectorised material leaf over a batch — one nogil njit call (so a
+    material searcher's leaf eval stays GIL-free and threads scale)."""
+    n = keys0.shape[0]
+    out = np.empty(n, dtype=np.float32)
+    for i in range(n):
+        out[i] = material_leaf_bits(keys0[i], keys1[i])
+    return out
+
+
 @njit(cache=True)
 def _depth1_value(lane0, lane1, gamma, tp_buf, ntp_buf, matrix, tableau, basis):
     n_tp = legal_tp_codes(lane0, lane1, _FULL_MASK, _NO_CAP, tp_buf)
@@ -156,6 +167,46 @@ def depth3_values(keys0, keys1, gamma):
             tp_buf3, ntp_buf3, matrix3,
         )
     return out
+
+
+class MaterialLeafSearcher:
+    """A BatchedSearcher whose 'network' is the material leaf — gives exact
+    depth-2/3 LP-backup values with material leaves via the deduped compiled
+    path, with NO neural model and purely on the CPU. Used to label the v0
+    anchor dataset far faster than the naive full-width recursion (which has
+    no transposition dedup)."""
+
+    def __new__(cls, prune_stock: bool = False, gamma: float = 0.999):
+        # Import here to avoid a module-load cycle (batched_search imports
+        # nothing from packed_eval; packed_eval imports it lazily).
+        from .batched_search import BatchedSearcher
+
+        class _Impl(BatchedSearcher):
+            def _net_values(self, keys0, keys1):
+                return material_leaf_batch(
+                    np.ascontiguousarray(keys0), np.ascontiguousarray(keys1)
+                )
+
+        return _Impl(model=None, device="cpu", gamma=gamma,
+                     prune_stock=prune_stock)
+
+
+def material_depth3_values(keys0, keys1, gamma: float = 0.999,
+                           n_threads: int = 8, prune_stock: bool = False):
+    """Threaded exact depth-3 material targets (v0 anchor). Bit-equivalent to
+    depth3_values (the naive recursion) but ~100x faster per state via
+    transposition dedup, and threaded on top. Falls back to depth 2 only on
+    expansion-buffer overflow, which does not occur for reachable states
+    (measured max leaves ~19k vs the 400k cap)."""
+    from .batched_search import parallel_depth3_values
+
+    def factory():
+        return MaterialLeafSearcher(prune_stock=prune_stock, gamma=gamma)
+
+    return parallel_depth3_values(
+        None, "cpu", keys0, keys1, gamma=gamma, prune_stock=prune_stock,
+        n_threads=n_threads, searcher_factory=factory,
+    )
 
 
 @njit(cache=True)

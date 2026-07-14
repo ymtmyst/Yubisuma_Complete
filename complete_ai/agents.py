@@ -17,14 +17,27 @@ from .batched_search import BatchedSearcher, _FULL_MASK, _NO_CAP
 
 
 class SearchAgent:
-    """LP-mixture play from the batched net-leaf search."""
+    """LP-mixture play from the batched net-leaf search.
+
+    If an ``endgame`` tablebase is supplied, states it contains are played from
+    the CERTIFIED-exact endgame LP mixture instead of the net's depth-2
+    approximation (N7-F(a); see :mod:`complete_ai.endgame_table`)."""
 
     def __init__(self, searcher: BatchedSearcher, rng: np.random.Generator,
-                 epsilon: float = 0.0, deterministic: bool = False):
+                 epsilon: float = 0.0, deterministic: bool = False,
+                 endgame=None):
         self.searcher = searcher
         self.rng = rng
         self.epsilon = epsilon
         self.deterministic = deterministic
+        self.endgame = endgame
+
+    def _solve(self, lane0: int, lane1: int):
+        """Exact endgame optimum if the state is in the tablebase, else the
+        net-leaf search. Same return shape either way."""
+        if self.endgame is not None and self.endgame.contains(lane0, lane1):
+            return self.endgame.solve(lane0, lane1)
+        return self.searcher.solve(lane0, lane1)
 
     def _pick(self, codes, policy) -> int:
         if self.deterministic:
@@ -38,11 +51,11 @@ class SearchAgent:
         return int(codes[self.rng.choice(len(p), p=p / total)])
 
     def tp_action(self, lane0: int, lane1: int) -> int:
-        _, tp_codes, _, tp_policy, _ = self.searcher.solve(lane0, lane1)
+        _, tp_codes, _, tp_policy, _ = self._solve(lane0, lane1)
         return self._pick(tp_codes, tp_policy)
 
     def ntp_action(self, lane0: int, lane1: int) -> int:
-        _, _, ntp_codes, _, ntp_policy = self.searcher.solve(lane0, lane1)
+        _, _, ntp_codes, _, ntp_policy = self._solve(lane0, lane1)
         return self._pick(ntp_codes, ntp_policy)
 
 

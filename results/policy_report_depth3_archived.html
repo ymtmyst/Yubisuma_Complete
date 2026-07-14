@@ -1,0 +1,39 @@
+<meta charset="utf-8">
+<title>方策分布レポート value_latest</title>
+<h1>方策分布レポート — value_latest</h1>
+<p>深さ2ネット葉探索+LP混合(ストック枝刈りON)。
+自己対戦 500 局(平均 9.4 手、
+打ち切り 0)。</p>
+
+<h2>1. 初期局面の混合戦略(確率の直接参照、サンプリングではない)</h2>
+<p>局面評価値(手番側視点): +0.0602</p><table border='1' cellpadding='4' cellspacing='0'><tr><th>宣言(TP)</th><th>確率</th></tr><tr><td>フェイント</td><td>40.1%</td></tr><tr><td>スキップ</td><td>30.3%</td></tr><tr><td>ブースト</td><td>29.6%</td></tr></table><p>反応側(NTP)の混合:</p><table border='1' cellpadding='4' cellspacing='0'><tr><th>反応</th><th>確率</th></tr><tr><td>なし(親指0)</td><td>37.3%</td></tr><tr><td>カウンター(親指0)</td><td>30.8%</td></tr><tr><td>ブロック(親指0)</td><td>13.5%</td></tr><tr><td>なし(親指1)</td><td>11.2%</td></tr><tr><td>なし(親指2)</td><td>7.2%</td></tr></table>
+
+<h2>2. (1,1)終盤基準局面の混合戦略(直接参照)</h2>
+<p>局面評価値(手番側視点): +0.1559</p><table border='1' cellpadding='4' cellspacing='0'><tr><th>宣言(TP)</th><th>確率</th></tr><tr><td>スキップ</td><td>53.6%</td></tr><tr><td>フェイント</td><td>28.0%</td></tr><tr><td>数字1</td><td>9.2%</td></tr><tr><td>数字1</td><td>9.2%</td></tr></table><p>反応側(NTP)の混合:</p><table border='1' cellpadding='4' cellspacing='0'><tr><th>反応</th><th>確率</th></tr><tr><td>ブロック(親指0)</td><td>34.7%</td></tr><tr><td>なし(親指0)</td><td>27.7%</td></tr><tr><td>カウンター(親指0)</td><td>16.1%</td></tr><tr><td>なし(親指1)</td><td>13.6%</td></tr><tr><td>カウンター(親指1)</td><td>7.9%</td></tr></table>
+
+<h2>3. 自己対戦でのTP宣言分布(フェーズ別・全スキル表示)</h2>
+<table border='1' cellpadding='4' cellspacing='0'><tr><th>行動</th><th>序盤(手4)</th><th>中盤(手3)</th><th>終盤(手2以下)</th><th>全体</th></tr><tr><td>数字宣言</td><td>5.0%</td><td>33.1%</td><td>56.9%</td><td><b>17.4%</b></td></tr><tr><td>フラッシュ</td><td>9.2%</td><td>6.1%</td><td>1.1%</td><td><b>7.6%</b></td></tr><tr><td>セメント</td><td>0.0%</td><td>0.0%</td><td>3.3%</td><td><b>0.3%</b></td></tr><tr><td>ガード</td><td>8.3%</td><td>7.4%</td><td>0.8%</td><td><b>7.5%</b></td></tr><tr><td>チャージ</td><td>0.0%</td><td>0.6%</td><td>0.0%</td><td><b>0.2%</b></td></tr><tr><td>クイック</td><td>4.6%</td><td>1.9%</td><td>6.4%</td><td><b>3.9%</b></td></tr><tr><td>スキップ</td><td>14.7%</td><td>17.2%</td><td>11.3%</td><td><b>15.2%</b></td></tr><tr><td>フェイント</td><td>28.6%</td><td>10.2%</td><td>6.9%</td><td><b>21.4%</b></td></tr><tr><td>ロック</td><td>0.0%</td><td>0.0%</td><td>0.8%</td><td><b>0.1%</b></td></tr><tr><td>コピー</td><td>17.3%</td><td>20.1%</td><td>7.7%</td><td><b>17.4%</b></td></tr><tr style="color:#999"><td>ストック</td><td>0.0%</td><td>0.0%</td><td>0.0%</td><td><b>0.0%</b></td></tr><tr style="color:#999"><td>オール</td><td>0.0%</td><td>0.0%</td><td>0.0%</td><td><b>0.0%</b></td></tr><tr style="color:#999"><td>ドロップ</td><td>0.0%</td><td>0.0%</td><td>0.0%</td><td><b>0.0%</b></td></tr><tr><td>ブースト</td><td>12.2%</td><td>3.4%</td><td>4.7%</td><td><b>9.0%</b></td></tr><tr style="color:#999"><td>タイム</td><td>0.0%</td><td>0.0%</td><td>0.0%</td><td><b>0.0%</b></td></tr></table>
+
+<h2>3b. 長期・条件付きスキルの合法 vs 選択(タイム/セメント/ロック/ストック/チャージ)</h2>
+<p>長期・条件付きスキルが「合法だったのに選ばれなかった」率。選択率がほぼ0%なら、弱いのか探索の地平線が届いていないのかの切り分け材料。</p><table border='1' cellpadding='4' cellspacing='0'><tr><th>スキル</th><th>合法だった手番</th><th>選択された回数</th><th>選択率</th></tr><tr><td>セメント</td><td>4,681</td><td>12</td><td>0.26%</td></tr><tr><td>ロック</td><td>4,681</td><td>3</td><td>0.06%</td></tr><tr><td>ストック</td><td>2,531</td><td>0</td><td>0.00%</td></tr><tr><td>チャージ</td><td>4,681</td><td>8</td><td>0.17%</td></tr><tr><td>タイム</td><td>1,930</td><td>0</td><td>0.00%</td></tr></table><p>必殺技が使える手番での選択(タイムが合法 = 必殺枠が未使用の手番):</p><table border='1' cellpadding='4' cellspacing='0'><tr><th>選択</th><th>回数</th><th>割合</th></tr><tr><td>ブースト</td><td>421</td><td>21.8%</td></tr><tr><td>タイム</td><td>0</td><td>0.0%</td></tr><tr><td>温存(他の手)</td><td>1,509</td><td>78.2%</td></tr></table>
+
+<h2>4. 自己対戦でのNTP反応分布(フェーズ別)</h2>
+<table border='1' cellpadding='4' cellspacing='0'><tr><th>行動</th><th>序盤(手4)</th><th>中盤(手3)</th><th>終盤(手2以下)</th><th>全体</th></tr><tr><td>なし</td><td>57.6%</td><td>60.6%</td><td>49.7%</td><td><b>57.9%</b></td></tr><tr><td>カウンター</td><td>34.0%</td><td>31.4%</td><td>35.1%</td><td><b>33.3%</b></td></tr><tr><td>ブロック</td><td>8.4%</td><td>8.0%</td><td>15.2%</td><td><b>8.8%</b></td></tr></table>
+
+<h2>5. 決着の統計(何が勝負を決めているか)</h2>
+<p>先手勝率: <b>52.0%</b></p>
+<h3>5a. 勝った側の決着宣言(手番側が勝った場合)</h3>
+<table border='1' cellpadding='4' cellspacing='0'><tr><th>決着手</th><th>回数</th><th>割合</th></tr><tr><td>数字0(反応:なし)</td><td>82</td><td>20.2%</td></tr><tr><td>コピー(反応:カウンター)</td><td>75</td><td>18.5%</td></tr><tr><td>フラッシュ(反応:なし)</td><td>61</td><td>15.0%</td></tr><tr><td>数字1(反応:カウンター)</td><td>46</td><td>11.3%</td></tr><tr><td>数字3(反応:カウンター)</td><td>25</td><td>6.2%</td></tr><tr><td>数字2(反応:カウンター)</td><td>23</td><td>5.7%</td></tr><tr><td>コピー(反応:なし)</td><td>21</td><td>5.2%</td></tr><tr><td>数字1(反応:なし)</td><td>20</td><td>4.9%</td></tr><tr><td>クイック(反応:なし)</td><td>15</td><td>3.7%</td></tr><tr><td>数字3(反応:なし)</td><td>15</td><td>3.7%</td></tr><tr><td>数字0(反応:カウンター)</td><td>10</td><td>2.5%</td></tr><tr><td>フェイント(反応:カウンター)</td><td>9</td><td>2.2%</td></tr><tr><td>数字2(反応:なし)</td><td>4</td><td>1.0%</td></tr></table>
+<h3>5b. 負けた側の最後の宣言(反応側に討たれた場合)</h3>
+<table border='1' cellpadding='4' cellspacing='0'><tr><th>決着手</th><th>回数</th><th>割合</th></tr><tr><td>数字0 → カウンターに討たれ</td><td>36</td><td>38.3%</td></tr><tr><td>数字0 → ブロックに討たれ</td><td>27</td><td>28.7%</td></tr><tr><td>フラッシュ → カウンターに討たれ</td><td>12</td><td>12.8%</td></tr><tr><td>コピー → カウンターに討たれ</td><td>11</td><td>11.7%</td></tr><tr><td>数字0 → なしに討たれ</td><td>8</td><td>8.5%</td></tr></table>
+
+<h2>6. ブーストがカウンターされた後(必殺技の空振り)</h2>
+<p>ブーストがカウンターされたゲーム: 105 局、
+ブースト側勝率: <b>46.7%</b>
+(対照: ブーストが通ったゲーム 263 局、
+ブースト側勝率 55.5%)</p>
+<h3>6a. 空振り後にブースト側が勝った時の決着手</h3>
+<table border='1' cellpadding='4' cellspacing='0'><tr><th>決着手</th><th>回数</th><th>割合</th></tr><tr><td>フラッシュ(反応:なし)</td><td>9</td><td>18.4%</td></tr><tr><td>数字0(反応:なし)</td><td>9</td><td>18.4%</td></tr><tr><td>コピー(反応:カウンター)</td><td>9</td><td>18.4%</td></tr><tr><td>数字1(反応:カウンター)</td><td>4</td><td>8.2%</td></tr><tr><td>数字2(反応:カウンター)</td><td>4</td><td>8.2%</td></tr><tr><td>数字3(反応:カウンター)</td><td>2</td><td>4.1%</td></tr><tr><td>相手の数字0をカウンター</td><td>2</td><td>4.1%</td></tr><tr><td>数字1(反応:なし)</td><td>2</td><td>4.1%</td></tr><tr><td>相手のコピーをカウンター</td><td>2</td><td>4.1%</td></tr><tr><td>コピー(反応:なし)</td><td>2</td><td>4.1%</td></tr><tr><td>数字3(反応:なし)</td><td>2</td><td>4.1%</td></tr><tr><td>数字0(反応:カウンター)</td><td>1</td><td>2.0%</td></tr><tr><td>相手のフラッシュをカウンター</td><td>1</td><td>2.0%</td></tr></table>
+
+<h2>7. AIの解釈</h2>
+<p>(生成時に観察を追記する欄)</p>

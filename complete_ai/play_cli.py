@@ -101,12 +101,42 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", default="models/value_latest.pt")
     parser.add_argument("--ai-first", action="store_true")
+    parser.add_argument("--selective-depth", type=int, default=0,
+                        help="0 = depth-2 search (default). >2 = N7-C selective "
+                             "deepening: read the equilibrium-support lines to "
+                             "this depth (stronger, ~0.3s/move at depth 5).")
+    parser.add_argument("--selective-tau", type=float, default=0.05)
+    parser.add_argument("--no-endgame-table", action="store_true",
+                        help="disable the exact endgame tablebase (N7-F): by "
+                             "default the AI plays certified-optimal moves in "
+                             "the (1,1)-hands stockless endgame.")
     args = parser.parse_args()
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model = load_model(args.model, device)
-    searcher = BatchedSearcher(model, device, prune_stock=True)
-    agent = SearchAgent(searcher, np.random.default_rng())
+    endgame = None
+    if not args.no_endgame_table:
+        from .endgame_table import load_endgame_tablebase
+        endgame = load_endgame_tablebase()
+
+    if args.selective_depth > 2:
+        from .selective_search import SelectiveSearcher
+        searcher = SelectiveSearcher(model, device, prune=True,
+                                     depth=args.selective_depth,
+                                     tau=args.selective_tau)
+        print(f"selective search: depth {args.selective_depth}, "
+              f"tau {args.selective_tau}")
+    elif endgame is not None:
+        # Pincer (N7-F(b)): exact endgame values as search leaves, so decisions
+        # LEADING INTO the endgame use the true value, not the net's estimate.
+        from .endgame_table import PincerSearcher
+        searcher = PincerSearcher(model, device, endgame, prune_stock=True)
+    else:
+        searcher = BatchedSearcher(model, device, prune_stock=True)
+    if endgame is not None:
+        print(f"endgame tablebase: exact play + exact search leaves in "
+              f"{len(endgame):,} solved (1,1) states")
+    agent = SearchAgent(searcher, np.random.default_rng(), endgame=endgame)
 
     init0, init1 = pack_state(initial_state())
     lane0, lane1 = np.int64(init0), np.int64(init1)

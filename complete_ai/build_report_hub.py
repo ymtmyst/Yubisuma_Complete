@@ -42,6 +42,10 @@ BADGES = {
 
 # Curated primary reports: (title, filename-relative-to-results, one-liner, badge).
 CURRENT = [
+    ("N7-A graph-vi モデルの方策分布", "policy_report_gvi.html",
+     "サブグラフNash-VI教師で学習したモデルの方策分布(深さ教師版と比較用)。", "hot"),
+    ("N7-A 深さ教師ベースラインの方策分布", "policy_report_depth_baseline.html",
+     "並行完走した深さ教師12世代モデルの方策分布(graph-vi との対照)。", "base"),
     ("現行AIの方策分布(最新)", "policy_report_value_latest_rules_v2.html",
      "使用スキル分布・全スキル統計(タイム等の合法vs選択)・決着分析。まずここ。", "hot"),
     ("N1 高速探索基盤ベンチマーク", "n1_fast_solver_benchmark.html",
@@ -77,6 +81,9 @@ DOCS = [
     ("全体像 PROJECT_SUMMARY", "PROJECT_SUMMARY.md", "md",
      "PROJECT_SUMMARY.html",
      "プロジェクト全体のわかりやすい要約。", "base"),
+    ("N7 戦略考察と設計案", "N7_STRATEGY_AND_DESIGN.md", "md",
+     "N7_STRATEGY_AND_DESIGN.html",
+     "深さを掘る以外で強くする路線の考察と設計案 A(サブグラフNash-VI)/B/C/D。", "hot"),
 ]
 
 # Rulebook (child-friendly, served from the game's webplay folder).

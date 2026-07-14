@@ -1,0 +1,445 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>N7 戦略考察と設計案</title>
+<style>
+:root { color-scheme: light dark; }
+* { box-sizing: border-box; }
+body { margin: 0; font-family: -apple-system, "Segoe UI", "Hiragino Kaku Gothic ProN",
+  "Yu Gothic", Meiryo, sans-serif; line-height: 1.75; color: #1f2328;
+  background: #f6f7f9; }
+.wrap { max-width: 820px; margin: 0 auto; padding: 32px 24px 96px; }
+.top { display: flex; align-items: center; gap: 12px; margin-bottom: 22px;
+  padding-bottom: 16px; border-bottom: 1px solid #e5e7eb; }
+.top a.back { font-size: 13px; color: #4f46e5; text-decoration: none; font-weight: 600;
+  padding: 6px 12px; border: 1px solid #e5e7eb; border-radius: 8px; background: #fff; }
+.top a.back:hover { border-color: #a5b4fc; }
+.top .meta { font-size: 12px; color: #9ca3af; margin-left: auto; }
+.doc { background: #fff; border: 1px solid #e5e7eb; border-radius: 14px;
+  padding: 36px 40px; box-shadow: 0 1px 3px rgba(0,0,0,.04); }
+.doc h1 { font-size: 26px; font-weight: 700; margin: 0 0 18px; padding-bottom: 12px;
+  border-bottom: 2px solid #e5e7eb; letter-spacing: .01em; }
+.doc h2 { font-size: 20px; font-weight: 700; margin: 34px 0 12px; padding-bottom: 8px;
+  border-bottom: 1px solid #eceef1; }
+.doc h3 { font-size: 16px; font-weight: 700; margin: 26px 0 10px; color: #374151; }
+.doc h4 { font-size: 14px; font-weight: 700; margin: 20px 0 8px; color: #4b5563; }
+.doc p { margin: 12px 0; }
+.doc ul, .doc ol { margin: 12px 0; padding-left: 26px; }
+.doc li { margin: 5px 0; }
+.doc a { color: #4f46e5; text-decoration: none; }
+.doc a:hover { text-decoration: underline; }
+.doc code { background: #f3f4f6; padding: 2px 6px; border-radius: 5px; font-size: 90%;
+  font-family: "SFMono-Regular", "Consolas", "Menlo", monospace; }
+.doc pre { background: #f6f8fa; border: 1px solid #e5e7eb; border-radius: 10px;
+  padding: 14px 16px; overflow-x: auto; line-height: 1.55; }
+.doc pre code { background: none; padding: 0; font-size: 13px; }
+.doc blockquote { margin: 14px 0; padding: 4px 16px; border-left: 4px solid #a5b4fc;
+  color: #6b7280; background: #f9fafb; border-radius: 0 8px 8px 0; }
+.doc table { border-collapse: collapse; width: 100%; margin: 16px 0; font-size: 14px;
+  display: block; overflow-x: auto; }
+.doc th, .doc td { border: 1px solid #e5e7eb; padding: 8px 12px; text-align: left;
+  vertical-align: top; }
+.doc th { background: #f3f4f6; font-weight: 700; }
+.doc tr:nth-child(even) td { background: #fafbfc; }
+.doc hr { border: none; border-top: 1px solid #e5e7eb; margin: 28px 0; }
+.doc img { max-width: 100%; }
+/* 完全ルール 専用 */
+.doc details.rb { border: 1px solid #e5e7eb; border-radius: 10px; margin: 10px 0;
+  background: #fbfbfc; overflow: hidden; }
+.doc details.rb > summary { cursor: pointer; list-style: none; padding: 12px 16px;
+  font-weight: 700; font-size: 15px; user-select: none; display: flex; align-items: center; gap: 8px; }
+.doc details.rb > summary::-webkit-details-marker { display: none; }
+.doc details.rb > summary::before { content: "▶"; color: #9ca3af; font-size: 11px;
+  transition: transform .15s; }
+.doc details.rb[open] > summary::before { transform: rotate(90deg); }
+.doc details.rb > summary:hover { background: #f3f4f6; }
+.doc .rbbody { padding: 4px 18px 14px; border-top: 1px solid #eceef1; }
+.doc .rbbody > *:first-child { margin-top: 12px; }
+.doc .skill { font-weight: 700; background: #eef2ff; color: #4338ca;
+  padding: 1px 7px; border-radius: 6px; font-size: 92%; }
+.doc .rnote { font-size: 13px; color: #6b7280; margin: 8px 0; }
+.doc .rh3 { font-size: 15px; }
+footer { margin-top: 40px; font-size: 12px; color: #9ca3af; text-align: center; }
+@media (prefers-color-scheme: dark) {
+  body { background: #0f1115; color: #d1d5db; }
+  .top { border-color: #232936; }
+  .top a.back { background: #171a21; border-color: #232936; color: #a5b4fc; }
+  .doc { background: #171a21; border-color: #232936; box-shadow: none; }
+  .doc h1 { border-color: #232936; }
+  .doc h2 { border-color: #1f2530; }
+  .doc h3 { color: #cbd5e1; }
+  .doc h4 { color: #b6bdc8; }
+  .doc code { background: #232936; }
+  .doc pre { background: #12151b; border-color: #232936; }
+  .doc blockquote { background: #12151b; color: #9ca3af; border-color: #4338ca; }
+  .doc th, .doc td { border-color: #232936; }
+  .doc th { background: #1b2028; }
+  .doc tr:nth-child(even) td { background: #12151b; }
+  .doc hr { border-color: #232936; }
+  .doc details.rb { background: #12151b; border-color: #232936; }
+  .doc details.rb > summary:hover { background: #1b2028; }
+  .doc .rbbody { border-color: #232936; }
+  .doc .skill { background: #1e1b3a; color: #c4b5fd; }
+}
+</style></head>
+<body><div class="wrap">
+<div class="top"><a class="back" href="../index.html">← ハブに戻る</a>
+<span class="meta">更新 07-14 ・ N7_STRATEGY_AND_DESIGN.md</span></div>
+<article class="doc"><h1>N7 戦略考察と設計案</h1>
+<h1 id="n7">N7 戦略考察と設計案 — 「深さを掘る以外」で強くする</h1>
+<p>作成日: 2026-07-14
+位置づけ: 深さ4教師に着手する前に、「単に探索深さを彫る」以外の強化路線を再検討した記録と、
+採用する3路線(A/B/C)の設計案。マスタープランは §5 N7 に本書の要約を反映済み。</p>
+<hr />
+<h2 id="part-0-tldr">Part 0. TL;DR</h2>
+<ul>
+<li><strong>アルゴリズムの「族」(LP バックアップ探索 + 価値ネット + fitted Nash-VI)は変えない。</strong> これは
+  AlphaZero を「同時手番ゼロ和」に正しく一般化した先にいるものであり、すでに正解。MuZero / CFR /
+  PSRO への乗り換えは、本プロジェクトの真のボトルネック(長期スキルの信用割当)を解かないうえ、
+  完全情報+厳密シミュレータという強みを捨てるので不採用。</li>
+<li><strong>「深さ4を掘る」は主戦略にしない。</strong> 遅効性スキル(セメント/ストック/ロック)が報われるのは
+  約10プライ先で、深さ4(葉+2プライ)では構造的に届かない。深さは指数コストで、投資の上限が見える。</li>
+<li><strong>本当のレバーは「価値ネットの長期精度」と「訓練分布のカバレッジ」。</strong> 価値ネットが完璧なら深さ1で
+  十分 ── 深さ探索は「ネットが表現しきれない地平線の先」の穴埋めにすぎない。ネット精度への投資は
+  原理的に無限の地平線を買える。</li>
+<li>採用する3路線:</li>
+<li><strong>A(本命): 到達可能サブグラフ Nash 値反復</strong> — 決定論+完全情報を使い切り、深さを掘らずに
+    長期価値をサブグラフ全域に伝播させて教師値を作る。A0 厳密DBの機構(<code>packed_vi</code>)の一般化。</li>
+<li><strong>B: 価値ネットの構成エンコーダ化</strong> — フラット特徴では潰れる「非線形スキルコンボ」を、
+    構成(保持スキル集合/盤面)への集合・注意エンコーダで表現。</li>
+<li><strong>C: 選択的/最良優先探索</strong> — 均一深さの代わりに均衡台(support)上の重要ラインだけ深掘り。
+    同コストで実効深さ6〜8。</li>
+<li><strong>D(並行・期待は持たない): 深さ4教師</strong> — インフラ完成済みなので安価に回して確認材料にする。</li>
+</ul>
+<hr />
+<h2 id="part-1">Part 1. 考察(なぜこの結論か)</h2>
+<h3 id="1-1-alphazero">1-1. 今のアーキテクチャは「AlphaZero」ではない(すでにその先)</h3>
+<p>現行 Complete AI は <strong>LP バックアップ深さ制限探索 + 価値ネット葉評価 + fitted Nash-VI 自己対戦</strong>。
+AlphaZero は MCTS(PUCT)で <strong>交互手番</strong> を前提に子の <code>max</code> でバックアップする。ユビスマは
+<strong>同時手番</strong> なので各ノードで <code>max</code> ではなく <strong>行列ゲームの均衡(LP)</strong> を解く必要があり、本 AI は
+それを実装している(<code>complete_ai/batched_search.py</code> の <code>_backup</code>/<code>_matrix_value</code>)。
+→ <strong>AlphaZero を同時手番ゼロ和向けに正しく一般化した位置</strong>にすでにいる。</p>
+<p>平易版: 「将棋型AI(AlphaZero)」は交互に指す前提の道具。ユビスマは同時に手を出すので、そのままでは
+使えず、我々は「毎ノードでじゃんけんの最適配分を計算する版」に作り替えてある。もう普通の AlphaZero
+の外にいる。</p>
+<h3 id="1-2">1-2. 他アーキテクチャに乗り換える価値は低い</h3>
+<table>
+<thead>
+<tr>
+<th>候補</th>
+<th>判定</th>
+<th>理由</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>MuZero</td>
+<td>不採用</td>
+<td>学習ダイナミクスで「シミュレータが無い」問題を埋める技術。我々は完全決定論の厳密 solver を持つので買うものがなく、純粋な精度劣化。</td>
+</tr>
+<tr>
+<td>CFR / Deep CFR</td>
+<td>不採用</td>
+<td>不完全情報ゲーム用。ユビスマは完全情報でオーバーキル。</td>
+</tr>
+<tr>
+<td>PSRO / NFSP</td>
+<td>見送り</td>
+<td>exploitability を直接叩くのは魅力だが、真の課題(長期地平線)を解かない。N6 で非搾取性は実測クリア済みで優先度が低い。</td>
+</tr>
+</tbody>
+</table>
+<p>→ <strong>族は維持</strong>。変えるのは「価値をどう伝播させ、どう表現するか」。</p>
+<h3 id="1-3-4">1-3. 深さ4を主戦略にしない理由</h3>
+<p>ドメイン知識(ユーザー由来のリトマス指標)より:
+- セメントは約10ターン後に効く遅効性スキル。「深さが10級に伸びればストック・セメントの価値は
+  大幅上昇するはず」。
+- 深さ4は葉が2プライ伸びるだけ。約10プライ先の効果には構造的に届かない。指数コストで10プライは不可能。</p>
+<p>→ 深さは「安いので回して確認する」価値はある(インフラ完成済み・1世代~31秒)が、<strong>これで長期スキルが
+開花すると期待するのは無理筋</strong>。</p>
+<h3 id="1-4">1-4. 真のボトルネック = ネットの長期精度 + カバレッジ(鶏と卵)</h3>
+<p>このアーキテクチャの心臓は価値ネット。理屈上 <strong>ネットが完璧なら深さ1で十分</strong>(葉=地平線の先の真の値)。
+逆に深さ探索は「ネットが表現しきれない分の穴埋め」でしかない。<strong>深さへの投資は上限が見えるが、ネット精度
+への投資は原理的に無限の地平線を買える。</strong></p>
+<p>なぜ長期スキルが学ばれないか ── <strong>鶏と卵</strong>:
+現在の(近視眼的)方策で自己対戦 → セメント/ストックが報われる局面に到達しない → ネットが価値を学ばない
+→ 探索がそのスキルを打たない → 永遠に到達しない。
+これは深さの問題ではなく <strong>訓練分布のカバレッジ問題</strong>。恣意的な強制は禁止(ドメインメモ準拠)だが、
+中立な手段(ランダム開幕・ε・広域到達状態サンプリング)でカバレッジを広げるのは既許可路線の延長。</p>
+<hr />
+<h2 id="part-2-a-nash">Part 2. 設計案 A(本命)— 到達可能サブグラフ Nash 値反復</h2>
+<h3 id="a-0">A-0. 一言で</h3>
+<p>深さ制限探索は「ルートから前向きに d プライ」しか見ない。代わりに、<strong>到達可能状態を大量にサンプリングして
+1枚の巨大なゲームグラフ(DAG に近い有向グラフ)を作り、その上で Nash 値反復を回して収束値を得る</strong>。
+収束値はグラフの端から端まで(長い連鎖では20〜40プライ)価値を伝播させたものなので、<strong>深さを掘らずに
+長期地平線を稼ぐ</strong>。この収束値を価値ネットの教師にすれば、ネットは「深さ4では絶対見えない長期価値」を
+直接学べる。</p>
+<p>平易版: いま AI は「ルートから数手先まで」しか読んでいない。代わりに、あちこちの局面を大量に集めて
+巨大な「すごろく盤の地図」を作り、地図全体で「勝ちに近い/遠い」をじわじわ染み込ませる。染み込んだ数字を
+お手本にすればネットが長期の価値を覚えられる、という作戦。</p>
+<h3 id="a-1">A-1. なぜ実現可能か(機構はすでに実証済み)</h3>
+<p><code>complete_solver/packed_vi.py</code> に、まさにこの計算の完成品がある。ただし今は
+<strong>A0(ストック禁止・閉じた宇宙)専用</strong>:</p>
+<ul>
+<li><code>_enumerate(root0, root1, alphabet_mask, max_stock, cap)</code> — 閉集合を njit BFS で列挙</li>
+<li><code>_count_cells</code> / <code>_fill_tables</code> — 各状態の子行列(TP×NTP)を CSR 的に平坦化</li>
+<li><code>_jacobi_sweep(...)</code> — 全状態を一斉更新するヤコビ式 Nash 値反復(GS は汚染値の自己維持振動を
+  起こすためヤコビに切替済み ── この教訓がそのまま効く)</li>
+<li><code>_matrix_value</code> / <code>_simplex_value</code> — 各セルの行列ゲーム値(縮退時は摂動再試行)</li>
+<li><code>PackedEndgameDB</code> / <code>solve_universe(...)</code> — 収束値の格納・保存・プローブ</li>
+</ul>
+<p><strong>実績</strong>: A0 = 33.4万状態が <strong>54スイープ25秒で収束</strong>。つまり「状態集合上のヤコビ Nash-VI」は
+規模・収束・数値安定性すべて検証済み。A はこれを <strong>閉じた宇宙 → サンプリングしたサブグラフ</strong> に一般化する
+だけで、新規性は「境界(フロンティア)の閉じ方」に集約される。</p>
+<h3 id="a-2-a0">A-2. A0 との本質的な違い = フロンティアの扱い</h3>
+<p>A0 宇宙は「ストック禁止」という制約で <strong>閉じている</strong>(全ての子も宇宙内)。一方サンプリングした
+サブグラフは閉じていない ── 端の状態(フロンティア)の子は enumerate 対象外。ここが唯一の新規設計:</p>
+<ul>
+<li><strong>内部状態(interior)</strong>: 子がすべてサブグラフ内 → 通常のヤコビ更新。</li>
+<li><strong>フロンティア状態(frontier)</strong>: 子が未列挙 → その値を <strong>価値ネット V(s)</strong>(＋ A0/厳密DBに在れば
+  そちらを優先)で <strong>固定境界条件</strong> として与える。</li>
+<li>終端状態: 既存どおり厳密終端値で固定。</li>
+</ul>
+<p>これは数学的には「フロンティアを境界としたグラフ上の fitted value iteration」で、深さ制限探索の
+「葉=ネット」を <strong>面(サブグラフ全域)</strong> に広げた形。深さ d 探索が「ルートから d 段の木」なのに対し、
+A は「サンプリング領域を覆う DAG」で、長い連鎖に沿って価値がずっと奥まで伝播する。</p>
+<h3 id="a-3">A-3. 状態サンプリング(カバレッジの中立な広げ方)</h3>
+<p>グラフに入れる状態集合 S を、恣意性なく広く取る(ドメインメモの禁止事項に抵触しない中立手段のみ):</p>
+<ol>
+<li><strong>自己対戦の訪問状態</strong>(既存 <code>selfplay.run_selfplay</code> の収集をそのまま流用) ── 実戦分布。</li>
+<li><strong>初期局面からの制限付き BFS</strong>(<code>packed_engine.step</code> + <code>legal_tp_codes</code>/<code>legal_ntp_codes</code>) ──
+   <code>cap</code> と <code>max_stock</code>(ドメイン知識: ストックは基本 2、例外 3、4個以上は不要)で規模制御。</li>
+<li><strong>ランダム開幕/ランダムウォーク種</strong>(既存 ε・0-2手ランダムの思想の延長) ── 長期スキルが絡む
+   到達領域へ中立に踏み込む。特にセメント/ストックを含む局面を「打たせる強制」ではなく
+   「そこを地図に載せる」形で確保する(価値の書き換えは VI が担う=恣意性なし)。</li>
+<li><strong>A0/厳密DBの状態を境界アンカーとして常時合流</strong> ── 端が厳密値で閉じるほど内部の収束値も正確。</li>
+</ol>
+<p>規模の目安: まず 10^5〜10^6 状態で試し(A0 実績から数十秒〜数分で収束見込み)、収束品質と
+教師寄与を見て 10^7 に拡大するか判断。<strong>silent cap は付けない</strong>(切り詰めたら log とレポートに明記)。</p>
+<h3 id="a-4-fitted-nash-vi">A-4. 教師としての使い方(fitted Nash-VI への接続)</h3>
+<p>現行の世代ループ(<code>generation_loop</code> → <code>dataset</code> → <code>train_on</code>)の教師値生成を、深さ3/4 バックアップから
+<strong>グラフVI収束値</strong>に差し替え(または併用):</p>
+<pre><code>世代ごと:
+  1. 状態集合 S を収集(A-3 の 1〜4)
+  2. サブグラフ構築(子展開・平坦化: _count_cells/_fill_tables を S 向けに一般化)
+  3. フロンティア値 = 現行ネット V(s)(＋厳密DB) を注入
+  4. ヤコビ Nash-VI を収束まで(_jacobi_sweep 再利用、GSは使わない)
+  5. 収束値 v*(s) を S 上の教師として回帰学習(train_on)
+  6. 世代対戦・A0相関・分布レポートで採否判定(既存ゲート)
+</code></pre>
+<p>深さ3教師との違い: 深さ3は各状態を独立に「3プライ木」で評価するが、A は S 全体を <strong>連立</strong> で解くので、
+S 内で共有される長期構造(セメントが効く筋、ストックの2個型の価値)が <strong>相互に整合した値</strong> として
+染み出す。これがリトマス「序盤セメント &gt; 終盤セメント」の逆転を狙う本命。</p>
+<h3 id="a-5">A-5. 実装タスク分解(粒度: 実装可能)</h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>内容</th>
+<th>再利用</th>
+<th>新規</th>
+<th>目安</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A1</td>
+<td>サブグラフ・ビルダー(状態集合→子平坦化テーブル)</td>
+<td><code>_count_cells</code>/<code>_fill_tables</code>/<code>legal_*_codes</code>/<code>step</code></td>
+<td>任意集合対応の enumerate(閉集合前提を撤廃)</td>
+<td>半日</td>
+</tr>
+<tr>
+<td>A2</td>
+<td>フロンティア境界注入(ネット/厳密DBで葉を固定)</td>
+<td><code>_net_values</code>, <code>PackedEndgameDB.get</code></td>
+<td>境界マスクとヤコビ更新のスキップ</td>
+<td>半日</td>
+</tr>
+<tr>
+<td>A3</td>
+<td>グラフ Nash-VI ドライバ(収束判定・摂動再試行)</td>
+<td><code>_jacobi_sweep</code>/<code>_matrix_value</code>/<code>_repair_state_value</code></td>
+<td>収束ログ・発散検知</td>
+<td>半日</td>
+</tr>
+<tr>
+<td>A4</td>
+<td>参照一致テスト(小さな閉集合で A0/FiniteHorizonSolver と bit 一致)</td>
+<td>既存ゴールデン思想</td>
+<td>テスト追加</td>
+<td>半日</td>
+</tr>
+<tr>
+<td>A5</td>
+<td>世代ループ結線(教師差し替え・世代ゲート)</td>
+<td><code>generation_loop</code>/<code>dataset</code>/<code>train_on</code></td>
+<td><code>--teacher graph-vi</code> フラグ</td>
+<td>半日</td>
+</tr>
+<tr>
+<td>A6</td>
+<td>実測・レポート(規模/収束スイープ数/A0相関/分布HTML)</td>
+<td><code>policy_report</code>/<code>build_report_hub</code></td>
+<td>新レポート</td>
+<td>半日</td>
+</tr>
+</tbody>
+</table>
+<p><strong>注意(既存教訓の適用)</strong>:
+- njit エンジン修正時は <code>__pycache__</code> の <code>.nbi/.nbc</code> を必ず削除(呼び出し元が旧 callee を焼き込む)。
+- 行列セル値は必ず失敗フラグを見る(<code>_backup</code>/<code>_root_value</code> の教訓)。証明失敗ノードは
+  <code>solve_small_zero_sum</code> 相当のロバスト解に fallback。
+- GS ではなくヤコビ(汚染値の自己維持振動回避)。
+- バッファは 96 行(最大78行動 + 余裕。64 でネイティブクラッシュ実績)。</p>
+<h3 id="a-6">A-6. リスクと対策</h3>
+<table>
+<thead>
+<tr>
+<th>リスク</th>
+<th>対策</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>サブグラフが開いていて収束が甘い</td>
+<td>フロンティアを厳密DBで極力閉じる/フロンティア割合を log 監視/内部率が低い領域は教師採用を割引</td>
+</tr>
+<tr>
+<td>ネット境界のブートストラップ発散</td>
+<td>厳密アンカー比率を上げる・ターゲットネット固定・世代ゲートで退行検知したら停止報告(既存作法)</td>
+</tr>
+<tr>
+<td>規模爆発</td>
+<td>max_stock=2〜3・cap・alphabet で制御。10^5 から漸進。切り詰めは必ず log</td>
+</tr>
+<tr>
+<td>フロンティアが多すぎて実質「深さ1」化</td>
+<td>サンプリングで内部密度を上げる(自己対戦連鎖・BFS 近傍を厚く)/収束前後の値変化量で有効伝播深さを実測</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="part-3-b">Part 3. 設計案 B — 価値ネットの構成エンコーダ化</h2>
+<h3 id="b-0">B-0. 一言で</h3>
+<p>現行ネットは 103〜107 次元のフラット特徴 MLP。ドメイン知識では「スキル/ストックの組合せは非線形コンボ」
+かつ「特定スキル同士に強力なコンボが存在」。フラット結合では組合せが原理的に潰れやすい。<strong>保持スキル集合や
+盤面構成を、集合/注意(self-attention)エンコーダで表現</strong>し、コンボを明示的に捉えられる形にする。</p>
+<h3 id="b-1">B-1. 設計方針</h3>
+<ul>
+<li>入力を「フラットな数値ベクトル」から「<strong>トークン集合</strong>」に再構成:</li>
+<li>各プレイヤーの保持スキル(ストック内容)を1トークンずつ(スキル種別 embedding + 属性)</li>
+<li>盤面グローバル特徴(手数・タイム・セメント状態・フェーズ)を CLS トークンに集約</li>
+<li>小さな <strong>self-attention(1〜2層)</strong> でトークン間相互作用を学習 → コンボ(例: 対カウンター系×通常、
+  ロック×タイム)を1層で表現。出力は CLS からスカラー値 V(s)。</li>
+<li>ドメイン制約を構造に反映: ストックは最大 3 トークン(4個以上は不要)、順序不変(集合)なので
+  permutation-invariant なエンコーダが自然。</li>
+</ul>
+<h3 id="b-2">B-2. 検証(既存ものさしを流用)</h3>
+<ul>
+<li>A0 厳密スライスでの MSE / 順位相関(現行の 0.919 / 深さ3相関 0.827 を基準に、
+  <strong>ストックを含む局面での相関</strong>を分離集計 ── ここが伸びれば B の効き目)。</li>
+<li>material / 現行フラットネットとの直接ものさし比較(N3 のレポート様式を流用)。</li>
+<li>過学習・推論速度(探索の葉評価で毎ノード呼ぶので、注意層のコストが探索速度を殺さないか実測)。</li>
+</ul>
+<h3 id="b-3">B-3. リスク</h3>
+<ul>
+<li>注意層は葉評価のホットパス。<strong>推論が重くなると探索スループットが落ちる</strong> → まず 1 層・小 d_model で、
+  速度退行が閾値内かを最初に確認(ダメなら蒸留 or 特徴量追加に留める)。</li>
+<li>データが足りないと注意は過学習。A(グラフVI)で教師が厚くなってから B に載せる相性が良い。</li>
+</ul>
+<hr />
+<h2 id="part-4-c-smarter-not-deeper">Part 4. 設計案 C — 選択的/最良優先探索(smarter, not deeper)</h2>
+<h3 id="c-0">C-0. 一言で</h3>
+<p>均一な深さ4ではなく、<strong>均衡混合戦略の台(support)上の手だけを選択的に深掘り</strong>する反復深化。
+大半の手は均衡でほぼ0確率なので展開不要。重要ラインだけ実効深さ6〜8まで伸ばせば、深さ4と同コストで
+より深く読める。</p>
+<h3 id="c-1">C-1. 設計方針</h3>
+<ul>
+<li>ルートで浅く LP を解き、<strong>support(確率&gt;閾値の手)</strong> を得る。</li>
+<li>support 上の子だけを1段深く再展開 → 再び LP。support 外は葉(ネット値)で据え置き。</li>
+<li>反復深化で予算(時間/展開数)まで support を掘り下げる。同時手番なので単一 PV はないが、
+  「support の直積」を掘る形で近似する。</li>
+<li>着手(深さ2据置の現行方針)と教師(深さ3/4 or A)双方に効く。特に <strong>実戦エージェントの手番</strong>で
+  重要局面だけ深く読めるのは体感の強さに直結。</li>
+</ul>
+<h3 id="c-2">C-2. 検証</h3>
+<ul>
+<li>同一計算予算で「均一深さ4」対「選択的深さ(実効6〜8)」の値精度(A0/厳密比較)と対戦勝率。</li>
+<li>support 閾値の感度(小さすぎると木が爆発、大きすぎると近視眼)。</li>
+<li>探索スループット(展開数/秒)と着手品質のトレードオフ曲線。</li>
+</ul>
+<h3 id="c-3">C-3. リスク</h3>
+<ul>
+<li>同時手番で support の直積を掘ると木が広がりやすい → 閾値と幅制限(top-k support)で抑制、log 明記。</li>
+<li>support が均衡の数値誤差で不安定 → 既存の tolerance/摂動処理を踏襲。</li>
+</ul>
+<hr />
+<h2 id="part-5">Part 5. 実施順序・依存関係</h2>
+<p>推奨順序と依存:</p>
+<ol>
+<li><strong>A(本命)を先に</strong>。理由: 教師の質を根本から底上げする=B/C/D すべての土台。A で長期価値が
+   ネットに入り始めれば、リトマス(序盤セメント&gt;終盤)の初動が見えるはず。</li>
+<li><strong>C を A と並行可</strong>(独立性が高い。探索側の改良で、教師生成にも実戦にも効く)。</li>
+<li><strong>B は A の後</strong>が相性最良(厚い教師ができてから表現力を上げると過学習しにくい)。</li>
+<li><strong>D(深さ4)は安価なので随時</strong>。A の効果測定の対照(「深さでは届かない」ことの実証)にも使える。</li>
+</ol>
+<p>各フェーズ末に確認成果物(HTML/表)+ 解釈を提示し、ユーザー承認後に次へ(AI_WORKFLOW_RULES 準拠)。
+新レポート/ドキュメントはレポートハブに登録する(PROJECT_SUMMARY §7 の運用ルール)。</p>
+<hr />
+<h2 id="part-6-2026-07-14">Part 6. 本質的な強化策の考察(2026-07-14 追記、ユーザー問い「深さはどこまで/深さ以外は」)</h2>
+<p>前提の実測: ゲームは平均約9手で終局・手の合計は単調減少(層構造)・selective のコストは深さ+1で約3〜4倍
+(56→232→639セル/局面)・ネットは教師を丸暗記(val_mse 0.0005)=律速は教師の質。</p>
+<h3 id="6-1">6-1. 深さの到達可能上限</h3>
+<p>3〜4倍/手の外挿: 深さ7≈6千セル、深さ10≈17万セル/局面。njit コンパイル(本プロジェクト実績 50〜1000倍)後は
+<strong>深さ10で~1s/手 = 実用圏</strong>。そして平均ゲーム長が9手なので、<strong>深さ10 ≈ 読み切り</strong>(葉が終局値=誤差源消滅)。
+つまり深さは無限のレースではなく「ゲーム長に届いたら終わり」のゴールがある。リスク: support 見落とし
+(浅読みで悪く見える手を永遠に掘らない)→ 深さ予算に応じた閾値緩和・top-k 強制深掘り・厳密ソルバ照合で対処。</p>
+<h3 id="6-2">6-2. 深さ以外の本質策(優先順)</h3>
+<ol>
+<li><strong>層の挟み撃ち(本命)</strong>: 手の合計が単調減少 → (1,1)終盤層を現実的ストック制限(s2/s3、ladder で誤差測定可能)
+   で厳密に解き(A0/s1_A4/s2_A4 は N2b で解済み)、前からは selective 深さ6前後で層境界に接続。
+   <strong>到達点=「均衡 support 沿いの弱解決」= 神視点の最適解</strong>。ゲームの短さと層構造ゆえ現実的射程。</li>
+<li><strong>graph-BR(真の exploitability 計)</strong>: 凍結エージェント相手の攻撃者問題は MDP → subgraph_vi の片側固定版で
+   厳密に近い BR が計算可能。PPO 攻撃者(弱い下界)を置き換える「神視点への距離」の計器。</li>
+<li><strong>教師の質ループ</strong>: コンパイル済み selective d6-8 を教師に(ネットは丸暗記できるので教師精度=ネット精度)。
+   graph-VI は教師平滑化として併用(実証済み)。</li>
+</ol>
+<h3 id="6-3">6-3. 本質的でないと確定したもの(証拠付き)</h3>
+<ul>
+<li>B(ネット大型化/構成エンコーダ): 教師丸暗記済み=ネット容量は律速でない(val_mse 0.0005)</li>
+<li>同一教師で世代数増: 12世代で頭打ち実測</li>
+<li>PPO 攻撃者の強化: graph-BR に本質で劣る</li>
+</ul>
+<h3 id="6-3b-caveat-2026-07-14">6-3b. 重要な caveat: ゲーム長は方策依存(ユーザー指摘 2026-07-14)</h3>
+<p>「平均9〜10手」は<strong>セメント/ストック/ロックを使わない現行方策</strong>での測定値。これらが真に有効なら(特にストックは
+ゲームを延ばしうる)最適プレイのゲーム長は伸び、必要深さの前提が変わる。=「深さ=ゲーム長で読み切り」の上限は
+下界にすぎない。ただし長期スキルは間接的・使用が難しく学習難度が高い(真に弱い可能性も残る)。<strong>含意</strong>: 深さ一本足
+より、ゲーム長に依存しない<strong>層の挟み撃ち</strong>と<strong>ストック込み厳密終盤テーブル(s2/s3)</strong>の価値が上がる。深さ外挿は
+保守的に見積もる。</p>
+<h3 id="6-3c-2026-07-14">6-3c. レジーム切替仮説とその定量確認(2026-07-14、ユーザー洞察)</h3>
+<p>ユーザー指摘: タイム(次いでロック/セメント/ストック/クイック/チャージ)は<strong>ゲーム構造を離散的に変える</strong>
+(タイム中は連続ターン系が減価しロック/セメントが増価、相手ストックは早期決着圧、勝敗確定盤面が増える等)
+= フラグ×スキルの相互作用項(レジーム切替)。<strong>A0厳密スライスをレジーム別に分割して定量確認</strong>
+(<code>complete_ai/n7_regime_slices.py</code>、パック bit15=time_active):
+- タイム発動中 39,177件: 順位相関 0.844(良)だが<strong>絶対誤差 0.150 vs 非発動 0.114(+32%悪化)</strong>。両ネット
+  (gvi/depth)で一貫。アルティメット未使用(参入判断局面)も悪い(0.139-0.146)。
+- <strong>含意</strong>: LP行列は絶対値同士の比較なので、レジーム較正の歪み=参入判断の系統的歪み。タイム使用0%→レジーム
+  データ暗黒→較正悪化→参入判断歪む→使わない、の<strong>レジーム版鶏卵</strong>。ロック/セメントの条件付き価値(タイム中
+  増価)も暗黒の中=見かけの弱さの一部を説明。
+- <strong>戦略的最重要</strong>: 相手はタイムを使える → 非搾取性にはレジーム対応力が必須。PPO攻撃者はレジーム搾取を
+  見つけるには弱い可能性 → 現行 exploitability は楽観的かも(graph-BR の価値が上がる)。
+- 留保: lock_active スライス0件(ビット解釈要確認・ロック未検証)。A0は最穏スライス(序盤層+ストックでは差が
+  拡大しうる)。タイムが真に弱い可能性も残る(が、それを証拠付きで言うにはレジーム厳密値が要る)。
+- 反映: 挟み撃ちテーブルはタイム/ストック次元込みで作る・n7_regime_slices を常設計器化・レジーム内厳密値を
+  錨に明示的に効かせる(中立)・graph-BR。</p>
+<h3 id="6-4">6-4. 推奨ロードマップ</h3>
+<p>① C の njit 化(全ての鍵)→ ② graph-BR 計器 → ③ (1,1)厳密テーブル接続(層挟み撃ち)→ ④ 深い教師で再学習→②で検証、反復。</p>
+<hr />
+<h2 id="_1">付記: この考察の出所</h2>
+<p>2026-07-14、ユーザーの問い「深さを掘る以外で強くする方法は? AlphaZero 以外のアーキテクチャは?
+それとも現状の延長線上か?」に対する回答として作成。ユーザーが内容を高く評価し記録を指示。
+関連メモ: domain-yubisuma-rules(長期スキルのリトマス指標)、project-complete-ai(全体進捗)。</p>
+</article>
+<footer>results/docs/ — <code>python -m complete_ai.build_report_hub</code> で再生成</footer>
+</div></body></html>

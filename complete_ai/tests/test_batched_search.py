@@ -12,8 +12,18 @@ from complete_ai.tests.test_features_and_targets import random_states
 from complete_solver.actions import RulesConfig
 from complete_solver.constants import CEMENT, FEINT, FLASH, GUARD, LOCK
 from complete_solver.fast_solver import FastHorizonSolver
-from complete_solver.finite_horizon import material_leaf_evaluator
-from complete_solver.packed_engine import SKILL_ID, pack_state
+from complete_solver.finite_horizon import (
+    FiniteHorizonSolver,
+    material_leaf_evaluator,
+)
+from complete_solver.packed_engine import (
+    SKILL_ID,
+    legal_ntp_codes,
+    legal_tp_codes,
+    pack_state,
+    step,
+)
+from complete_solver.small_matrix import solve_small_zero_sum
 from complete_solver.state import PlayerState, State
 
 CONFIG = RulesConfig(False, False)
@@ -71,6 +81,72 @@ class TestDepth3Value(unittest.TestCase):
             )
 
 
+class TestDepth4Value(unittest.TestCase):
+    def test_depth4_extends_depth3_composition(self):
+        """value_depth4(s) must equal a one-ply LP over the root whose child
+        values are value_depth3 — i.e. expand_depth4 is a faithful one-level
+        extension of expand_depth3. Holds regardless of the extra-turn
+        transposition bug below (both sides inherit it identically)."""
+        searcher = MaterialLeafSearcher(prune_stock=True)
+        full = np.int64(255)
+        no_cap = np.int64(99)
+        tp_buf = np.zeros(96, dtype=np.int64)
+        ntp_buf = np.zeros(16, dtype=np.int64)
+        for state in random_states(seed=17, count=20):
+            lane0, lane1 = pack_state(state)
+            n_tp = legal_tp_codes(np.int64(lane0), np.int64(lane1),
+                                  full, no_cap, tp_buf)
+            n_ntp = legal_ntp_codes(np.int64(lane0), np.int64(lane1), ntp_buf)
+            matrix = np.empty((n_tp, n_ntp))
+            for a in range(n_tp):
+                for b in range(n_ntp):
+                    c0, c1, status, reward = step(
+                        np.int64(lane0), np.int64(lane1),
+                        tp_buf[a], ntp_buf[b], full,
+                    )
+                    if status == 2:
+                        matrix[a, b] = reward
+                    else:
+                        sign = 1.0 if status == 1 else -1.0
+                        matrix[a, b] = (
+                            sign * GAMMA * searcher.value_depth3(int(c0), int(c1))
+                        )
+            composed, _, _ = solve_small_zero_sum(matrix)
+            self.assertAlmostEqual(
+                searcher.value_depth4(lane0, lane1), composed, delta=1e-6,
+                msg=f"state={state}",
+            )
+
+class TestDegenerateMatrixRepair(unittest.TestCase):
+    """Regression for the 2026-07-14 fix. backup_children/root_value_only
+    previously discarded _matrix_value's success flag, so when the fast packed
+    simplex could not certify a degenerate subgame it silently used the
+    (maximin+minimax)/2 PLACEHOLDER as the value — a ~0.04 error that surfaced
+    on skip / extra-turn TARGET states (found via depth-4 parity). The fix
+    re-solves those rare nodes exactly with solve_small_zero_sum. This state's
+    depth-3 tree contains exactly such a 39x9 degenerate matrix."""
+
+    def test_extra_turn_state_matches_exact_solver(self):
+        searcher = MaterialLeafSearcher(prune_stock=False)
+        exact = FiniteHorizonSolver(
+            CONFIG, gamma=GAMMA, leaf_evaluator=material_leaf_evaluator
+        )
+        state = State(
+            me=PlayerState(hands=2, used_ultimate=True, has_declared_skill=True),
+            opp=PlayerState(hands=2, has_declared_skill=True),
+            previous_skill="ブースト", me_extra_turns=2,
+        )
+        lane0, lane1 = pack_state(state)
+        self.assertAlmostEqual(
+            searcher.value_depth3(lane0, lane1), exact.value(state, 3),
+            delta=1e-6,
+        )
+        self.assertAlmostEqual(
+            searcher.value_depth4(lane0, lane1), exact.value(state, 4),
+            delta=1e-6,
+        )
+
+
 class TestBatchedParity(unittest.TestCase):
     """Batched/threaded helpers must equal the per-state path exactly."""
 
@@ -100,6 +176,20 @@ class TestBatchedParity(unittest.TestCase):
             self.assertAlmostEqual(
                 bv, searcher.value_depth3(lane0, lane1), delta=1e-9
             )
+
+    def test_material_depth3_values_matches_naive(self):
+        # The threaded deduped anchor path (used by dataset.py) must equal the
+        # naive full-width depth-3 material recursion it replaced.
+        from complete_ai.packed_eval import (
+            depth3_values, material_depth3_values,
+        )
+        states = random_states(seed=27, count=30)
+        packed = [pack_state(s) for s in states]
+        k0 = np.ascontiguousarray(np.array([p[0] for p in packed], dtype=np.int64))
+        k1 = np.ascontiguousarray(np.array([p[1] for p in packed], dtype=np.int64))
+        naive = depth3_values(k0, k1, GAMMA)
+        fast = material_depth3_values(k0, k1, GAMMA, n_threads=4)
+        self.assertTrue(np.allclose(naive, fast, atol=1e-5))
 
 
 class TestStockPruning(unittest.TestCase):

@@ -1,0 +1,6 @@
+phase2 plies (sum<=2): 468
+(1,1) plies: 239
+  in tablebase: 214 (89.5% of (1,1) plies)
+  NOT in table: 25
+faint rate  IN-table : 0/214 = 0.00%   (god=0%)
+faint rate  (1,1) NOT-in-table: 3/25 = 12.00%

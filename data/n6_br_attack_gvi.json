@@ -1,0 +1,24 @@
+{
+  "model": "models/value_gvi_latest.pt",
+  "steps": 150000,
+  "seeds": {
+    "0": {
+      "episodes": 300,
+      "attacker_wins": 146,
+      "attacker_losses": 154,
+      "truncations": 0,
+      "attacker_winrate": 0.4866666666666667,
+      "train_seconds": 737.3829405999859
+    },
+    "1": {
+      "episodes": 300,
+      "attacker_wins": 141,
+      "attacker_losses": 159,
+      "truncations": 0,
+      "attacker_winrate": 0.47,
+      "train_seconds": 879.4840482000145
+    }
+  },
+  "worst_attacker_winrate": 0.4866666666666667,
+  "gate_pass": true
+}

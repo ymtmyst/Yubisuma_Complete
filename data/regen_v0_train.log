@@ -1,0 +1,70 @@
+device: cuda
+dataset: 123731 states (train 103731, val 20000)
+epoch 1: train 0.090185 val 0.065973
+epoch 2: train 0.045426 val 0.030665
+epoch 3: train 0.026578 val 0.022253
+epoch 4: train 0.019959 val 0.017944
+epoch 5: train 0.015884 val 0.014442
+epoch 6: train 0.012778 val 0.011980
+epoch 7: train 0.010641 val 0.010028
+epoch 8: train 0.008925 val 0.008731
+epoch 9: train 0.007909 val 0.007823
+epoch 10: train 0.007255 val 0.007076
+epoch 11: train 0.006473 val 0.006444
+epoch 12: train 0.005900 val 0.006008
+epoch 13: train 0.005296 val 0.005487
+epoch 14: train 0.004953 val 0.005010
+epoch 15: train 0.004487 val 0.004756
+epoch 16: train 0.004573 val 0.004373
+epoch 17: train 0.003923 val 0.004237
+epoch 18: train 0.003716 val 0.004382
+epoch 19: train 0.003424 val 0.003934
+epoch 20: train 0.003149 val 0.003346
+epoch 21: train 0.002871 val 0.003174
+epoch 22: train 0.002835 val 0.003169
+epoch 23: train 0.002711 val 0.003068
+epoch 24: train 0.002582 val 0.002889
+epoch 25: train 0.002327 val 0.002660
+epoch 26: train 0.002129 val 0.002781
+epoch 27: train 0.002073 val 0.002384
+epoch 28: train 0.001894 val 0.002301
+epoch 29: train 0.002228 val 0.002181
+epoch 30: train 0.002030 val 0.002123
+epoch 31: train 0.001709 val 0.002033
+epoch 32: train 0.001746 val 0.001938
+epoch 33: train 0.001591 val 0.001907
+epoch 34: train 0.001407 val 0.001818
+epoch 35: train 0.001360 val 0.001711
+epoch 36: train 0.001298 val 0.002174
+epoch 37: train 0.001488 val 0.002046
+epoch 38: train 0.001391 val 0.001592
+epoch 39: train 0.001184 val 0.001601
+epoch 40: train 0.001131 val 0.001581
+epoch 41: train 0.001115 val 0.001460
+epoch 42: train 0.001058 val 0.001418
+epoch 43: train 0.000941 val 0.001386
+epoch 44: train 0.001040 val 0.001667
+epoch 45: train 0.001016 val 0.001302
+epoch 46: train 0.000921 val 0.001386
+epoch 47: train 0.001004 val 0.001218
+epoch 48: train 0.000817 val 0.001206
+epoch 49: train 0.000848 val 0.001400
+epoch 50: train 0.000791 val 0.001521
+epoch 51: train 0.000816 val 0.001227
+epoch 52: train 0.000686 val 0.001088
+epoch 53: train 0.000670 val 0.001066
+epoch 54: train 0.000605 val 0.001165
+epoch 55: train 0.000886 val 0.001373
+epoch 56: train 0.000635 val 0.001027
+epoch 57: train 0.000566 val 0.001052
+epoch 58: train 0.000692 val 0.001119
+epoch 59: train 0.000570 val 0.000976
+epoch 60: train 0.000535 val 0.000951
+model saved to models\value_v0.pt
+{
+  "train_seconds": 2.3060359000228345,
+  "val_mse_net": 0.0009513309341855347,
+  "val_mse_material": 0.12538710236549377,
+  "n_train": 103731,
+  "n_val": 20000
+}

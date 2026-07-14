@@ -1,0 +1,6 @@
+=== A0 states (exact value known): depth-2 backup error vs exact ===
+net-only : mean|Δ|=0.0369  max=0.2369
+pincer   : mean|Δ|=0.0000  max=0.0061
+→ pincer removes 100.0% of the net's endgame error
+
+net vs pincer root-value on A0: mean|Δ|=0.0368, >0.01 in 51% of states

@@ -84,7 +84,7 @@ footer { margin-top: 40px; font-size: 12px; color: #9ca3af; text-align: center; 
 </style></head>
 <body><div class="wrap">
 <div class="top"><a class="back" href="../index.html">← ハブに戻る</a>
-<span class="meta">更新 07-13 ・ AI_MASTER_PLAN_V2.md</span></div>
+<span class="meta">更新 07-14 ・ AI_MASTER_PLAN_V2.md</span></div>
 <article class="doc"><h1>計画書 AI_MASTER_PLAN_V2</h1>
 <h1 id="complete-ai-v2-off-ai">Complete AI マスタープラン V2 — ミラー・リバーシ OFF 最強 AI</h1>
 <p>作成日: 2026-07-12
@@ -251,10 +251,32 @@ footer { margin-top: 40px; font-size: 12px; color: #9ca3af; text-align: center; 
 <li>内容: named NTP 方策一式・旧ベスト PPO 2 モデルとの対戦、<strong>BR 攻撃</strong>(既存 MaskablePPO 基盤を攻撃者として凍結エージェントに 250k steps × 複数 seed 訓練)、行動レポート。</li>
 <li>完了条件: §6 の全ゲート通過 + ユーザー最終承認。</li>
 </ul>
-<h3 id="n7">N7. 反復強化(継続・任意)</h3>
+<h3 id="n7">N7. 反復強化(継続) — 「深さを掘る以外」で強くする</h3>
+<p>戦略考察と設計案の全文は <code>N7_STRATEGY_AND_DESIGN.md</code>。要旨:</p>
 <ul>
-<li>depth 引き上げ、データ増、ネット拡大、コアの Rust 化、γ 感度(0.997〜0.999)最終確定、弱点局面の的当て学習。</li>
+<li><strong>族(LP バックアップ探索 + 価値ネット + fitted Nash-VI)は変えない。</strong> これは AlphaZero を同時手番
+  ゼロ和に正しく一般化した先。MuZero/CFR/PSRO への乗り換えは真のボトルネック(長期スキルの信用割当)を
+  解かず、完全情報+厳密シミュレータの強みを捨てるので不採用。</li>
+<li><strong>深さ4は主戦略にしない。</strong> 遅効性スキル(セメント/ストック/ロック)は約10プライ先で報われ、深さ4
+  (葉+2プライ)では構造的に届かない。真のレバーは <strong>価値ネットの長期精度と訓練カバレッジ</strong>
+  (ネットが完璧なら深さ1で足りる=深さ探索は穴埋めにすぎない)。</li>
 </ul>
+<p>採用する強化路線(優先度順):</p>
+<ul>
+<li><strong>A(本命)— 到達可能サブグラフ Nash 値反復</strong>: 決定論+完全情報を使い切り、深さを掘らずに長期価値を
+  サブグラフ全域へ伝播させて教師値を作る。A0 厳密DBの機構(<code>packed_vi</code> の <code>_enumerate</code>/<code>_jacobi_sweep</code>/
+  <code>PackedEndgameDB</code>、A0=33.4万状態を54スイープ25秒で収束の実績)を「閉じた宇宙→サンプリング領域+
+  フロンティアをネットで閉じる」形に一般化。教師差し替えで B/C/D すべての土台になる。</li>
+<li><strong>B — 価値ネットの構成エンコーダ化</strong>: フラット特徴で潰れる非線形スキルコンボを、保持スキル集合/盤面への
+  集合・注意エンコーダで表現。A の後(厚い教師の後)が相性最良。</li>
+<li><strong>C — 選択的/最良優先探索(smarter, not deeper)</strong>: 均衡台(support)上の重要ラインだけ深掘りする反復
+  深化で、深さ4同コストで実効深さ6〜8。A と並行可。</li>
+<li><strong>D — 深さ4教師</strong>: インフラ完成済みで安価。A の効果測定の対照(=深さでは届かないことの実証)に随時活用。</li>
+</ul>
+<p>(旧 N7 メモ: depth 引き上げ、データ増、ネット拡大、コアの Rust 化、γ 感度 0.997〜0.999 最終確定、
+弱点局面の的当て学習 — これらは上記に統合/継続。)</p>
+<p>想定順序: A(先行)→ C は A と並行可 → B は A の後 → D は随時。各フェーズ末に確認成果物+解釈を提示し
+ユーザー承認後に次へ。</p>
 <p>想定順序は N1 → N2 → N3 → N4 → N5 → N6(→ N7 反復)。N2 と N3 は一部並行可。</p>
 <hr />
 <h2 id="6">6. 採用ゲート(最終合格条件)</h2>
@@ -322,7 +344,29 @@ footer { margin-top: 40px; font-size: 12px; color: #9ca3af; text-align: center; 
 <li>[x] N5 承認(2026-07-13 ゲート再定義込みで承認済み)</li>
 <li>[ ] N6: 評価ゲート全通過(§6)</li>
 <li>[ ] N6 最終承認 = ミラー・リバーシ OFF 最強 AI v1 完成</li>
-<li>[ ] N7: 反復強化(継続)</li>
+<li>[ ] N7: 反復強化(継続) — 戦略再検討完了(2026-07-14、<code>N7_STRATEGY_AND_DESIGN.md</code>)。族は維持、深さは主戦略にしない方針を確立。採用路線 A(サブグラフNash-VI・本命)/B(構成エンコーダ)/C(選択的探索)/D(深さ4・対照)。設計案 A/B/C 執筆済み、実装は A から着手予定</li>
+<li>[~] N7-A: 到達可能サブグラフ Nash 値反復 — A1〜A6 完了・<strong>実現可能性実証(2026-07-14)</strong>。<ul>
+<li>A1〜A4: <code>complete_solver/subgraph_vi.py</code>(開サブグラフ Nash-VI、<code>packed_vi</code> の sweep/repair を無改造再利用)+ 参照テスト3件。A0 厳密宇宙で閉集合=solve_universe一致・開集合+厳密境界=真値回復を実証(全3件PASS)。</li>
+<li>A5〜A6: <code>complete_ai/graph_teacher.py</code>(ネット結線)+ <code>complete_ai/n7a_feasibility.py</code>(実測)。<strong>グラフVI教師は生ネットより対A0厳密値で一様に良い</strong>(mean_abs ほぼ半減 0.14→0.06、spearman +0.07〜0.09)=案Aの狙い(深さを掘らず長期信号注入)を小規模実証。ストール検知追加。</li>
+<li>①ダンピング(ω=0.5)で plateau 解消済み(converged 9.9e-7、精度不変=不動点保存を実証)。②世代ループ結線済み(<code>generation_loop --teacher graph-vi</code>)。③実ゲーム端到端スモークOK(ω=0.5 clean収束)。</li>
+<li>本番12世代 graph-vi 完走(別名空間 tag=gvi、深さ12世代ベースライン保存)。<strong>a0相関で全世代 深さ版を上回る</strong>(final 0.8189 vs 0.8143、教師改善を実証)。ただし<strong>リトマス(序盤セメント&gt;終盤)は両モデルとも未達</strong>(序盤0% vs 終盤~4.5%)。長期スキル使用は微増(セメント0.30→0.38%)。</li>
+<li>新ボトルネック=<strong>カバレッジ密度</strong>(frontier率89%・種がオンポリシーのみ)。generation_loop に <code>--tag</code> 名前空間 + <code>--graph-coverage</code>(ランダムウォーク種)追加済み。</li>
+<li><strong>カバレッジ強化実験(gvicov 12世代)完了 — 正直な結論: リトマス依然未達</strong>。3モデル序盤セメント全て0%(depth/gvi/gvicov)、セメント総使用は微増(0.31→0.45%)のみ。<strong>構造的限界を特定</strong>: frontier88%の境界ネットの盲点(セメントの~10プライ先payoffを知らない)が内部へ伝播し、graph-VIは「ネットに無い長期信号」を作れない。→ A は教師品質改善としては確立だが長期スキル開花は A+カバレッジ単体では不可。真の突破は世代横断の大量種蓄積/別機構が要る(貴重な負の結果)</li>
+</ul>
+</li>
+<li>[ ] N7-B: 価値ネット構成エンコーダ化(設計済み、A の後)</li>
+<li>[~] N7-C: 選択的/最良優先探索 — 実装+実証+実戦搭載(2026-07-14)。<code>complete_ai/selective_search.py</code>(support上のみ深掘りする反復深化、tau&lt;0=uniform一致で検証、3件PASS)。<strong>選択的で uniform depth-3 を約130分の1のセル数(値差0.019)、depth-5 が uniform depth-3 の約1/13コスト</strong>。<strong><code>SelectiveSearcher.solve()</code> を BatchedSearcher と同 signature で実装→実戦エージェントに drop-in、<code>play_cli --selective-depth</code></strong>。検証: 同一ネットで selective vs 深さ2 = 深さ4 0.525/深さ5 0.558(単調に強い、追加学習ゼロ)。残: <strong>njit コンパイル版</strong>(exploitability測定/深さ5教師を解禁する本命ピース)</li>
+<li><strong>方針確定(2026-07-14)</strong>: リトマス(長期スキル開花)は非目標化。最優先=値の正確さ/exploitability(神視点最適解への近さ)。未使用スキルは最適解で真に不使用の可能性ありとユーザー明言</li>
+<li><strong>~~【決定的】exploitability 比較(2026-07-14)~~【撤回: バグの産物と判明】</strong>: 旧測定 graph-vi 0.440 vs depth 0.540 は<strong>バグ版モデルでの測定</strong>。バグが depth 側を不当に悪化させていた。→ 下記の修正済み再測定で撤回。</li>
+<li><strong>【更新】exploitability 修正済み再測定(2026-07-14)</strong>: 修正済み両モデルに BR攻撃者(PPO 150k×2seed)を再学習。<strong>graph-vi worst 0.487(PASS) vs depth worst 0.480(PASS)</strong> =<strong>両者ほぼ同値(差0.007=ノイズ内)、どちらも非搾取</strong>。バグ修正で depth が 0.540 FAIL→0.480 PASS へ大改善。a0 も僅差(gvi 0.8375 vs depth 0.8352)。→ <strong>「graph-vi 明確優位=本採用確定」の根拠は消失。両者ほぼ同等が正直な現状</strong>。決着は graph-BR(厳密exploitability)finalize 待ち。data/n6_br_attack_{gvi,depth}.json。<strong>本採用モデルの選択はユーザー判断待ち</strong></li>
+<li><strong>スキップ局面バグ修正の再生成【範囲完遂】(2026-07-14)</strong>: <code>_matrix_value</code> 証明失敗ノードで mid プレースホルダを採用していた <code>expand_depth3</code>/<code>root_value_only</code> バグの修正後、<strong>本採用 graph-vi 本番モデルだけがバグ教師のまま(a0 0.8189)放置</strong>されていたのを発見。v0アンカー→graph-vi 12世代→depth 12世代を修正済みコードで統一再生成。<strong>graph-vi a0 0.8189→0.8375(+0.019)</strong>、depth 0.8352。回帰テスト <code>test_extra_turn_state_matches_exact_solver</code> PASSで修正有効化を確認。<strong>A0厳密DB/graph-vi内部は影響なし</strong>と確定(<code>packed_vi._jacobi_sweep</code>+<code>_repair_state_value</code> が失敗セルをscipy厳密修復して公開=前回宿題「VI側修復の妥当性」を解決)。退避 archive_pre_rerun_2026-07-14/。litmusは未逆転(非目標)。<strong>要更新: 下記 exploitability 比較(0.440 vs 0.540)は旧バグ版での測定 → 修正済みモデルで再測定待ち</strong></li>
+<li><strong>レジーム切替の定量確認(2026-07-14、Part 6-3c)</strong>: タイム発動中はネット絶対誤差+25〜32%悪化(両ネット一貫)。相手はタイムを使えるので非搾取性にレジーム対応必須。挟み撃ちテーブルはタイム/ストック次元込みで。計器 <code>n7_regime_slices.py</code></li>
+<li><strong>graph-BR(厳密exploitability)機構構築(2026-07-14、<code>graph_br.py</code>)</strong>: 連立VI(V_mover/V_reactor)で攻撃者の厳密BR。小規模で収束・式健全。<strong>但し到達集合(攻撃者任意×凍結support)は40万でも閉じず(&gt;400k、推定10^6)、純Python列挙555状態/秒=実用外</strong>。finalize要: 凍結方策バッチ化+VI njit化 or 深さ制限BR+厳密終盤テーブル葉(挟み撃ち)。当面 exploitability 主指標は PPO 版。予備数値0.65は打ち切り過大で信用不可</li>
+<li>[ ] <strong>N7-E(TODO・保留): graph-BR finalize = 未使用スキルによる搾取可能性の厳密判定</strong>。ユーザー懸念(2026-07-14): 「ストック/ロック/セメント/チャージ/タイム等、今ほぼ0%のスキルが神視点では実は強く、それを駆使する方策が現行モデルを搾取できるのでは?」。<strong>現時点で否定不能=実在リスク</strong>(理由: 唯一の厳密計算A0はストックレス終盤のみ/PPO-BRは長期スキルに弱い下界で盲点あり/2モデルは分布ほぼ同一=同じ盲点を共有→第三の方策が両者を破りうる)。決着には graph-BR をストック・タイム次元込みで finalize する必要(凍結方策バッチ化+連立VI njit化 or 深さ制限BR+厳密終盤テーブル葉)。<strong>重い作業につき保留</strong>。安価な部分検証として A0厳密(ストックレス終盤)の神視点policy vs モデルを先行(下記 N7-F)</li>
+<li>[x] <strong>N7-F: A0厳密の神視点 policy vs モデル policy 比較(2026-07-14 完了)</strong>。神=mask=0の1手LP+<code>solve_small_zero_sum</code>混合、<strong>LP値=A0値(max|Δ|2.8e-10)で正しさ保証</strong>、8000局面。<strong>結果(ストックレス終盤): 神も ロック/セメント/チャージ/タイム/ガード/ストック=すべて0.0% → これらの不使用は盲点でなく終盤では最適=懸念は終盤についてはシロ</strong>。唯一の差: モデルはフェイント使いすぎ(神0% vs 6.6〜7.0%)+数字宣言少なめ(神47.3% vs 39.8%)=軽微。A0 DB は現行ルールで再ビルド一致(209,698状態・値max|Δ|1.2e-6)=currency確定、data/endgame_h11_A0_current.npz。<strong>限界: ストック自体と序盤の価値は測定不可 → graph-BR(N7-E)待ち</strong></li>
+<li>[x] <strong>N7-F(a): 終盤マージ=A0厳密テーブルを実戦エージェントに接続(2026-07-14 完了)</strong>。<code>complete_ai/endgame_table.py</code>(<code>EndgameTablebase</code>: A0値を葉にした1手LPで厳密最適mixtureを返す、BatchedSearcher.solveと同signature、状態キャッシュ付)+ <code>SearchAgent(endgame=)</code> drop-in + <code>play_cli</code>(既定ON、<code>--no-endgame-table</code>)。<strong>適用範囲=両者手1本かつストック無</strong>(それ以外はネットへフォールバック)。文脈(ガード/タイム/必殺/参照スキル)は状態キーに内包され自動反映。単体テスト4件PASS(値=A0一致1e-6・分布妥当・境界・エージェント経由でネット不呼出)。<strong>実測: (1,1)手の89.5%で発火、発火局面のフェイント率0.00%=神と完全一致(=「フェイント使いすぎ」ズレを是正)</strong>。残10.5%はh11閉包外の(1,1)。</li>
+<li>[x] <strong>N7-F(b): 挟み撃ち(pincer)=探索の葉をA0厳密値に差替(2026-07-14 完了)</strong>。<code>endgame_table.PincerSearcher</code>(BatchedSearcherの<code>_net_values</code>だけをoverride: 葉キーがA0にあれば厳密値、無ければネット値。<strong>訓練/nogil経路は非改変=対局専用</strong>)。<code>play_cli</code> は endgame有効時にpincerを既定採用(selective時を除く)。単体テスト追加(A0局面でpincer値=厳密値, max|Δ|&lt;0.02)。<strong>実測(1500 A0局面): 深さ2バックアップ誤差 net-only mean0.037/max0.24 → pincer mean0.0000/max0.006 = ネット終盤誤差をほぼ100%除去、net vs pincerで値&gt;0.01差が51%</strong>。→ 終盤"手前"の判断もネット誤差なしに。次: play_server配線(任意・EXE要再ビルド)、A0閉包を実(1,1)入口へ拡張で発火率↑</li>
+<li>[ ] N7-D: 深さ4教師(インフラ完成済み、随時)</li>
 </ul>
 <h2 id="9">9. 記録</h2>
 <ul>

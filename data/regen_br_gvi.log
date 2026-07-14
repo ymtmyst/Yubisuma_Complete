@@ -1,0 +1,11 @@
+Gym has been unmaintained since 2022 and does not support NumPy 2.0 amongst other critical functionality.
+Please upgrade to Gymnasium, the maintained drop-in replacement of Gym, or contact the authors of your software and request that they upgrade.
+Users of this version of Gym should be able to simply replace 'import gym' with 'import gymnasium as gym' in the vast majority of cases.
+See the migration guide at https://gymnasium.farama.org/introduction/migration_guide/ for additional information.
+=== BR attacker seed 0 ===
+trained in 737s; evaluating...
+seed 0: {"episodes": 300, "attacker_wins": 146, "attacker_losses": 154, "truncations": 0, "attacker_winrate": 0.4866666666666667, "train_seconds": 737.3829405999859}
+=== BR attacker seed 1 ===
+trained in 879s; evaluating...
+seed 1: {"episodes": 300, "attacker_wins": 141, "attacker_losses": 159, "truncations": 0, "attacker_winrate": 0.47, "train_seconds": 879.4840482000145}
+GATE: worst attacker winrate 0.487 (PASS)

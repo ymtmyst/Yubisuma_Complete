@@ -1,0 +1,14 @@
+enumerated 209698 states in 0.5s
+tables: 13092016 cells (0.3s, 52MB)
+sweep 10 max_delta 2.337e-02 repairs 0
+sweep 20 max_delta 5.495e-05 repairs 0
+sweep 30 max_delta 1.669e-07 repairs 0
+sweep 40 max_delta 6.929e-10 repairs 0
+VI: 40 sweeps, delta=6.93e-10, 9.1s, converged=True
+BUILD INFO: {'states': 209698, 'cells': 13092016, 'vi_seconds': 9.134543600026518}
+saved c:\Users\tktho\Documents\★Download\yubisuma\Complete\data\endgame_h11_A0_current.npz n= 209698 mask= 0
+
+stored n=209698  new n=209698  mask old=0 new=0
+common=209698 only_old=0 only_new=0
+value |Δ| on common: max=1.181e-06 mean=1.107e-08 >1e-6: 8
+STALE

@@ -111,12 +111,45 @@ def main() -> None:
     parser.add_argument("--start-model", default="models/value_v0.pt")
     parser.add_argument("--start-generation", type=int, default=1)
     parser.add_argument("--threads", type=int, default=8,
-                        help="threads for depth-3 target generation")
+                        help="threads for depth target generation")
+    parser.add_argument("--target-depth", type=int, default=3, choices=(3, 4),
+                        help="LP-backup depth for training targets (acting "
+                             "stays depth 2)")
+    parser.add_argument("--teacher", default="depth",
+                        choices=("depth", "graph-vi", "selective"),
+                        help="training-target source: fixed-depth LP backup "
+                             "(default), N7-A sub-graph Nash-VI (long horizon), "
+                             "or N7-C selective deepening (deep on support)")
+    parser.add_argument("--sel-depth", type=int, default=5,
+                        help="selective teacher: deepening depth")
+    parser.add_argument("--sel-tau", type=float, default=0.05,
+                        help="selective teacher: support threshold")
+    parser.add_argument("--graph-max-stock", type=int, default=3,
+                        help="graph-vi teacher: max stock in the transition "
+                             "model (domain: 4+ never worth considering)")
+    parser.add_argument("--graph-omega", type=float, default=0.5,
+                        help="graph-vi teacher: Jacobi under-relaxation factor")
+    parser.add_argument("--graph-coverage", type=int, default=0,
+                        help="graph-vi teacher: add this many random-walk "
+                             "reachable states to the interior seeds (neutral "
+                             "coverage of long-horizon-skill lines that "
+                             "on-policy self-play never reaches). 0 = off.")
+    parser.add_argument("--tag", default="",
+                        help="output namespace: files become "
+                             "selfplay_<tag>_gen*.npz / value_<tag>_gen*.pt / "
+                             "n4_<tag>_generations.jsonl / value_<tag>_latest.pt. "
+                             "Empty = legacy names. Use to run an experiment "
+                             "(e.g. --tag gvi) without clobbering another run.")
     args = parser.parse_args()
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"device: {device}", flush=True)
     model = load_model(Path(args.start_model), device)
+
+    # Output namespace: keep parallel experiments (e.g. graph-vi vs depth) in
+    # separate files so neither run overwrites the other's generations/log.
+    pfx = f"{args.tag}_" if args.tag else ""
+    log_path = DATA_DIR / f"n4_{pfx}generations.jsonl"
 
     for gen in range(args.start_generation, args.start_generation + args.generations):
         print(f"=== generation {gen} ===", flush=True)
@@ -127,20 +160,83 @@ def main() -> None:
             searcher, n_games=args.games, epsilon=args.epsilon, seed=gen
         )
         # Deeper training targets (N4b core): act at depth 2, learn from
-        # depth-3 net-leaf backups so slow skills' payoffs fall inside the
-        # credit-assignment horizon (designer diagnosis 2026-07-13).
+        # depth-3/4 net-leaf backups so slow skills' payoffs fall inside the
+        # credit-assignment horizon (designer diagnosis 2026-07-13). --target-
+        # depth 4 extends the horizon one more ply (N7).
         keys0, keys1 = result["keys0"], result["keys1"]
         t_targets = time.perf_counter()
-        deep = parallel_depth3_values(
-            model, device, keys0, keys1, prune_stock=True, n_threads=args.threads
-        )
+        if args.teacher == "graph-vi":
+            # N7-A: seed a sub-graph with the self-play states (connected
+            # trajectories ⇒ denser interior), close the frontier with the net,
+            # and solve Nash-VI so long-horizon value propagates across the
+            # whole sampled region — reaching delayed-payoff skills that a fixed
+            # depth-2/3 backup cannot see. Values return aligned to keys0/keys1.
+            from .graph_teacher import graph_vi_teacher, random_walk_seeds
+            if args.graph_coverage > 0:
+                # Augment interior with neutral random-walk coverage so long-
+                # horizon-skill lines (unreached by on-policy self-play) enter
+                # the sub-graph; train on the FULL augmented set.
+                rw0, rw1 = random_walk_seeds(args.graph_coverage, seed=gen)
+                stacked = np.vstack([
+                    np.stack([keys0, keys1], axis=1),
+                    np.stack([rw0, rw1], axis=1),
+                ])
+                uniq = np.unique(stacked, axis=0)
+                keys0 = np.ascontiguousarray(uniq[:, 0])
+                keys1 = np.ascontiguousarray(uniq[:, 1])
+                result["keys0"], result["keys1"] = keys0, keys1
+            deep, tab, gvi = graph_vi_teacher(
+                model, device, keys0, keys1,
+                max_stock=args.graph_max_stock, gamma=0.999,
+                omega=args.graph_omega,
+            )
+            # Sub-graph VI works in float64; training targets/features are
+            # float32 (match the depth teacher, else loss.backward dtype-clashes).
+            deep = deep.astype(np.float32)
+            print(
+                f"graph-vi targets: {tab.n_seed} interior + {tab.n_front} "
+                f"frontier ({tab.frontier_fraction*100:.1f}%), "
+                f"{gvi['iterations']} sweeps {gvi['vi_seconds']:.0f}s, "
+                f"converged={gvi['converged']} stalled={gvi['stalled']} "
+                f"max_delta={gvi['max_delta']:.1e} "
+                f"({time.perf_counter() - t_targets:.0f}s)",
+                flush=True,
+            )
+        elif args.teacher == "selective":
+            # N7-C: deep-on-support selective values as targets. Reads the
+            # equilibrium support to sel_depth (far deeper than depth-3) at a
+            # fraction of a uniform deep search's cost — a MORE ACCURATE teacher
+            # (the compounding lever: net fits its teacher, so a better teacher
+            # → a better net). Pure-Python for now (slow ~0.3s/state at d5);
+            # njit compilation is the scale unlock if this proves out.
+            from .selective_search import SelectiveSearcher
+            ss = SelectiveSearcher(model, device, prune=True,
+                                   depth=args.sel_depth, tau=args.sel_tau)
+            deep = np.array(
+                [ss.value(int(k0), int(k1), args.sel_depth, args.sel_tau)
+                 for k0, k1 in zip(keys0, keys1)],
+                dtype=np.float32,
+            )
+            print(
+                f"selective-d{args.sel_depth} targets: {len(deep)} states "
+                f"({time.perf_counter() - t_targets:.0f}s)",
+                flush=True,
+            )
+        else:
+            # Deeper training targets (N4b core): act at depth 2, learn from
+            # depth-3/4 net-leaf backups so slow skills' payoffs fall inside the
+            # credit-assignment horizon (designer diagnosis 2026-07-13).
+            deep = parallel_depth3_values(
+                model, device, keys0, keys1, prune_stock=True,
+                n_threads=args.threads, depth=args.target_depth,
+            )
+            print(
+                f"depth-{args.target_depth} targets: {len(deep)} states "
+                f"({time.perf_counter() - t_targets:.0f}s)",
+                flush=True,
+            )
         result["targets"] = deep
-        print(
-            f"depth-3 targets: {len(deep)} states "
-            f"({time.perf_counter() - t_targets:.0f}s)",
-            flush=True,
-        )
-        gen_path = DATA_DIR / f"selfplay_gen{gen:03d}.npz"
+        gen_path = DATA_DIR / f"selfplay_{pfx}gen{gen:03d}.npz"
         save_generation(result, gen_path)
         print(
             f"selfplay: {len(result['targets'])} states, "
@@ -152,7 +248,7 @@ def main() -> None:
         # Train a fresh copy so a bad generation can be rolled back.
         new_model = ValueNet().to(device)
         new_model.load_state_dict(model.state_dict())
-        recent = sorted(DATA_DIR.glob("selfplay_gen*.npz"))[-REPLAY_GENERATIONS:]
+        recent = sorted(DATA_DIR.glob(f"selfplay_{pfx}gen*.npz"))[-REPLAY_GENERATIONS:]
         # Anchor replay (N4b): keep the broad v0 dataset in every training
         # set so on-policy fine-tuning cannot silently forget rare regions.
         anchor = DATA_DIR / "value_v0_dataset.npz"
@@ -170,7 +266,7 @@ def main() -> None:
         spearman = a0_spearman(new_model, device)
         print(f"a0 spearman: {spearman:.4f}", flush=True)
 
-        model_path = MODEL_DIR / f"value_gen{gen:03d}.pt"
+        model_path = MODEL_DIR / f"value_{pfx}gen{gen:03d}.pt"
         torch.save(
             {"state_dict": new_model.state_dict(), "feature_size": FEATURE_SIZE},
             model_path,
@@ -188,7 +284,7 @@ def main() -> None:
             "gen_seconds": time.perf_counter() - t0,
             "model": str(model_path),
         }
-        with open(LOG_PATH, "a", encoding="utf-8") as fh:
+        with open(log_path, "a", encoding="utf-8") as fh:
             fh.write(json.dumps(record) + "\n")
 
         # Accept unless clearly worse (fitted VI: value accuracy is the goal,
@@ -200,7 +296,7 @@ def main() -> None:
 
     torch.save(
         {"state_dict": model.state_dict(), "feature_size": FEATURE_SIZE},
-        MODEL_DIR / "value_latest.pt",
+        MODEL_DIR / f"value_{pfx}latest.pt",
     )
     print("DONE", flush=True)
 
