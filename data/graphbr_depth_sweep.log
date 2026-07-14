@@ -1,0 +1,6 @@
+endgame 209,698 states; frozen = pincer (deployed agent)
+
+  D   states   egLeaf    dLeaf  hitCap   seat0   seat1  winrate  enum+vi(s)
+  4     9378    17247   974088   False   0.094  -0.026   0.5169         109
+  6   250000   247148 19188521    True   0.186   0.088   0.5684        3285
+   (hit cap → set too big at this depth; stop)

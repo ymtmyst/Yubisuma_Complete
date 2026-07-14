@@ -49,8 +49,18 @@ def _solve_cached(searcher, cache, key):
 
 
 def enumerate_br(searcher, cap: int = 200_000, support_eps: float = 1e-3,
-                 verbose: bool = True):
+                 endgame=None, max_depth=None, verbose: bool = True):
     """BFS the reachable graph under attacker-any × frozen-support.
+
+    If ``endgame`` (an :class:`~complete_ai.endgame_table.EndgameTablebase`) is
+    given, any child state it contains is treated as an EXACT leaf and NOT
+    expanded (pincer / N7-F): the frozen agent plays the certified-optimal
+    endgame there, so a best-responding attacker gets exactly the game value —
+    ``A0[child]`` to the mover — with no room to exploit. This caps the back of
+    the graph at the endgame boundary, replacing the optimistic over-cap leaf
+    (value 0) with the true value and dramatically shrinking the reachable set.
+    Endgame leaves are recorded with child index ``-3`` and the A0 value carried
+    in the reward slot; :func:`solve_br` decodes them by role/status.
 
     Returns a dict of parallel arrays/lists keyed by state index.
     """
@@ -58,9 +68,12 @@ def enumerate_br(searcher, cap: int = 200_000, support_eps: float = 1e-3,
     tp_buf = np.zeros(96, dtype=np.int64)
     ntp_buf = np.zeros(16, dtype=np.int64)
     solve_cache: dict[tuple[int, int], tuple] = {}
+    n_endgame_leaves = 0
+    n_depth_leaves = 0
 
     index: dict[tuple[int, int], int] = {(int(init0), int(init1)): 0}
     order = [(int(init0), int(init1))]
+    depth = [0]                       # BFS depth per state (parallel to order)
     # per-state cell records for the two roles:
     #   mover_cells[i]   = list of (child_index_or_-1, status, reward, weight)
     #     grouped by tp-row → we store as (n_tp, list per row of (idx,status,rew,w))
@@ -82,11 +95,29 @@ def enumerate_br(searcher, cap: int = 200_000, support_eps: float = 1e-3,
         supp_ntp = np.where(ntp_pol > support_eps)[0]
 
         def child_of(tc, nc):
+            nonlocal n_endgame_leaves, n_depth_leaves
             c0, c1, status, reward = step(np.int64(s0), np.int64(s1),
                                           np.int64(tc), np.int64(nc), _FULL)
             if int(status) == 2:
                 return -1, 2, float(reward)
             key = (int(c0), int(c1))
+            if endgame is not None:
+                a0 = endgame.value(key[0], key[1])
+                if a0 is not None:
+                    # Exact endgame leaf: carry A0 value (mover's view) in the
+                    # reward slot; -3 marks it for solve_br's role decode.
+                    n_endgame_leaves += 1
+                    return -3, int(status), float(a0)
+            if max_depth is not None and depth[i] + 1 >= max_depth:
+                # Depth-limited leaf: beyond the horizon, cap with the FROZEN
+                # agent's own value estimate V_net(child) (mover's view) — i.e.
+                # assume play is game-fair from here. Decoded identically to an
+                # endgame leaf (-3). This UNDER-counts the attacker (it stops
+                # best-responding past depth D), so the estimate rises toward the
+                # true exploitability as max_depth grows.
+                n_depth_leaves += 1
+                v = _solve_cached(searcher, solve_cache, key)[0]
+                return -3, int(status), float(v)
             ci = index.get(key)
             if ci is None:
                 if len(order) >= cap:
@@ -94,6 +125,7 @@ def enumerate_br(searcher, cap: int = 200_000, support_eps: float = 1e-3,
                 ci = len(order)
                 index[key] = ci
                 order.append(key)
+                depth.append(depth[i] + 1)
                 mover_rows.append(None)
                 reactor_cols.append(None)
             return ci, int(status), 0.0
@@ -124,9 +156,13 @@ def enumerate_br(searcher, cap: int = 200_000, support_eps: float = 1e-3,
 
     if verbose:
         print(f"enumerated {len(order)} states in "
-              f"{time.perf_counter()-t0:.0f}s (cap {cap})", flush=True)
+              f"{time.perf_counter()-t0:.0f}s (cap {cap}, "
+              f"endgame leaves {n_endgame_leaves}, depth leaves {n_depth_leaves})",
+              flush=True)
     return {"order": order, "mover_rows": mover_rows,
-            "reactor_cols": reactor_cols, "n": len(order)}
+            "reactor_cols": reactor_cols, "n": len(order),
+            "endgame_leaves": n_endgame_leaves,
+            "depth_leaves": n_depth_leaves}
 
 
 def solve_br(data, gamma: float = 0.999, max_iters: int = 4000,
@@ -139,6 +175,11 @@ def solve_br(data, gamma: float = 0.999, max_iters: int = 4000,
     def child_val(ci, st, rew, Vm, Vr):
         if st == 2:
             return rew            # terminal reward to the mover (=attacker here)
+        if ci == -3:
+            # Exact endgame leaf: rew = A0 value (mover's view). Attacker was
+            # mover here; if the turn is kept (st 1) the attacker is still mover
+            # at the child (V_mover = A0), else it flips to reactor (V = -A0).
+            return gamma * (rew if st == 1 else -rew)
         if ci < 0:
             # over-cap leaf: value unknown. Returning 0 (neutral) is OPTIMISTIC
             # for a maximizing attacker (0 > many real losses) ⇒ hitting the cap
@@ -153,6 +194,12 @@ def solve_br(data, gamma: float = 0.999, max_iters: int = 4000,
         # status 0 flips to attacker-mover.
         if st == 2:
             return -rew
+        if ci == -3:
+            # Endgame leaf, attacker was reactor: frozen (mover) secures A0, so
+            # attacker gets -A0 if frozen keeps the move (st 1, attacker stays
+            # reactor → V_reactor=-A0); if it flips (st 0) attacker becomes mover
+            # → V_mover = A0.
+            return gamma * (-rew if st == 1 else rew)
         if ci < 0:
             return 0.0
         return gamma * (Vr[ci] if st == 1 else Vm[ci])

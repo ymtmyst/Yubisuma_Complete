@@ -931,6 +931,29 @@ footer { margin-top: 40px; font-size: 12px; color: #9ca3af; text-align: center; 
 <li><strong>検証(1500 A0局面, scratchpad/verify_pincer.py)</strong>: 深さ2バックアップの対厳密誤差 <strong>net-only mean0.0369/max0.237 → pincer mean0.0000/max0.006 = ネット終盤誤差をほぼ100%除去</strong>。net vs pincer で root値が&gt;0.01違う局面が51%(=厳密情報が終盤評価の半分を実際に書き換え)。単体テスト <code>TestPincerSearcher</code>(A0局面でpincer値=厳密, max|Δ|&lt;0.02)PASS。endgame_table全5件PASS。end-to-endスモーク300局 打切0・勝率0.497(均衡で鈍感=想定内)。</li>
 <li><strong>平易版</strong>: 探索の"読みの終端"が終盤の正解表に触れたら、ネットの勘ではなく厳密値を使うようにした。結果、終盤の値の勘違い(平均3.7%・最大24%)がほぼゼロに。終盤そのものだけでなく、終盤に入る"手前"の判断も正確になる。</li>
 <li><strong>残候補</strong>: play_server配線(任意・EXE再ビルド要)/ A0閉包を実ゲームの(1,1)入口へ拡張で発火率89.5%↑ / graph-BR(N7-E, ストック・序盤の本丸, 保留)。</li>
+</ul>
+<h3 id="graph-br-finalize-2026-07-14go-python">graph-BR finalize 着手(2026-07-14、ユーザーGo) — 挟み撃ちで前進も純Python厳密は壁</h3>
+<ul>
+<li><strong>実装</strong>: <code>graph_br.enumerate_br</code> に<strong>終盤テーブルキャップ</strong>(endgame=)追加=A0局面を厳密リーフ化(-3, A0値をrewに、solve_brがrole/statusで符号デコード)。凍結エージェントを<strong>実配信版(PincerSearcher)</strong>に統一(n7_graph_br)。符号ロジック再導出で正当確認、小cap(4000)で収束・正常値(0.634=cap汚染の上界)。</li>
+<li><strong>【決定的】厳密graph-BRは純Pythonで不可能と確定</strong>: 終盤キャップは強力(338,841局面を厳密リーフ化)だが、<strong>非終盤の到達集合はcap40万でも閉じない</strong>(frontierピーク32万→cap頭打ち、639秒)。攻撃者のストック/中盤の分岐爆発が支配的(メモ推定10^6を実証)。</li>
+<li><strong>深さ制限BR実装</strong>(<code>enumerate_br(max_depth=)</code>): 深さDの先の非終盤リーフを凍結ネット値<code>solve(child)[0]</code>でキャップ(=D先はフェア想定、真値をやや下回る下界寄り、-3同機構で符号デコード)。<code>n7_graph_br --max-depth</code>。</li>
+<li><strong>深さ掃引結果(凍結=pincer, gvi model)</strong>:</li>
+<li><strong>D=4: exploitability 0.5169</strong>(9,378状態, クリーン)</li>
+<li><strong>D=5: 0.5283</strong>(65,946状態, クリーン, 636秒)</li>
+<li>D=6: 到達集合&gt;25万でcap到達→0.5684は超過リーフ楽観値汚染で信用不可。純Python VIも250kで約55分=非現実的。</li>
+<li><strong>【所見】exploitabilityは深さで単調上昇し頭打ちにならない(0.517→0.528→…)</strong>=厳密BRは深く読むほど搾取を見つけ続ける=<strong>深い(ストック等の長期)搾取が存在する示唆</strong>。席別: 攻撃者先手(seat0)の方が搾取大(値0.119 vs 反応side -0.006)。</li>
+<li><strong>PPOとの整合</strong>: PPO下界0.44 &lt; 厳密D=4 0.517 &lt; D=5 0.528。厳密BRはPPOより高い=PPOは弱い下界だったことを実証(既知の留保が定量化)。</li>
+<li><strong>平易版</strong>: 「相手が完璧に弱点を突く」を数手ぶんだけ厳密計算できた。結果、AIは僅かに搾取される(4手読みで51.7%、5手で52.8%)。しかも深く読むほど数字が上がり続ける=もっと深いところ(ストック絡み等)に穴がある可能性が濃厚。ただし深い計算は純Pythonでは重すぎて到達できない。</li>
+<li><strong>残(本丸)</strong>: 深いgraph-BRには<strong>njitコンパイル</strong>(列挙のsolveバッチ化+VIのnumpy/njitベクトル化)が必須。これが finalize の本命だが大規模改修。中間策として VIのnumpyベクトル化だけでもD=6-8が射程に入る可能性。<strong>ストック/序盤の搾取可能性は「浅くは小さいが深さで増大、深部は未計測」が現時点の正直な結論</strong>。</li>
+</ul>
+<h3 id="graph-br-njit-2026-07-14go">graph-BR njitフル改修 着手(2026-07-14、ユーザーGo「既存は残し新規で切替可能に」)</h3>
+<ul>
+<li><strong>方針</strong>: 既存 <code>graph_br.py</code>(純Python)は<strong>不変で温存</strong>。新規 <code>complete_ai/graph_br_fast.py</code> に<strong>njit版VIを追加</strong>、<code>n7_graph_br --engine python|njit</code>(既定njit)で<strong>切替可能</strong>。列挙(<code>enumerate_br</code>)は共有(torch/LP依存でnjit不可、両ラインで同一)。</li>
+<li><strong>njit VI の設計</strong>: ①<strong>葉定数折り込み</strong> — 終端/終盤-3/深さ-3/超過-2 のセルは反復値(Vm/Vr)に依存しないので flatten時に per-row 定数へ畳み込み、sweepは<strong>内部エッジ(ci≥0)のみ</strong>走査(D=6で葉19M→内部数M、大幅減)。②<strong>njit連立Jacobi sweep</strong>(nogil, CSR flat配列)。符号規約は <code>solve_br</code> から逐語コピー。</li>
+<li><strong>検証</strong>: <code>tests/test_graph_br_fast.py</code> — 手組みトイ+ランダムfuzz8件で <strong>njit VI == 純Python VI</strong>(winrate 1e-5一致)PASS。endgame系と併せ7件PASS。</li>
+<li><strong>効果</strong>: 従来の律速だったVI(250k状態で約55分)を<strong>njitで実質数秒</strong>に。→ D=6 がクリーンに算出可能になった(従来はVIが壁で不可能)。<strong>残る律速は列挙(torch solve 500状態/秒)</strong> → D≥7 には列挙バッチ化(solve_batch)が次の本丸。</li>
+<li><strong>D=6 クリーン結果(njit, 2026-07-14)</strong>: <strong>exploitability ≈ 0.5368</strong>(346,378状態で閉合 hit_cap=False)。列挙2191s(pincer凍結で158状態/s)、<strong>VI njit 19秒</strong>(371 sweeps 収束、深さリーフ27,986,787+終盤リーフ278,777を内部エッジ7,082,646に畳込)=純Python約45分相当をnjitで19秒に実証。</li>
+<li><strong>【深さトレンド確定・重要】exploitability は単調上昇し頭打ちにならない</strong>: D4 0.5169 / D5 0.5283 / <strong>D6 0.5368</strong>(全クリーン)。増分 +1.14→+0.85pt と減速するが上昇継続 → 幾何的外挿で真値<strong>~0.55-0.56</strong>の可能性。<strong>含意: PPO(0.44)は大幅な過小評価だった。graph-vi モデルは厳密best-responseに対し実際は~0.54+搾取される=「非搾取(≤0.50)」の旧結論は誤り、モデルは測定可能に搾取可能</strong>。深い搾取(ストック等長期筋の可能性)の存在も支持。深部(D7-8で頭打ち確認・ストック起因の切り分け)には列挙バッチ化が必要。log data/graphbr_d6_njit.log。</li>
 <li><strong>平易版</strong>: 2モデルはクセがほぼ同じ。心配だった「ロック/セメント/タイム等を神は使うのに我々は使ってない?」は終盤では"神も使わない"と確定(=穴ではない)。ただしモデルはフェイントを神より多用する軽いクセあり。ストック自体と序盤の価値だけは今回の道具(終盤・ストック抜き)では測れないので、そこはgraph-BR待ちで保留。</li>
 </ul>
 <h3 id="2026-07-14-graph-vi-a0n7-aexploitability-graph-brexploitability-finalize-value_gvi_latestpt-graph_br-finalizevi-njit-or-br-play_cliplay_serverpolicy_report-model-value_latestptdepth-graph-vi-or">【決定(2026-07-14)】本採用 = graph-vi 継続(a0・長期スキル使用で僅優、N7-A本命路線と整合)。exploitability の互角を踏まえ<strong>最終決着は graph-BR(厳密exploitability)の finalize に委ねる</strong>。それまで value_gvi_latest.pt を本採用維持。次アクション候補: graph_br finalize(凍結方策バッチ化+連立VI njit化 or 深さ制限BR+厳密終盤テーブル葉)。<strong>注意: play_cli/play_server/policy_report の既定 --model が value_latest.pt(depth) のため、配信で graph-vi を使うなら明示指定 or 既定変更が必要</strong>。</h3>

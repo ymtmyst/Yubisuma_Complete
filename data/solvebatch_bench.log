@@ -1,0 +1,2 @@
+BatchedSearcher(net)   per-state=3.06s (980/s)  solve_batch=2.63s (1140/s)  speedup=1.16x
+PincerSearcher         per-state=4.02s (747/s)  solve_batch=3.43s (874/s)  speedup=1.17x

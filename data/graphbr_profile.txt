@@ -1,0 +1,38 @@
+states enumerated: 8000
+         13588512 function calls (13445196 primitive calls) in 40.699 seconds
+
+   Ordered by: cumulative time
+   List reduced from 199 to 28 due to restriction <28>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+        1    2.438    2.438   40.700   40.700 C:\Users\tktho\Documents\★Download\yubisuma\Complete\.\complete_ai\graph_br.py:51(enumerate_br)
+     8000    0.038    0.000   28.738    0.004 C:\Users\tktho\Documents\★Download\yubisuma\Complete\.\complete_ai\graph_br.py:43(_solve_cached)
+     8000    1.342    0.000   28.695    0.004 C:\Users\tktho\Documents\★Download\yubisuma\Complete\.\complete_ai\batched_search.py:628(solve)
+     7962    2.442    0.000   15.056    0.002 C:\Users\tktho\Documents\★Download\yubisuma\Complete\.\complete_ai\endgame_table.py:121(_net_values)
+     7962    0.471    0.000   11.013    0.001 C:\Users\tktho\Documents\★Download\yubisuma\Complete\.\complete_ai\batched_search.py:555(_net_values)
+  1134023    7.242    0.000    9.323    0.000 C:\Users\tktho\Documents\★Download\yubisuma\Complete\.\complete_ai\graph_br.py:97(child_of)
+79620/7962    0.210    0.000    6.974    0.001 C:\Users\tktho\AppData\Local\Programs\Python\Python310\lib\site-packages\torch\nn\modules\module.py:1735(_wrapped_call_impl)
+79620/7962    0.270    0.000    6.936    0.001 C:\Users\tktho\AppData\Local\Programs\Python\Python310\lib\site-packages\torch\nn\modules\module.py:1743(_call_impl)
+     7962    0.078    0.000    6.831    0.001 C:\Users\tktho\Documents\★Download\yubisuma\Complete\.\complete_ai\train_v0.py:44(forward)
+     7962    0.295    0.000    6.553    0.001 C:\Users\tktho\AppData\Local\Programs\Python\Python310\lib\site-packages\torch\nn\modules\container.py:248(forward)
+     8000    0.078    0.000    5.009    0.001 C:\Users\tktho\Documents\★Download\yubisuma\Complete\.\complete_solver\small_matrix.py:27(solve_small_zero_sum)
+     7735    3.983    0.001    4.543    0.001 C:\Users\tktho\Documents\★Download\yubisuma\Complete\.\complete_solver\small_matrix.py:91(_solve_by_simplex)
+     8000    4.386    0.001    4.386    0.001 C:\Users\tktho\Documents\★Download\yubisuma\Complete\.\complete_ai\batched_search.py:100(expand_depth2)
+    31848    0.156    0.000    4.118    0.000 C:\Users\tktho\AppData\Local\Programs\Python\Python310\lib\site-packages\torch\nn\modules\linear.py:124(forward)
+    31848    3.909    0.000    3.909    0.000 {built-in method torch._C._nn.linear}
+     8000    0.144    0.000    2.728    0.000 C:\Users\tktho\Documents\★Download\yubisuma\Complete\.\complete_ai\batched_search.py:564(_backup)
+     7962    2.556    0.000    2.556    0.000 C:\Users\tktho\Documents\★Download\yubisuma\Complete\.\complete_ai\batched_search.py:475(backup_children)
+  6918150    2.062    0.000    2.062    0.000 {method 'get' of 'dict' objects}
+     7962    1.293    0.000    1.293    0.000 {method 'to' of 'torch._C.TensorBase' objects}
+     7962    1.216    0.000    1.216    0.000 {method 'cpu' of 'torch._C.TensorBase' objects}
+    23886    0.037    0.000    1.155    0.000 C:\Users\tktho\AppData\Local\Programs\Python\Python310\lib\site-packages\torch\nn\modules\activation.py:132(forward)
+    23886    0.038    0.000    1.117    0.000 C:\Users\tktho\AppData\Local\Programs\Python\Python310\lib\site-packages\torch\nn\functional.py:1693(relu)
+    23886    1.068    0.000    1.068    0.000 {built-in method torch.relu}
+  1045894    0.779    0.000    1.059    0.000 C:\Users\tktho\Documents\★Download\yubisuma\Complete\.\complete_ai\endgame_table.py:60(value)
+  1134023    0.684    0.000    0.684    0.000 C:\Users\tktho\Documents\★Download\yubisuma\Complete\.\complete_solver\packed_engine.py:348(step)
+    78300    0.534    0.000    0.534    0.000 {method 'reduce' of 'numpy.ufunc' objects}
+     7962    0.424    0.000    0.449    0.000 C:\Users\tktho\Documents\★Download\yubisuma\Complete\.\complete_ai\features.py:105(features_from_lanes)
+     7962    0.012    0.000    0.347    0.000 C:\Users\tktho\AppData\Local\Programs\Python\Python310\lib\site-packages\torch\nn\modules\activation.py:391(forward)
+
+
+
