@@ -25,6 +25,7 @@ from numba.typed import Dict as NumbaDict
 from numba.core import types
 
 from .actions import RulesConfig
+from .choice_collapse import collapse_choice_matrix_packed, collapse_choice_rows_njit
 from .packed_engine import (
     FULL_ALPHABET_MASK,
     SKILL_ID,
@@ -34,6 +35,7 @@ from .packed_engine import (
     step,
     unpack_state,
 )
+from .small_matrix import solve_small_zero_sum
 from .state import State
 
 _KEY_TYPE = types.UniTuple(types.int64, 2)
@@ -100,7 +102,12 @@ def _count_cells(keys0, keys1, count, alphabet_mask, max_stock):
 
 @njit(cache=True)
 def _fill_tables(keys0, keys1, count, index, alphabet_mask, max_stock,
-                 offsets, child_idx, cell_val):
+                 offsets, child_idx, cell_val, row_offsets, tp_code_table):
+    """Fill the flat transition tables AND ``tp_code_table`` — each state's
+    own legal TP codes, stored contiguously at ``row_offsets[i]``. The codes
+    are needed (not just counts) so the Jacobi sweep can collapse same-thumb
+    CHOICE rows (2+ choosable stock) to their post-reaction column max
+    (see choice_collapse.py) — the CHOICE rule fix."""
     tp_buf = np.zeros(96, dtype=np.int64)
     ntp_buf = np.zeros(16, dtype=np.int64)
     for i in range(count):
@@ -108,6 +115,9 @@ def _fill_tables(keys0, keys1, count, index, alphabet_mask, max_stock,
         lane1 = keys1[i]
         n_tp = legal_tp_codes(lane0, lane1, alphabet_mask, max_stock, tp_buf)
         n_ntp = legal_ntp_codes(lane0, lane1, ntp_buf)
+        row_base = row_offsets[i]
+        for a in range(n_tp):
+            tp_code_table[row_base + a] = tp_buf[a]
         base = offsets[i]
         pos = base
         for a in range(n_tp):
@@ -294,7 +304,7 @@ def _simplex_value(matrix, n_rows, n_cols, tableau, basis, perturb):
 
 @njit(cache=True)
 def _jacobi_sweep(tp_counts, ntp_counts, offsets, child_idx, cell_val,
-                  v_old, v_new, gamma, fail_idx):
+                  v_old, v_new, gamma, fail_idx, row_offsets, tp_code_table):
     """One double-buffered Jacobi sweep of the Shapley operator.
 
     Jacobi (not Gauss-Seidel): the in-place GS variant let mid-sweep midpoint
@@ -302,9 +312,17 @@ def _jacobi_sweep(tp_counts, ntp_counts, offsets, child_idx, cell_val,
     them, sustaining a limit cycle (2026-07-13). Jacobi applies one fixed
     operator per sweep — a gamma-contraction with guaranteed convergence.
     States whose matrix could not be certified go into *fail_idx* for exact
-    scipy repair; returns (max_delta, n_failed)."""
+    scipy repair; returns (max_delta, n_failed).
+
+    CHOICE fix: each state's own TP codes (``tp_code_table``, sliced at
+    ``row_offsets[i]``) let same-thumb CHOICE rows (2+ choosable stock)
+    collapse to their per-column max BEFORE ``_matrix_value`` — the
+    post-reaction skill pick (see choice_collapse.py). Single/no-choice
+    states collapse to a no-op."""
     count = tp_counts.shape[0]
     matrix = np.zeros((96, 16), dtype=np.float64)
+    collapsed = np.zeros((96, 16), dtype=np.float64)
+    collapsed_codes = np.zeros(96, dtype=np.int64)
     tableau = np.zeros((97, 120), dtype=np.float64)
     basis = np.zeros(96, dtype=np.int64)
     max_delta = 0.0
@@ -321,7 +339,12 @@ def _jacobi_sweep(tp_counts, ntp_counts, offsets, child_idx, cell_val,
                 else:
                     matrix[a, b] = cell_val[pos] * gamma * v_old[ci]
                 pos += 1
-        new_value, ok = _matrix_value(matrix, n_tp, n_ntp, tableau, basis)
+        row_base = row_offsets[i]
+        codes = tp_code_table[row_base:row_base + n_tp]
+        n_c = collapse_choice_rows_njit(
+            codes, matrix, n_tp, n_ntp, collapsed_codes, collapsed
+        )
+        new_value, ok = _matrix_value(collapsed, n_c, n_ntp, tableau, basis)
         if not ok and n_failed < fail_idx.shape[0]:
             fail_idx[n_failed] = i
             n_failed += 1
@@ -335,10 +358,8 @@ def _jacobi_sweep(tp_counts, ntp_counts, offsets, child_idx, cell_val,
 
 
 def _repair_state_value(i, tp_counts, ntp_counts, offsets, child_idx,
-                        cell_val, values, gamma):
+                        cell_val, values, gamma, row_offsets, tp_code_table):
     """Exact scipy re-solve of one state's matrix game (repair path)."""
-    from .small_matrix import solve_small_zero_sum
-
     n_tp = int(tp_counts[i])
     n_ntp = int(ntp_counts[i])
     pos = int(offsets[i])
@@ -351,6 +372,9 @@ def _repair_state_value(i, tp_counts, ntp_counts, offsets, child_idx,
             else:
                 matrix[a, b] = cell_val[pos] * gamma * values[ci]
             pos += 1
+    row_base = int(row_offsets[i])
+    codes = np.asarray(tp_code_table[row_base:row_base + n_tp])
+    _, matrix, _ = collapse_choice_matrix_packed(codes, matrix)
     value, _, _ = solve_small_zero_sum(matrix)
     return float(value)
 
@@ -453,10 +477,17 @@ def solve_universe(
         (tp_counts.astype(np.int64) * ntp_counts.astype(np.int64))[:-1],
         out=offsets[1:],
     )
+    # row_offsets/tp_code_table: each state's own legal TP codes, stored
+    # contiguously (much smaller than the cell tables — one entry per
+    # (state, row), not per (state, row, col)). Needed by the Jacobi sweep to
+    # collapse same-thumb CHOICE rows to their post-reaction column max.
+    row_offsets = np.zeros(count, dtype=np.int64)
+    np.cumsum(tp_counts.astype(np.int64)[:-1], out=row_offsets[1:])
+    tp_code_table = np.empty(int(tp_counts.astype(np.int64).sum()), dtype=np.int64)
     child_idx = np.empty(int(total_cells), dtype=np.int32)
     cell_val = np.empty(int(total_cells), dtype=np.int8)
     _fill_tables(keys0, keys1, count, index, np.int64(mask), np.int64(max_stock),
-                 offsets, child_idx, cell_val)
+                 offsets, child_idx, cell_val, row_offsets, tp_code_table)
     table_seconds = time.perf_counter() - t0
     if verbose:
         print(
@@ -475,14 +506,14 @@ def solve_universe(
     for iterations in range(1, max_iterations + 1):
         max_delta, n_failed = _jacobi_sweep(
             tp_counts, ntp_counts, offsets, child_idx, cell_val,
-            values, v_next, gamma, fail_idx,
+            values, v_next, gamma, fail_idx, row_offsets, tp_code_table,
         )
         # Exact repair of uncertified solves (scipy) before publishing.
         for k in range(n_failed):
             i = int(fail_idx[k])
             repaired = _repair_state_value(
                 i, tp_counts, ntp_counts, offsets, child_idx, cell_val,
-                values, gamma,
+                values, gamma, row_offsets, tp_code_table,
             )
             delta = abs(repaired - values[i])
             if delta > max_delta:

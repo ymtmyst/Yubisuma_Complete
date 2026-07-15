@@ -92,6 +92,11 @@ def run_selfplay(
             else:
                 tp_code = tp_codes[_sample(rng, tp_policy, epsilon)]
                 ntp_code = ntp_codes[_sample(rng, ntp_policy, epsilon)]
+            # CHOICE fix: a collapsed CHOICE declaration (thumb only) is
+            # resolved to the concrete stocked skill AFTER the opponent's
+            # reaction is sampled — the post-reaction (second-mover) pick
+            # (see choice_collapse.py). No-op for every non-CHOICE code.
+            tp_code = searcher.resolve_tp_code(lane0, lane1, int(tp_code), int(ntp_code))
             child0, child1, status, _ = step(
                 lane0, lane1, np.int64(tp_code), np.int64(ntp_code), _FULL_MASK
             )

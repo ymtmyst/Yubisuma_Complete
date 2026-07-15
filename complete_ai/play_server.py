@@ -40,7 +40,13 @@ from complete_solver.actions import (
 )
 from complete_solver.state import State, initial_state
 from complete_solver.transition import transition
-from complete_solver.packed_engine import pack_state
+from complete_solver.packed_engine import (
+    code_to_ntp_action,
+    code_to_tp_action,
+    ntp_action_to_code,
+    pack_state,
+)
+from complete_solver.choice_collapse import is_choice_meta_code
 
 from .agents import SearchAgent
 from .batched_search import BatchedSearcher
@@ -86,13 +92,13 @@ SKILL_INFO = {
     "チョイス": ("🎯", "ためたスキルから1つ選んで使う"),
     "オール": ("🎆", "ためたスキルを全部いっきに出す"),
     "ドロップ": ("🗑️", "相手が使えないスキルを作り、追加ターン"),
-    "ブースト": ("🚀", "必殺技:追加3ターン(1ゲーム1回)"),
-    "タイム": ("⏳", "必殺技:相手の連続行動を奪う(1ゲーム1回)"),
+    "ブースト": ("🚀", "必殺スキル:追加3ターン"),
+    "タイム": ("⏳", "必殺スキル:相手の連続行動を奪う"),
 }
 REACTION_INFO = {
-    "なし": ("🙅", "反応しない"),
+    "なし": ("", "反応しない"),
     "カウンター": ("↩️", "相手のスキルを跳ね返す"),
-    "ブロック": ("🚫", "必殺技:相手のスキルを無効化(1ゲーム1回)"),
+    "ブロック": ("🚫", "反応・必殺スキル:相手のスキルを無効化"),
 }
 
 
@@ -132,9 +138,11 @@ class WebGame:
         self.difficulty = difficulty
         self.state = initial_state()
         self.human_is_mover = human_first
-        self.committed_ai_tp: TPAction | None = None
+        self.committed_ai_tp_code: int | None = None
+        self.pending_human_choice: dict | None = None
         self.entries: list[dict] = []          # structured exchange log
         self.last_exchange: dict | None = None  # most recent, shown big
+        self.skip_notice: dict | None = None
         self.phase = {"human": 0, "ai": 0}
         self.turn = {"human": 0, "ai": 0}
         self.last_mover: str | None = None
@@ -145,7 +153,8 @@ class WebGame:
     @staticmethod
     def _tp_badge(tp: TPAction) -> dict:
         if isinstance(tp.skill, int):
-            return {"emoji": "🔢", "name": f"数字{tp.skill}", "thumb": tp.thumb}
+            return {"emoji": str(tp.skill), "kind": "number",
+                    "name": f"数字{tp.skill}", "thumb": tp.thumb}
         if tp.skill == "チョイス":
             emoji = SKILL_INFO.get(tp.choice, ("🎯", ""))[0]
             return {"emoji": emoji, "name": f"選ぶ→{tp.choice}", "thumb": tp.thumb}
@@ -172,16 +181,13 @@ class WebGame:
     def _ai(self):
         return self.state.opp if self.human_is_mover else self.state.me
 
-    def _decode_ai_tp(self) -> TPAction:
+    def _decode_ai_tp_code(self) -> int:
         lane0, lane1 = pack_state(self.state)
-        code = self.agent.tp_action(int(lane0), int(lane1))
-        from complete_solver.packed_engine import code_to_tp_action
-        return code_to_tp_action(code)
+        return self.agent.tp_action(int(lane0), int(lane1))
 
     def _ai_ntp(self) -> NTPAction:
         lane0, lane1 = pack_state(self.state)
         code = self.agent.ntp_action(int(lane0), int(lane1))
-        from complete_solver.packed_engine import code_to_ntp_action
         return code_to_ntp_action(code)
 
     # ── options for the human ──────────────────────────────────────────────
@@ -192,12 +198,13 @@ class WebGame:
         numbers = sorted({a.skill for a in actions if isinstance(a.skill, int)})
         skills = []
         for a in actions:
-            if isinstance(a.skill, str) and a.skill != "チョイス" and a.skill not in skills:
+            if isinstance(a.skill, str) and a.skill not in skills:
                 skills.append(a.skill)
         choices = sorted({a.choice for a in actions if a.skill == "チョイス" and a.choice})
         thumbs = sorted({a.thumb for a in actions})
         return {"numbers": numbers, "skills": skills, "choices": choices,
-                "thumbs": thumbs, "max_hands": self._human().hands}
+                "thumbs": thumbs, "max_hands": self._human().hands,
+                "copy_source": self.state.previous_skill if "コピー" in skills else None}
 
     def _human_ntp_options(self) -> dict:
         actions = legal_ntp_actions(self.state, CONFIG)
@@ -216,10 +223,22 @@ class WebGame:
             "entries": self.entries[-30:],
             "over": self.over,
         }
+        if self.skip_notice is not None:
+            side = self.skip_notice["side"]
+            v[side]["skip_notice"] = self.skip_notice["remaining"]
         if self.over:
             v["phase"] = "over"
             v["human_won"] = self.human_won
             v["ai_advantage"] = -1.0 if self.human_won else 1.0
+            return v
+        if self.pending_human_choice is not None:
+            pending = self.pending_human_choice
+            v["phase"] = "choice"
+            v["options"] = {
+                "choices": pending["choices"],
+                "reaction": self._ntp_badge(pending["ntp"]),
+            }
+            v["ai_advantage"] = 0.0
             return v
         # AI confidence meter: the game value from the AI's perspective in
         # [-1, 1] (positive = AI ahead). One extra (cached) search.
@@ -231,8 +250,8 @@ class WebGame:
             v["options"] = self._human_tp_options()
         else:
             # AI commits its declaration now (hidden); human reacts.
-            if self.committed_ai_tp is None:
-                self.committed_ai_tp = self._decode_ai_tp()
+            if self.committed_ai_tp_code is None:
+                self.committed_ai_tp_code = self._decode_ai_tp_code()
             v["phase"] = "react"
             v["options"] = self._human_ntp_options()
         return v
@@ -245,13 +264,51 @@ class WebGame:
             self.over = True
             self.human_won = False
             return
+
+        if self.pending_human_choice is not None:
+            pending = self.pending_human_choice
+            target = payload.get("target")
+            if payload.get("kind") != "choice_target" or target not in pending["choices"]:
+                return
+            self.pending_human_choice = None
+            self._resolve_exchange(
+                TPAction("チョイス", pending["thumb"], choice=target),
+                pending["ntp"],
+            )
+            return
+
         mover = "human" if self.human_is_mover else "ai"
         if self.human_is_mover:
             tp = self._build_tp(payload)
             ntp = self._ai_ntp()
+            if tp.skill == "チョイス" and tp.choice is None:
+                choices = self._human_tp_options()["choices"]
+                if not choices:
+                    return
+                self.pending_human_choice = {
+                    "thumb": tp.thumb,
+                    "ntp": ntp,
+                    "choices": choices,
+                }
+                return
         else:
-            tp = self.committed_ai_tp
+            code = self.committed_ai_tp_code
+            if code is None:
+                return
             ntp = self._build_ntp(payload)
+            if is_choice_meta_code(code):
+                lane0, lane1 = pack_state(self.state)
+                code = self.agent.resolve_tp_action(
+                    int(lane0), int(lane1), code, ntp_action_to_code(ntp)
+                )
+            tp = code_to_tp_action(code)
+
+        self._resolve_exchange(tp, ntp)
+
+    def _resolve_exchange(self, tp: TPAction, ntp: NTPAction) -> None:
+        mover = "human" if self.human_is_mover else "ai"
+        reactor = "ai" if mover == "human" else "human"
+        self.skip_notice = None
 
         self._bump_phase_turn(mover)
         entry = {
@@ -267,6 +324,8 @@ class WebGame:
         result = transition(self.state, tp, ntp, CONFIG)
 
         if result.terminal_reward is not None:
+            if result.terminal_state is not None:
+                self.state = result.terminal_state
             mover_won = result.terminal_reward > 0
             self.human_won = (mover_won == self.human_is_mover)
             self.over = True
@@ -275,7 +334,13 @@ class WebGame:
         self.state = result.next_state
         if not result.same_turn_player:
             self.human_is_mover = not self.human_is_mover
-        self.committed_ai_tp = None
+        if "phase_skipped" in result.events:
+            skipped_player = self._human() if reactor == "human" else self._ai()
+            self.skip_notice = {
+                "side": reactor,
+                "remaining": skipped_player.skip_phases,
+            }
+        self.committed_ai_tp_code = None
 
         # If it's now the AI's continuous turn (AI is mover), auto-play AI
         # declarations until the turn returns to the human or the game ends.
@@ -349,7 +414,7 @@ def _build_tp(self: WebGame, payload: dict) -> TPAction:
     if kind == "number":
         return TPAction(int(payload["value"]), thumb)
     if kind == "choice":
-        return TPAction("チョイス", thumb, choice=payload["target"])
+        return TPAction("チョイス", thumb)
     return TPAction(payload["name"], thumb)
 
 

@@ -1,0 +1,31 @@
+mask OK: both engines _CP_MASK=0
+{
+  "model": "models/value_gvi_latest.pt",
+  "mask": 0,
+  "plies": 55407,
+  "truncations": 0,
+  "stock_decl_pct": 0.0018,
+  "stock_hold_ply_pct": 0.0,
+  "stock_hold_game_pct": 0.0,
+  "cement_decl_pct": 0.3375,
+  "flash_decl_pct": 8.1741,
+  "number_decl_pct": 16.9563,
+  "thumb_overall_pct": {
+    "0": 87.19,
+    "1": 9.17,
+    "2": 3.64
+  },
+  "thumb_flash_pct": {
+    "0": 37.87,
+    "1": 39.21,
+    "2": 22.92
+  },
+  "ntp_reaction_pct": {
+    "なし": 58.12,
+    "カウンター": 32.74,
+    "ブロック": 9.14
+  },
+  "stock_decl_under_counter_plies": 1,
+  "cement_decl_under_counter_plies": 0
+}
+wrote data/cp_baseline_dist.json

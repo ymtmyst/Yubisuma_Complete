@@ -33,7 +33,25 @@ from .constants import (
     TIME,
     ULTIMATE_TP_SKILLS,
 )
+from .packed_engine import _CP_MASK, SKILL_ID
 from .state import PlayerState, SkillRef, State
+from .toggles import STOCK_FREECHOICE, STOCK_FREETEMPO
+
+
+def _is_counter_pierced(skill: SkillRef) -> bool:
+    """True if *skill* is in the counter-piercing set (YS_COUNTER_PIERCE).
+
+    Experimental toggle, defaults OFF (mask 0 → always False, base game
+    byte-identical). Mirrors packed_engine.step's pierce check; the skill
+    id ↔ name mapping is packed_engine.SKILL_ID so both engines agree on
+    what a given mask bit means.
+    """
+    if not isinstance(skill, str):
+        return False
+    skill_id = SKILL_ID.get(skill)
+    if skill_id is None:
+        return False
+    return ((_CP_MASK >> skill_id) & 1) == 1
 
 
 @dataclass(frozen=True)
@@ -42,6 +60,9 @@ class Transition:
     terminal_reward: float | None
     same_turn_player: bool
     events: tuple[str, ...] = ()
+    # Resolved board at game end. ``next_state`` remains None for solver
+    # compatibility, while UIs can still show the actual final position.
+    terminal_state: State | None = None
 
 
 @dataclass(slots=True)
@@ -113,7 +134,12 @@ def transition(
         else:
             work.event("blocked")
     elif ntp_action.reaction == COUNTER:
-        if isinstance(skill, str) and skill in ANTI_COUNTER_SKILLS:
+        if _is_counter_pierced(skill):
+            # Counter-piercing (experimental, toggle via YS_COUNTER_PIERCE):
+            # this skill fires exactly as under reaction NONE; COUNTER does
+            # not negate it. BLOCK (handled above) is unaffected.
+            _resolve_skill_effect(work, tp_action, ntp_action, charge_was_active)
+        elif isinstance(skill, str) and skill in ANTI_COUNTER_SKILLS:
             _resolve_anti_counter(work, skill)
         elif skill == COPY:
             _resolve_copy_countered(work, tp_action, ntp_action)
@@ -249,12 +275,28 @@ def _resolve_skill_effect(
         return
 
     if skill == STOCK:
-        previous = work.previous_skill
-        if isinstance(previous, str) and previous in REFERENCEABLE_SKILLS:
-            work.me = work.me._replace(stock=frozenset(set(work.me.stock) | {previous}))
-            work.event("stock_added")
+        if STOCK_FREECHOICE and tp_action.stock_target is not None:
+            # Targeted STOCK (YS_STOCK_FREECHOICE): the target is chosen at
+            # declaration time (see legal_tp_actions), independent of
+            # previous_skill.
+            target = tp_action.stock_target
+            if target not in work.me.stock:
+                work.me = work.me._replace(stock=frozenset(set(work.me.stock) | {target}))
+                work.event("stock_added")
+            else:
+                work.event("stock_failed")
         else:
-            work.event("stock_failed")
+            previous = work.previous_skill
+            if isinstance(previous, str) and previous in REFERENCEABLE_SKILLS:
+                work.me = work.me._replace(stock=frozenset(set(work.me.stock) | {previous}))
+                work.event("stock_added")
+            else:
+                work.event("stock_failed")
+        if STOCK_FREETEMPO:
+            # YS_STOCK_FREETEMPO: STOCK does not pass initiative (base and
+            # targeted alike).
+            _add_extra_turns(work, 1)
+            work.event("stock_free_tempo")
         return
 
     if skill == CHOICE:
@@ -581,6 +623,12 @@ def _attempt_two_hand_drop(work: _Work, target: str, event_name: str) -> None:
         work.event(f"{event_name}_blocked_this_turn")
         return
 
+    if dropper.hands <= 2 and not (
+        work.me.has_declared_skill and work.opp.has_declared_skill
+    ):
+        work.event(f"{event_name}_premature_win_cancelled")
+        return
+
     if dropper.hands < 2:
         lowered = _lower_one(dropper, target, work)
         if target == "me":
@@ -614,6 +662,11 @@ def _lower_one(player: PlayerState, owner: str, work: _Work) -> PlayerState:
         return player
     if owner == "opp" and work.opp_blocked:
         return player
+    if player.hands <= 1 and not (
+        work.me.has_declared_skill and work.opp.has_declared_skill
+    ):
+        work.event(f"premature_win_cancelled_{owner}")
+        return player
     hands = max(0, player.hands - 1)
     return player._replace(hands=hands, cement=min(player.cement, hands))
 
@@ -637,11 +690,26 @@ def _cleanup_end_of_turn(work: _Work, quick_before: int, skill: SkillRef) -> Non
 
 def _finish_turn(work: _Work, skill: SkillRef | None) -> Transition:
     both_declared = work.me.has_declared_skill and work.opp.has_declared_skill
+    # A player cannot win before both players have made at least one
+    # declaration.  Merely postponing the terminal check leaves a player at
+    # zero hands (and therefore with no legal continuation), so cancel the
+    # hand drop that would have produced that premature win.
+    if not both_declared:
+        if work.me.hands <= 0:
+            work.me = work.me._replace(hands=1, cement=min(work.me.cement, 1))
+            work.event("premature_win_cancelled_me")
+        if work.opp.hands <= 0:
+            work.opp = work.opp._replace(hands=1, cement=min(work.opp.cement, 1))
+            work.event("premature_win_cancelled_opp")
     if both_declared:
         if work.me.hands <= 0:
-            return Transition(None, 1.0, False, tuple(work.events or ()))
+            return Transition(
+                None, 1.0, False, tuple(work.events or ()), _work_state(work)
+            )
         if work.opp.hands <= 0:
-            return Transition(None, -1.0, False, tuple(work.events or ()))
+            return Transition(
+                None, -1.0, False, tuple(work.events or ()), _work_state(work)
+            )
 
     pending = work.me_extra_turns + work.added_extra_turns
     if work.opp.time_active and pending > 0:
@@ -711,6 +779,19 @@ def _finish_turn(work: _Work, skill: SkillRef | None) -> Transition:
 
     next_state = _switch_perspective(work)
     return Transition(next_state, None, False, tuple(work.events or ()))
+
+
+def _work_state(work: _Work) -> State:
+    """Snapshot the fully resolved board without switching perspective."""
+    return State(
+        me=work.me,
+        opp=work.opp,
+        previous_skill=work.previous_skill,
+        me_extra_turns=work.me_extra_turns + work.added_extra_turns,
+        opp_extra_turns=work.opp_extra_turns,
+        me_guard_extra_used_this_phase=work.me_guard_extra_used,
+        opp_guard_extra_used_this_phase=work.opp_guard_extra_used,
+    )
 
 
 def _switch_perspective(work: _Work) -> State:

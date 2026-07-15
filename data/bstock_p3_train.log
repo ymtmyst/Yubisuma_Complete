@@ -1,0 +1,205 @@
+device: cuda
+=== generation 1 ===
+selfplay 200/2500 games (15.6 games/s, 1337 unique states)
+selfplay 400/2500 games (25.9 games/s, 2287 unique states)
+selfplay 600/2500 games (34.0 games/s, 3089 unique states)
+selfplay 800/2500 games (40.7 games/s, 3844 unique states)
+selfplay 1000/2500 games (46.0 games/s, 4590 unique states)
+selfplay 1200/2500 games (50.4 games/s, 5385 unique states)
+selfplay 1400/2500 games (54.4 games/s, 6068 unique states)
+selfplay 1600/2500 games (57.6 games/s, 6754 unique states)
+selfplay 1800/2500 games (61.2 games/s, 7320 unique states)
+selfplay 2000/2500 games (64.0 games/s, 8006 unique states)
+selfplay 2200/2500 games (66.7 games/s, 8592 unique states)
+selfplay 2400/2500 games (68.9 games/s, 9172 unique states)
+graph-vi targets: 9491 interior + 254972 frontier (96.4%), 381 sweeps 24s, converged=True stalled=False max_delta=9.9e-07 (25s)
+selfplay: 9491 states, outcomes={'terminal': 2500, 'truncated': 0}, mean_plies=11.4, 36s
+train: {'val_mse': 0.0024459240958094597, 'n_samples': 133222}
+arena (new as A): {'games': 120, 'wins_a': 67, 'wins_b': 53, 'truncations': 0, 'winrate_a': 0.5583333333333333}
+a0 spearman: 0.8365
+=== generation 2 ===
+selfplay 200/2500 games (71.0 games/s, 1206 unique states)
+selfplay 400/2500 games (73.3 games/s, 2117 unique states)
+selfplay 600/2500 games (78.6 games/s, 2852 unique states)
+selfplay 800/2500 games (80.6 games/s, 3543 unique states)
+selfplay 1000/2500 games (82.8 games/s, 4180 unique states)
+selfplay 1200/2500 games (85.5 games/s, 4721 unique states)
+selfplay 1400/2500 games (87.6 games/s, 5352 unique states)
+selfplay 1600/2500 games (89.6 games/s, 5885 unique states)
+selfplay 1800/2500 games (89.9 games/s, 6469 unique states)
+selfplay 2000/2500 games (91.0 games/s, 7089 unique states)
+selfplay 2200/2500 games (92.2 games/s, 7612 unique states)
+selfplay 2400/2500 games (93.1 games/s, 8168 unique states)
+graph-vi targets: 8432 interior + 227053 frontier (96.4%), 693 sweeps 33s, converged=True stalled=False max_delta=9.9e-07 (34s)
+selfplay: 8432 states, outcomes={'terminal': 2500, 'truncated': 0}, mean_plies=10.8, 27s
+train: {'val_mse': 0.005199983716011047, 'n_samples': 141654}
+arena (new as A): {'games': 120, 'wins_a': 57, 'wins_b': 63, 'truncations': 0, 'winrate_a': 0.475}
+a0 spearman: 0.8263
+=== generation 3 ===
+selfplay 200/2500 games (65.8 games/s, 1395 unique states)
+selfplay 400/2500 games (73.5 games/s, 2244 unique states)
+selfplay 600/2500 games (77.8 games/s, 2957 unique states)
+selfplay 800/2500 games (81.8 games/s, 3580 unique states)
+selfplay 1000/2500 games (84.2 games/s, 4257 unique states)
+selfplay 1200/2500 games (87.3 games/s, 4838 unique states)
+selfplay 1400/2500 games (90.4 games/s, 5384 unique states)
+selfplay 1600/2500 games (91.7 games/s, 5924 unique states)
+selfplay 1800/2500 games (92.9 games/s, 6538 unique states)
+selfplay 2000/2500 games (93.0 games/s, 7225 unique states)
+selfplay 2200/2500 games (93.6 games/s, 7838 unique states)
+selfplay 2400/2500 games (94.0 games/s, 8423 unique states)
+graph-vi targets: 8673 interior + 228996 frontier (96.4%), 643 sweeps 32s, converged=True stalled=False max_delta=9.9e-07 (32s)
+selfplay: 8673 states, outcomes={'terminal': 2500, 'truncated': 0}, mean_plies=11.0, 26s
+train: {'val_mse': 0.005145486909896135, 'n_samples': 150327}
+arena (new as A): {'games': 120, 'wins_a': 65, 'wins_b': 55, 'truncations': 0, 'winrate_a': 0.5416666666666666}
+a0 spearman: 0.8234
+=== generation 4 ===
+selfplay 200/2500 games (75.6 games/s, 1168 unique states)
+selfplay 400/2500 games (78.1 games/s, 2181 unique states)
+selfplay 600/2500 games (81.1 games/s, 2942 unique states)
+selfplay 800/2500 games (86.3 games/s, 3616 unique states)
+selfplay 1000/2500 games (88.0 games/s, 4348 unique states)
+selfplay 1200/2500 games (89.4 games/s, 5013 unique states)
+selfplay 1400/2500 games (91.8 games/s, 5626 unique states)
+selfplay 1600/2500 games (93.5 games/s, 6272 unique states)
+selfplay 1800/2500 games (94.0 games/s, 6859 unique states)
+selfplay 2000/2500 games (94.8 games/s, 7446 unique states)
+selfplay 2200/2500 games (95.5 games/s, 8141 unique states)
+selfplay 2400/2500 games (97.6 games/s, 8629 unique states)
+graph-vi targets: 8945 interior + 237910 frontier (96.4%), 762 sweeps 38s, converged=True stalled=False max_delta=9.9e-07 (38s)
+selfplay: 8945 states, outcomes={'terminal': 2500, 'truncated': 0}, mean_plies=11.3, 26s
+train: {'val_mse': 0.005787555128335953, 'n_samples': 149781}
+arena (new as A): {'games': 120, 'wins_a': 61, 'wins_b': 59, 'truncations': 0, 'winrate_a': 0.5083333333333333}
+a0 spearman: 0.8210
+=== generation 5 ===
+selfplay 200/2500 games (68.9 games/s, 1204 unique states)
+selfplay 400/2500 games (71.6 games/s, 2214 unique states)
+selfplay 600/2500 games (72.3 games/s, 3093 unique states)
+selfplay 800/2500 games (75.0 games/s, 3816 unique states)
+selfplay 1000/2500 games (78.2 games/s, 4534 unique states)
+selfplay 1200/2500 games (78.6 games/s, 5262 unique states)
+selfplay 1400/2500 games (81.3 games/s, 5862 unique states)
+selfplay 1600/2500 games (82.5 games/s, 6522 unique states)
+selfplay 1800/2500 games (84.2 games/s, 7127 unique states)
+selfplay 2000/2500 games (85.6 games/s, 7762 unique states)
+selfplay 2200/2500 games (86.8 games/s, 8239 unique states)
+selfplay 2400/2500 games (89.0 games/s, 8728 unique states)
+graph-vi targets: 9038 interior + 242530 frontier (96.4%), 593 sweeps 30s, converged=True stalled=False max_delta=1.0e-06 (31s)
+selfplay: 9038 states, outcomes={'terminal': 2500, 'truncated': 0}, mean_plies=11.6, 28s
+train: {'val_mse': 0.0065207770094275475, 'n_samples': 150387}
+arena (new as A): {'games': 120, 'wins_a': 61, 'wins_b': 59, 'truncations': 0, 'winrate_a': 0.5083333333333333}
+a0 spearman: 0.8138
+=== generation 6 ===
+selfplay 200/2500 games (62.5 games/s, 1320 unique states)
+selfplay 400/2500 games (68.9 games/s, 2211 unique states)
+selfplay 600/2500 games (69.5 games/s, 3138 unique states)
+selfplay 800/2500 games (73.0 games/s, 3964 unique states)
+selfplay 1000/2500 games (74.9 games/s, 4705 unique states)
+selfplay 1200/2500 games (76.3 games/s, 5421 unique states)
+selfplay 1400/2500 games (77.0 games/s, 6205 unique states)
+selfplay 1600/2500 games (79.3 games/s, 6794 unique states)
+selfplay 1800/2500 games (80.9 games/s, 7337 unique states)
+selfplay 2000/2500 games (82.0 games/s, 7900 unique states)
+selfplay 2200/2500 games (83.6 games/s, 8461 unique states)
+selfplay 2400/2500 games (84.3 games/s, 9061 unique states)
+graph-vi targets: 9372 interior + 249035 frontier (96.4%), 335 sweeps 18s, converged=True stalled=False max_delta=9.8e-07 (18s)
+selfplay: 9372 states, outcomes={'terminal': 2500, 'truncated': 0}, mean_plies=12.1, 30s
+train: {'val_mse': 0.006197209004312754, 'n_samples': 151086}
+arena (new as A): {'games': 120, 'wins_a': 61, 'wins_b': 57, 'truncations': 2, 'winrate_a': 0.5169491525423728}
+a0 spearman: 0.8178
+=== generation 7 ===
+selfplay 200/2500 games (61.6 games/s, 1368 unique states)
+selfplay 400/2500 games (65.0 games/s, 2434 unique states)
+selfplay 600/2500 games (70.2 games/s, 3355 unique states)
+selfplay 800/2500 games (73.2 games/s, 4100 unique states)
+selfplay 1000/2500 games (75.6 games/s, 4830 unique states)
+selfplay 1200/2500 games (77.7 games/s, 5530 unique states)
+selfplay 1400/2500 games (79.8 games/s, 6274 unique states)
+selfplay 1600/2500 games (81.4 games/s, 6984 unique states)
+selfplay 1800/2500 games (83.6 games/s, 7613 unique states)
+selfplay 2000/2500 games (84.4 games/s, 8358 unique states)
+selfplay 2200/2500 games (85.4 games/s, 9140 unique states)
+selfplay 2400/2500 games (85.9 games/s, 9853 unique states)
+graph-vi targets: 10195 interior + 272566 frontier (96.4%), 330 sweeps 18s, converged=True stalled=False max_delta=9.9e-07 (18s)
+selfplay: 10195 states, outcomes={'terminal': 2499, 'truncated': 1}, mean_plies=12.7, 29s
+train: {'val_mse': 0.006115749478340149, 'n_samples': 152336}
+arena (new as A): {'games': 120, 'wins_a': 57, 'wins_b': 58, 'truncations': 5, 'winrate_a': 0.4956521739130435}
+a0 spearman: 0.8135
+=== generation 8 ===
+selfplay 200/2500 games (74.4 games/s, 1222 unique states)
+selfplay 400/2500 games (71.8 games/s, 2419 unique states)
+selfplay 600/2500 games (71.2 games/s, 3510 unique states)
+selfplay 800/2500 games (73.2 games/s, 4438 unique states)
+selfplay 1000/2500 games (75.6 games/s, 5273 unique states)
+selfplay 1200/2500 games (77.6 games/s, 6065 unique states)
+selfplay 1400/2500 games (81.0 games/s, 6765 unique states)
+selfplay 1600/2500 games (82.9 games/s, 7526 unique states)
+selfplay 1800/2500 games (84.2 games/s, 8355 unique states)
+selfplay 2000/2500 games (85.1 games/s, 9025 unique states)
+selfplay 2200/2500 games (86.8 games/s, 9600 unique states)
+selfplay 2400/2500 games (88.0 games/s, 10224 unique states)
+graph-vi targets: 10626 interior + 279197 frontier (96.3%), 354 sweeps 22s, converged=True stalled=False max_delta=9.6e-07 (23s)
+selfplay: 10626 states, outcomes={'terminal': 2499, 'truncated': 1}, mean_plies=13.1, 28s
+train: {'val_mse': 0.005971747916191816, 'n_samples': 153924}
+arena (new as A): {'games': 120, 'wins_a': 62, 'wins_b': 50, 'truncations': 8, 'winrate_a': 0.5535714285714286}
+a0 spearman: 0.8073
+=== generation 9 ===
+selfplay 200/2500 games (69.3 games/s, 1341 unique states)
+selfplay 400/2500 games (68.6 games/s, 2536 unique states)
+selfplay 600/2500 games (74.2 games/s, 3444 unique states)
+selfplay 800/2500 games (77.8 games/s, 4290 unique states)
+selfplay 1000/2500 games (80.9 games/s, 5051 unique states)
+selfplay 1200/2500 games (83.8 games/s, 5775 unique states)
+selfplay 1400/2500 games (86.2 games/s, 6497 unique states)
+selfplay 1600/2500 games (87.6 games/s, 7294 unique states)
+selfplay 1800/2500 games (89.5 games/s, 7966 unique states)
+selfplay 2000/2500 games (90.5 games/s, 8672 unique states)
+selfplay 2200/2500 games (92.5 games/s, 9243 unique states)
+selfplay 2400/2500 games (93.7 games/s, 9893 unique states)
+graph-vi targets: 10133 interior + 263433 frontier (96.3%), 349 sweeps 19s, converged=True stalled=False max_delta=9.8e-07 (19s)
+selfplay: 10133 states, outcomes={'terminal': 2498, 'truncated': 2}, mean_plies=12.5, 26s
+train: {'val_mse': 0.005895060487091541, 'n_samples': 154685}
+arena (new as A): {'games': 120, 'wins_a': 49, 'wins_b': 66, 'truncations': 5, 'winrate_a': 0.4260869565217391}
+a0 spearman: 0.8065
+=== generation 10 ===
+selfplay 200/2500 games (71.3 games/s, 1311 unique states)
+selfplay 400/2500 games (78.4 games/s, 2237 unique states)
+selfplay 600/2500 games (80.9 games/s, 3134 unique states)
+selfplay 800/2500 games (84.8 games/s, 3863 unique states)
+selfplay 1000/2500 games (85.9 games/s, 4648 unique states)
+selfplay 1200/2500 games (87.0 games/s, 5533 unique states)
+selfplay 1400/2500 games (87.5 games/s, 6334 unique states)
+selfplay 1600/2500 games (89.3 games/s, 6943 unique states)
+selfplay 1800/2500 games (90.2 games/s, 7676 unique states)
+selfplay 2000/2500 games (90.4 games/s, 8394 unique states)
+selfplay 2200/2500 games (89.6 games/s, 9244 unique states)
+selfplay 2400/2500 games (91.6 games/s, 9732 unique states)
+graph-vi targets: 10020 interior + 259008 frontier (96.3%), 3000 sweeps 153s, converged=False stalled=False max_delta=1.1e-04 (154s)
+selfplay: 10020 states, outcomes={'terminal': 2498, 'truncated': 2}, mean_plies=12.6, 27s
+train: {'val_mse': 0.006247158162295818, 'n_samples': 154510}
+arena (new as A): {'games': 120, 'wins_a': 60, 'wins_b': 60, 'truncations': 0, 'winrate_a': 0.5}
+a0 spearman: 0.8067
+=== generation 11 ===
+selfplay 200/2500 games (67.6 games/s, 1454 unique states)
+Traceback (most recent call last):
+  File "C:\Users\tktho\AppData\Local\Programs\Python\Python310\lib\runpy.py", line 196, in _run_module_as_main
+    return _run_code(code, main_globals, None,
+  File "C:\Users\tktho\AppData\Local\Programs\Python\Python310\lib\runpy.py", line 86, in _run_code
+    exec(code, run_globals)
+  File "C:\Users\tktho\Documents\\u2605Download\yubisuma\Complete\complete_ai\generation_loop.py", line 305, in <module>
+    main()
+  File "C:\Users\tktho\Documents\\u2605Download\yubisuma\Complete\complete_ai\generation_loop.py", line 159, in main
+    result = run_selfplay(
+  File "C:\Users\tktho\Documents\\u2605Download\yubisuma\Complete\complete_ai\selfplay.py", line 84, in run_selfplay
+    value, tp_codes, ntp_codes, tp_policy, ntp_policy = cached_solve(key)
+  File "C:\Users\tktho\Documents\\u2605Download\yubisuma\Complete\complete_ai\selfplay.py", line 72, in cached_solve
+    cached = searcher.solve(key[0], key[1])
+  File "C:\Users\tktho\Documents\\u2605Download\yubisuma\Complete\complete_ai\batched_search.py", line 735, in solve
+    value, tp_policy, ntp_policy = solve_small_zero_sum(collapsed_matrix)
+  File "C:\Users\tktho\Documents\\u2605Download\yubisuma\Complete\complete_solver\small_matrix.py", line 67, in solve_small_zero_sum
+    solution = solve_zero_sum_matrix(matrix)
+  File "C:\Users\tktho\Documents\\u2605Download\yubisuma\Complete\complete_solver\matrix_game.py", line 28, in solve_zero_sum_matrix
+    row_policy, row_value = _solve_row_player(matrix)
+  File "C:\Users\tktho\Documents\\u2605Download\yubisuma\Complete\complete_solver\matrix_game.py", line 67, in _solve_row_player
+    raise RuntimeError(f"row LP failed: {result.message}")
+RuntimeError: row LP failed: The HiGHS status code was not recognized. (HiGHS Status 15: model_status is Unknown; primal_status is Feasible)

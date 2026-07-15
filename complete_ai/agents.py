@@ -58,6 +58,18 @@ class SearchAgent:
         _, _, ntp_codes, _, ntp_policy = self._solve(lane0, lane1)
         return self._pick(ntp_codes, ntp_policy)
 
+    def resolve_tp_action(self, lane0: int, lane1: int, tp_code: int,
+                          ntp_code: int) -> int:
+        """Post-reaction resolution for a sampled ``tp_action`` (see
+        BatchedSearcher.resolve_tp_code / choice_collapse.py): turns a
+        collapsed CHOICE meta code into the concrete stocked skill that
+        maximizes the payoff against the now-realized ``ntp_code``. A no-op
+        for non-CHOICE codes and for the exact-endgame path (which never
+        collapses — it always returns concrete codes)."""
+        if self.endgame is not None and self.endgame.contains(lane0, lane1):
+            return tp_code
+        return self.searcher.resolve_tp_code(lane0, lane1, tp_code, ntp_code)
+
 
 class ScriptedAgent:
     """Fixed baseline: uniform-random TP declarations, styled NTP reactions.

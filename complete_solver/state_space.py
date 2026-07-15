@@ -8,6 +8,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from .actions import RulesConfig, legal_ntp_actions, legal_tp_actions
+from .choice_collapse import choice_row_groups, collapse_rows_by_sources
 from .matrix_game import solve_zero_sum_matrix
 from .state import State
 from .transition import transition
@@ -142,10 +143,15 @@ def value_iteration(
     #                            sign_factor stored, next_idx in state_list
     shapes: list[tuple[int, int]] = []
     tables: list[list[list[tuple]]] = []
+    # CHOICE fix: row grouping depends only on the (fixed) action list, so it
+    # is precomputed once per state (see choice_collapse.py).
+    row_sources_list: list[list[tuple[int, ...]]] = []
 
     for state in state_list:
         tp_actions = legal_tp_actions(state, config)
         ntp_actions = legal_ntp_actions(state, config)
+        _, row_sources = choice_row_groups(tp_actions)
+        row_sources_list.append(row_sources)
         shapes.append((len(tp_actions), len(ntp_actions)))
         rows: list[list[tuple]] = []
         for tp_action in tp_actions:
@@ -188,6 +194,7 @@ def value_iteration(
                         matrix[j, k] = sign_or_const
                     else:
                         matrix[j, k] = gamma * sign_or_const * values[next_idx]
+            matrix = collapse_rows_by_sources(matrix, row_sources_list[i])
             new_values[i] = solve_zero_sum_matrix(matrix).value
 
         max_delta = float(np.max(np.abs(new_values - values)))

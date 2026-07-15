@@ -1,0 +1,92 @@
+<!doctype html><html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>N7-G2 スキル別 価値プローブ（2026-07-14）</title>
+<style>
+:root{color-scheme:light dark}
+body{font-family:-apple-system,"Segoe UI","Yu Gothic UI",sans-serif;line-height:1.6;
+max-width:1100px;margin:0 auto;padding:24px;color:#111;background:#fff}
+h1{font-size:22px;margin:0 0 4px} h2{font-size:17px;margin:26px 0 8px;border-left:5px solid #2563eb;padding-left:8px}
+.sub{color:#666;font-size:13px;margin-bottom:16px}
+.box{background:#f6f8fa;border:1px solid #e2e6ea;border-radius:10px;padding:14px 18px;margin:12px 0}
+table{border-collapse:collapse;width:100%;font-size:13px;margin-top:8px}
+th,td{border:1px solid #e2e6ea;padding:6px 8px;text-align:left;vertical-align:top}
+th{background:#eef2f7;position:sticky;top:0}
+td.n{text-align:right;font-variant-numeric:tabular-nums} td.b{font-weight:700} td.l{font-weight:600}
+.tag{color:#fff;font-size:11px;font-weight:700;padding:1px 7px;border-radius:6px;white-space:nowrap}
+.wrap{overflow-x:auto}
+ul{margin:6px 0} li{margin:3px 0}
+@media (prefers-color-scheme:dark){
+body{color:#e6e6e6;background:#0f1115} .box{background:#161a20;border-color:#2a2f37}
+th{background:#1b2028} th,td{border-color:#2a2f37}
+}
+</style></head><body>
+<h1>N7-G2 スキル別 価値プローブ</h1>
+<div class="sub">計測 2026-07-14。採用モデル value_gvi_latest.pt。selective 探索 深さ5・A0厳密終盤テーブル併用。値は勝率%換算＝100·(v+1)/2（50%＝互角）。測定専用（モデル・ルール不変）。</div>
+
+<div class="box">
+<b>いちばん短い結論</b><br>
+未使用スキルの共通の姿は「<b>発動した状態は強いが、中立から“宣言しに行く”のは損</b>」。理由は相手が指を上げず回避（defuse 約62%）できるから。神視点でもだいたい正しく“使わない”。<br>
+<b>例外＝実践級に使われるもの</b>：<b>フェイントのストック</b>と<b>フェイントを含むストックのペア</b>。ここは最適解でも約40〜50%の頻度で実際に使う。<br>
+<b>バフ候補</b>：<b>ガード</b>（宣言コストがほぼ互角 −0.026 なのに使用0%）と<b>ロック</b>（発動時66.9%と最強だが未使用）。
+</div>
+
+<h2>強い行動・弱い行動・実践級（深掘り）</h2>
+<div class="box">
+<b>■ 実践級（最適解でも実際に使う）</b>
+<ul>
+<li><b>チョイス:フェイント</b>（フェイント1個ストック時）＝最適使用 <b>40.8%</b>／AI 42.9%。Q=55.5%で保持価値と同値＝“使っても損しない最適手”。<b>これが「ストック0%は違和感」への答え：フェイントストックは実際に使われている。</b></li>
+<li><b>フェイント入りストックのペア</b>：{フェイント,ガード} 最適50.2%、{フェイント,スキップ} 48.0%、{フェイント,クイック} 44.8%、{フェイント,フラッシュ} 39.7%。オール/チョイスで消化。保持価値も57〜59%と高い。</li>
+<li><b>日常の主力</b>（中立の均衡手）＝フェイント 約41%・スキップ 約33%・ブースト 約25%。実戦AIの土台はこの3つ＋終盤の数字宣言。</li>
+</ul>
+<b>■ 発動すれば強いが「宣言」は損（＝未使用は妥当）</b>
+<ul>
+<li>ロック 発動時<b>66.9%</b>（全スキル最強の発動状態）／ セメント2個 62.8% ／ チャージ 60.1% ／ ガード 55.9%。いずれも中立から宣言すると相手のdefuseで −3〜−9pt になり、均衡が0%にするのは正しい。</li>
+</ul>
+<b>■ 弱い／注意</b>
+<ul>
+<li><b>フェイントの入らない単発ストック</b>（フラッシュ/ガード/スキップ/クイック単発、{フラッシュ,ガード}ペア）＝保持しても最適使用ほぼ0%。ストックの価値はほぼフェイントが担っている。</li>
+<li><b>タイム</b>＝発動状態でも 50.7%（互角級）で宣言コスト最大。ただし<b>フラグは相手が次に連続手番を取ろうとするまで不活性</b>なので単発測定では過小評価の可能性（要・追加測定）。</li>
+<li><b>チャージ</b>＝発動時60%だが宣言 −0.087（全幅でも −0.059、深さで不変＝horizonでない）。相手1本だと発動時49.8%まで低下＝弱い。</li>
+</ul>
+<b>■ ストックは最適解でどれだけ使われるか（保持時の消化率）</b>
+<ul>
+<li>フェイント含み：<b>40〜50%</b>（実践級）。フェイント無し：<b>ほぼ0%</b>（中立）。相手1本ではフラッシュ単発も17.9%まで上がる。</li>
+<li>＝ドメイン知識「ストックの筆頭＝フェイント」と完全一致。AIは既にそれを発見している。</li>
+</ul>
+</div>
+
+<div class="box"><b>計測上の注意（既知の限界）</b><br>
+単一ストックの「1手を単独forced-Qで見た最良」ではまれに<b>オール</b>が最良に出るが、これは<b>アーティファクト</b>。1個ストックではチョイスがオールの完全上位互換（同じ効果＋ストック温存で次フェイズ再使用可）のはずで、理論上オールが勝つことはない。原因は深さ5探索でチョイスの温存価値（2手以上先＝次フェイズ）が地平線の先で見えず、終盤（相手1本）では温存価値自体が消えるため。<b>信頼すべきは均衡混合（「均衡採用」「最適使用%」列）</b>で、そちらはフェイント単発で正しくチョイスを採用している。</div>
+
+<h2>全データ（24行）</h2>
+<div class="sub">発動済み＝そのスキルが効いている状態の価値。宣言コスト＝中立からそのスキルを宣言する手のQ値（gap＝均衡値との差、マイナス＝損）。AI使用＝配信版(深さ2)の使用率、最適使用＝深さ5探索の使用率。回避率＝相手が指を上げずにやり過ごす割合。</div>
+<div class="wrap"><table>
+<tr><th>行動</th><th>文脈</th><th>発動済<br>勝率%</th><th>宣言<br>勝率%</th><th>gap</th><th>AI使用%</th><th>最適使用%</th><th>回避%</th><th>判定</th></tr>
+<tr><td class='l'>チャージ</td><td>中立(2対2)</td><td class='n'>60.1</td><td class='n'>49.5</td><td class='n'>-0.087</td><td class='n'>0.0</td><td class='n b'>0.0</td><td class='n'>61.7</td><td><span class='tag' style='background:#2563eb'>条件付き強</span> 発動時は強いが宣言は損→未使用は妥当</td></tr>
+<tr><td class='l'>チャージ</td><td>相手1本(2対1)</td><td class='n'>49.8</td><td class='n'>32.8</td><td class='n'>-0.137</td><td class='n'>0.0</td><td class='n b'>0.0</td><td class='n'>13.0</td><td><span class='tag' style='background:#dc2626'>弱</span> 発動しても弱め</td></tr>
+<tr><td class='l'>ロック</td><td>中立(2対2)</td><td class='n'>66.9</td><td class='n'>50.6</td><td class='n'>-0.064</td><td class='n'>0.0</td><td class='n b'>0.0</td><td class='n'>61.7</td><td><span class='tag' style='background:#2563eb'>条件付き強</span> 発動時は強いが宣言は損→未使用は妥当</td></tr>
+<tr><td class='l'>ロック</td><td>相手1本(2対1)</td><td class='n'>64.3</td><td class='n'>35.5</td><td class='n'>-0.084</td><td class='n'>0.0</td><td class='n b'>0.0</td><td class='n'>13.0</td><td><span class='tag' style='background:#2563eb'>条件付き強</span> 発動時は強いが宣言は損→未使用は妥当</td></tr>
+<tr><td class='l'>ガード</td><td>中立(2対2)</td><td class='n'>55.9</td><td class='n'>52.6</td><td class='n'>-0.026</td><td class='n'>0.0</td><td class='n b'>0.0</td><td class='n'>61.7</td><td><span class='tag' style='background:#d97706'>要注目</span> 宣言コストほぼ互角なのに未使用＝バフ候補</td></tr>
+<tr><td class='l'>ガード</td><td>相手1本(2対1)</td><td class='n'>38.7</td><td class='n'>35.0</td><td class='n'>-0.092</td><td class='n'>0.0</td><td class='n b'>0.0</td><td class='n'>13.0</td><td><span class='tag' style='background:#dc2626'>弱</span> 発動しても弱め</td></tr>
+<tr><td class='l'>タイム</td><td>中立(2対2)</td><td class='n'>50.7</td><td class='n'>45.9</td><td class='n'>-0.159</td><td class='n'>0.0</td><td class='n b'>0.0</td><td class='n'>61.7</td><td><span class='tag' style='background:#6b7280'>中立</span> 発動時そこそこ・宣言は損</td></tr>
+<tr><td class='l'>タイム</td><td>相手1本(2対1)</td><td class='n'>35.3</td><td class='n'>30.4</td><td class='n'>-0.186</td><td class='n'>0.0</td><td class='n b'>0.0</td><td class='n'>13.0</td><td><span class='tag' style='background:#dc2626'>弱</span> 発動しても弱め</td></tr>
+<tr><td class='l'>ストック {ガード}</td><td>中立(2対2)</td><td class='n'>54.9</td><td class='n'>47.4</td><td class='n'>-0.130</td><td class='n'>0.0</td><td class='n b'>0.0</td><td class='n'>61.7</td><td><span class='tag' style='background:#9ca3af'>低</span> 最適ではほぼ使わない</td></tr>
+<tr><td class='l'>ストック {ガード}</td><td>相手1本(2対1)</td><td class='n'>37.6</td><td class='n'>30.3</td><td class='n'>-0.187</td><td class='n'>0.0</td><td class='n b'>0.0</td><td class='n'>13.0</td><td><span class='tag' style='background:#9ca3af'>低</span> 最適ではほぼ使わない</td></tr>
+<tr><td class='l'>ストック {クイック}</td><td>中立(2対2)</td><td class='n'>55.0</td><td class='n'>47.3</td><td class='n'>-0.130</td><td class='n'>0.0</td><td class='n b'>0.0</td><td class='n'>61.7</td><td><span class='tag' style='background:#9ca3af'>低</span> 最適ではほぼ使わない</td></tr>
+<tr><td class='l'>ストック {スキップ}</td><td>中立(2対2)</td><td class='n'>54.9</td><td class='n'>45.9</td><td class='n'>-0.205</td><td class='n'>0.0</td><td class='n b'>0.0</td><td class='n'>0.0</td><td><span class='tag' style='background:#9ca3af'>低</span> 最適ではほぼ使わない</td></tr>
+<tr><td class='l'>ストック {フェイント}</td><td>中立(2対2)</td><td class='n'>55.5</td><td class='n'>48.2</td><td class='n'>-0.166</td><td class='n'>42.9</td><td class='n b'>40.8</td><td class='n'>45.6</td><td><span class='tag' style='background:#16a34a'>実践級</span> 最適でも実際に使う（フェイント系） ・均衡採用=チョイス:フェイント</td></tr>
+<tr><td class='l'>ストック {フェイント}</td><td>相手1本(2対1)</td><td class='n'>38.3</td><td class='n'>31.5</td><td class='n'>-0.232</td><td class='n'>49.6</td><td class='n b'>50.6</td><td class='n'>16.1</td><td><span class='tag' style='background:#16a34a'>実践級</span> 最適でも実際に使う（フェイント系） ・均衡採用=チョイス:フェイント</td></tr>
+<tr><td class='l'>ストック {フェイント・ガード}</td><td>中立(2対2)</td><td class='n'>59.3</td><td class='n'>—</td><td class='n'>—</td><td class='n'>55.0</td><td class='n b'>50.2</td><td class='n'>0.0</td><td><span class='tag' style='background:#16a34a'>実践級</span> 最適でも実際に使う（フェイント系） ・均衡採用=オール</td></tr>
+<tr><td class='l'>ストック {フェイント・ガード}</td><td>相手1本(2対1)</td><td class='n'>42.1</td><td class='n'>—</td><td class='n'>—</td><td class='n'>54.8</td><td class='n b'>53.9</td><td class='n'>0.0</td><td><span class='tag' style='background:#16a34a'>実践級</span> 最適でも実際に使う（フェイント系） ・均衡採用=オール</td></tr>
+<tr><td class='l'>ストック {フェイント・クイック}</td><td>中立(2対2)</td><td class='n'>57.1</td><td class='n'>—</td><td class='n'>—</td><td class='n'>49.9</td><td class='n b'>44.8</td><td class='n'>0.0</td><td><span class='tag' style='background:#16a34a'>実践級</span> 最適でも実際に使う（フェイント系） ・均衡採用=オール</td></tr>
+<tr><td class='l'>ストック {フェイント・スキップ}</td><td>中立(2対2)</td><td class='n'>58.7</td><td class='n'>—</td><td class='n'>—</td><td class='n'>53.3</td><td class='n b'>48.0</td><td class='n'>0.0</td><td><span class='tag' style='background:#16a34a'>実践級</span> 最適でも実際に使う（フェイント系） ・均衡採用=オール</td></tr>
+<tr><td class='l'>ストック {フェイント・フラッシュ}</td><td>中立(2対2)</td><td class='n'>57.6</td><td class='n'>—</td><td class='n'>—</td><td class='n'>78.7</td><td class='n b'>39.7</td><td class='n'>0.0</td><td><span class='tag' style='background:#16a34a'>実践級</span> 最適でも実際に使う（フェイント系） ・均衡採用=チョイス:フェイント</td></tr>
+<tr><td class='l'>ストック {フェイント・フラッシュ}</td><td>相手1本(2対1)</td><td class='n'>41.2</td><td class='n'>—</td><td class='n'>—</td><td class='n'>22.3</td><td class='n b'>62.8</td><td class='n'>0.0</td><td><span class='tag' style='background:#16a34a'>実践級</span> 最適でも実際に使う（フェイント系） ・均衡採用=チョイス:フェイント</td></tr>
+<tr><td class='l'>ストック {フラッシュ}</td><td>中立(2対2)</td><td class='n'>55.1</td><td class='n'>47.3</td><td class='n'>-0.131</td><td class='n'>0.0</td><td class='n b'>1.1</td><td class='n'>61.7</td><td><span class='tag' style='background:#9ca3af'>低</span> 最適ではほぼ使わない ・均衡採用=チョイス:フラッシュ</td></tr>
+<tr><td class='l'>ストック {フラッシュ}</td><td>相手1本(2対1)</td><td class='n'>38.0</td><td class='n'>30.2</td><td class='n'>-0.189</td><td class='n'>21.7</td><td class='n b'>17.9</td><td class='n'>12.7</td><td><span class='tag' style='background:#0891b2'>中程度</span> 条件付きで使う ・均衡採用=オール</td></tr>
+<tr><td class='l'>ストック {フラッシュ・ガード}</td><td>中立(2対2)</td><td class='n'>56.0</td><td class='n'>—</td><td class='n'>—</td><td class='n'>0.0</td><td class='n b'>0.0</td><td class='n'>0.0</td><td><span class='tag' style='background:#9ca3af'>低</span> 最適ではほぼ使わない</td></tr>
+<tr><td class='l'>ストック {フラッシュ・ガード}</td><td>相手1本(2対1)</td><td class='n'>38.0</td><td class='n'>—</td><td class='n'>—</td><td class='n'>17.9</td><td class='n b'>14.0</td><td class='n'>0.0</td><td><span class='tag' style='background:#0891b2'>中程度</span> 条件付きで使う ・均衡採用=オール</td></tr>
+</table></div>
+
+<div class="sub" style="margin-top:16px">ハーネス: scratchpad/skill_probe.py（測定専用）。個別JSON: scratchpad/probe_results/*.json。関連: WORK_LOG「N7-G2」。</div>
+</body></html>

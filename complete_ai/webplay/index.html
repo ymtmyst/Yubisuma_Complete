@@ -8,11 +8,12 @@
 </head>
 <body>
 
-<!-- 右上トグル(こども/おとな・説明ポップアップ) -->
+<!-- 左上トグル(ルール・説明・サウンド) -->
 <div id="toggles">
   <a class="tg big" href="rulebook.html" target="_blank"><span class="tg-emoji">📖</span>ルール</a>
-  <button class="tg" id="tg-mode" data-mode="adult"><span class="tg-emoji">🧑</span><span id="tg-mode-label">おとな</span></button>
   <button class="tg on" id="tg-tip"><span class="tg-emoji">💬</span><span id="tg-tip-label">説明ON</span></button>
+  <button class="tg on" id="tg-meter"><span class="tg-emoji">📊</span><span id="tg-meter-label">形勢判断ON</span></button>
+  <button class="tg on" id="tg-sound"><span class="tg-emoji">🔊</span><span id="tg-sound-label">サウンドON</span></button>
 </div>
 
 <div id="app">
@@ -69,6 +70,12 @@
         <div class="meta" id="ai-meta"></div>
       </div>
       <div class="exchange" id="last-exchange"><div class="ex-empty">ゲーム開始！</div></div>
+      <div class="game-end hidden" id="game-end">
+        <div class="game-end-emoji" id="game-end-emoji"></div>
+        <div class="game-end-text" id="game-end-text"></div>
+        <div class="record" id="game-end-record"></div>
+        <button class="big-btn primary" id="again-inline"></button>
+      </div>
       <div class="player-panel human">
         <div class="panel-head"><span class="who">🙂 あなた</span><span class="badge" id="human-badge"></span></div>
         <div class="hands" id="human-hands"></div>

@@ -23,6 +23,11 @@ from numba import njit
 from numba.typed import Dict as NumbaDict
 from numba.core import types
 
+from complete_solver.choice_collapse import (
+    collapse_choice_matrix_packed,
+    collapse_choice_rows_njit,
+    is_choice_meta_code,
+)
 from complete_solver.packed_engine import legal_ntp_codes, legal_tp_codes, step
 from complete_solver.packed_vi import _matrix_value
 from complete_solver.small_matrix import solve_small_zero_sum
@@ -475,11 +480,20 @@ def expand_depth4(root0, root1, prune,
 @njit(cache=True, nogil=True)
 def backup_children(n_children, child_tp_n, child_ntp_n, child_offset,
                     cell_const, cell_leaf, leaf_values, gamma,
-                    matrix, tableau, basis, out_values, out_flags):
+                    matrix, tableau, basis, out_values, out_flags,
+                    child_keys0, child_keys1, prune,
+                    tp_buf, collapsed_codes, collapsed_matrix):
     """Back up each parent node's matrix-game value. out_flags[i] is set to 1
     when the fast solver could not certify an equilibrium (it returns a
     placeholder); the caller must re-solve those exactly (they are rare and
-    degenerate)."""
+    degenerate).
+
+    CHOICE fix: each node's own TP codes are recomputed (cheap — the same
+    enumeration expand_depth* already ran once to build the cells; codes
+    aren't persisted per-cell, only counts) so same-thumb CHOICE rows
+    (2+ choosable stock) can be collapsed to their per-column max — the
+    post-reaction skill pick — before the matrix-game value is taken. A
+    single/no-choice node's codes collapse to a no-op."""
     n_fail = 0
     for i in range(n_children):
         n_tp = child_tp_n[i]
@@ -493,7 +507,11 @@ def backup_children(n_children, child_tp_n, child_ntp_n, child_offset,
                 else:
                     matrix[a, b] = cell_const[pos] * gamma * leaf_values[leaf]
                 pos += 1
-        value, ok = _matrix_value(matrix, n_tp, n_ntp, tableau, basis)
+        _legal_tp_pruned(child_keys0[i], child_keys1[i], prune, tp_buf)
+        n_c = collapse_choice_rows_njit(
+            tp_buf, matrix, n_tp, n_ntp, collapsed_codes, collapsed_matrix
+        )
+        value, ok = _matrix_value(collapsed_matrix, n_c, n_ntp, tableau, basis)
         out_values[i] = value
         if ok:
             out_flags[i] = 0
@@ -505,11 +523,15 @@ def backup_children(n_children, child_tp_n, child_ntp_n, child_offset,
 
 @njit(cache=True, nogil=True)
 def root_value_only(n_tp, n_ntp, root_const, root_child, child_values, gamma,
-                    matrix, tableau, basis):
+                    matrix, tableau, basis, root_tp, collapsed_codes,
+                    collapsed_matrix):
     """Root game VALUE only (no policies) — used by value_depth3/4, which need
     just the target. Kept nogil so the whole backup is GIL-free and the
     threaded target path scales. Returns (value, ok); ok is False when the
-    fast solver could not certify an equilibrium (caller re-solves exactly)."""
+    fast solver could not certify an equilibrium (caller re-solves exactly).
+
+    CHOICE fix: same-thumb CHOICE rows (root_tp[a] >= 128) are collapsed to
+    their per-column max before the value is taken (see backup_children)."""
     for a in range(n_tp):
         for b in range(n_ntp):
             pos = a * n_ntp + b
@@ -518,7 +540,10 @@ def root_value_only(n_tp, n_ntp, root_const, root_child, child_values, gamma,
                 matrix[a, b] = root_const[pos]
             else:
                 matrix[a, b] = root_const[pos] * gamma * child_values[child]
-    value, ok = _matrix_value(matrix, n_tp, n_ntp, tableau, basis)
+    n_c = collapse_choice_rows_njit(
+        root_tp, matrix, n_tp, n_ntp, collapsed_codes, collapsed_matrix
+    )
+    value, ok = _matrix_value(collapsed_matrix, n_c, n_ntp, tableau, basis)
     return value, ok
 
 
@@ -551,6 +576,19 @@ class BatchedSearcher:
         # Reusable per-node certification-failure flags for _backup (max node
         # count across levels is MAX_L2 == MAX_L3). Avoids a per-call alloc.
         self._flags = np.zeros(MAX_L2, dtype=np.int64)
+        # CHOICE-collapse scratch (see choice_collapse.py): a node's own TP
+        # codes (recomputed per backup call) and the collapsed matrix buffer.
+        self._tp_code_buf = np.zeros(MAX_ACTIONS, dtype=np.int64)
+        self._collapsed_codes = np.zeros(MAX_ACTIONS, dtype=np.int64)
+        self._collapsed_matrix = np.zeros((MAX_ACTIONS, 16), dtype=np.float64)
+        # Per-state cache of the most recent solve()'s CHOICE collapse groups
+        # (meta code -> concrete codes), for post-reaction resolution
+        # (resolve_tp_code). Small (>=2 choosable stock only); one entry.
+        self._last_choice_groups: dict = {}
+        self._last_choice_key: tuple[int, int] | None = None
+        self._last_root_tp = np.zeros(0, dtype=np.int64)
+        self._last_root_ntp = np.zeros(0, dtype=np.int64)
+        self._last_root_matrix = np.zeros((0, 0), dtype=np.float64)
 
     def _net_values(self, keys0: np.ndarray, keys1: np.ndarray) -> np.ndarray:
         feats = features_from_lanes(keys0, keys1)
@@ -561,14 +599,17 @@ class BatchedSearcher:
                 out.append(self.model(chunk).float().cpu().numpy())
         return np.concatenate(out) if out else np.zeros(0, dtype=np.float32)
 
-    def _backup(self, n, tp_n, ntp_n, offset, const, idx, child_values):
+    def _backup(self, n, tp_n, ntp_n, offset, const, idx, child_values,
+                keys0, keys1):
         """Back up n parent nodes' game values via the fast njit solver, then
         re-solve exactly (solve_small_zero_sum) any node the fast solver could
         not certify. Such nodes are rare, degenerate matrices where the packed
         simplex stalls; the fast path returns a placeholder + failure flag by
         design (batched_search previously discarded the flag and used the
         placeholder — a ~0.04 error on skip/extra-turn target states, fixed
-        2026-07-14)."""
+        2026-07-14). ``keys0``/``keys1`` are the packed lane keys of these n
+        nodes — needed to recompute their own TP codes for the CHOICE
+        post-reaction collapse (see backup_children)."""
         out = np.zeros(max(n, 1), dtype=np.float64)
         if n <= 0:
             return out
@@ -576,6 +617,8 @@ class BatchedSearcher:
         n_fail = backup_children(
             n, tp_n, ntp_n, offset, const, idx, child_values,
             self.gamma, self._matrix, self._tableau, self._basis, out, flags,
+            keys0, keys1, self.prune_stock,
+            self._tp_code_buf, self._collapsed_codes, self._collapsed_matrix,
         )
         # Repair only the (rare, usually zero) uncertifiable nodes. When none
         # failed the hot path skips the scan entirely, so the nogil-friendly
@@ -587,11 +630,12 @@ class BatchedSearcher:
                 out[i] = self._exact_cell_value(
                     int(tp_n[i]), int(ntp_n[i]), int(offset[i]),
                     const, idx, child_values, float(out[i]),
+                    int(keys0[i]), int(keys1[i]),
                 )
         return out
 
     def _exact_cell_value(self, n_tp, n_ntp, offset, const, idx, child_values,
-                          fallback):
+                          fallback, lane0, lane1):
         matrix = np.empty((n_tp, n_ntp))
         for a in range(n_tp):
             base = offset + a * n_ntp
@@ -602,14 +646,22 @@ class BatchedSearcher:
                     matrix[a, b] = const[pos]
                 else:
                     matrix[a, b] = const[pos] * self.gamma * child_values[leaf]
+        codes = np.empty(n_tp, dtype=np.int64)
+        _legal_tp_pruned(np.int64(lane0), np.int64(lane1), self.prune_stock,
+                         self._tp_code_buf)
+        codes[:] = self._tp_code_buf[:n_tp]
+        _, matrix, _ = collapse_choice_matrix_packed(codes, matrix)
         return _safe_matrix_value(matrix, fallback)
 
-    def _root_value(self, n_tp, n_ntp, root_const, root_child, child_values):
+    def _root_value(self, n_tp, n_ntp, root_const, root_child, child_values,
+                    root_tp):
         """Root game value (no policies), with the same exact-repair fallback
-        as _backup for uncertifiable degenerate matrices."""
+        as _backup for uncertifiable degenerate matrices. ``root_tp`` are the
+        root's own TP codes (needed for the CHOICE post-reaction collapse)."""
         value, ok = root_value_only(
             n_tp, n_ntp, root_const, root_child, child_values,
             self.gamma, self._matrix, self._tableau, self._basis,
+            root_tp, self._collapsed_codes, self._collapsed_matrix,
         )
         if ok:
             return float(value)
@@ -622,12 +674,22 @@ class BatchedSearcher:
                     matrix[a, b] = root_const[pos]
                 else:
                     matrix[a, b] = root_const[pos] * self.gamma * child_values[child]
+        _, matrix, _ = collapse_choice_matrix_packed(
+            np.asarray(root_tp[:n_tp]), matrix
+        )
         # `value` is the bounded njit placeholder; keep it if repair errors.
         return _safe_matrix_value(matrix, value)
 
     def solve(self, lane0: int, lane1: int):
         """Depth-2 net-leaf solve. Returns (value, tp_codes, ntp_codes,
-        tp_policy, ntp_policy)."""
+        tp_policy, ntp_policy).
+
+        CHOICE fix: same-thumb CHOICE codes (2+ choosable stock) are
+        collapsed to one pseudo code (``choice_collapse.CHOICE_META_BASE +
+        thumb``) whose row is the per-column max — the post-reaction skill
+        pick. A single/no-choice state's codes pass through unchanged. Call
+        ``resolve_tp_code`` after the opponent's NTP action is realized to
+        turn a sampled meta code into the concrete code ``step`` needs."""
         n_tp, n_ntp, n_children, n_leaves = expand_depth2(
             np.int64(lane0), np.int64(lane1), self.prune_stock,
             self._root_tp, self._root_ntp,
@@ -651,6 +713,7 @@ class BatchedSearcher:
         child_values = self._backup(
             n_children, self._child_tp_n, self._child_ntp_n,
             self._child_offset, self._cell_const, self._cell_leaf, leaf_values,
+            self._child_keys0, self._child_keys1,
         )
 
         root_matrix = np.empty((n_tp, n_ntp))
@@ -664,14 +727,63 @@ class BatchedSearcher:
                     root_matrix[a, b] = (
                         self._root_const[pos] * self.gamma * child_values[child]
                     )
-        value, tp_policy, ntp_policy = solve_small_zero_sum(root_matrix)
+        root_tp = self._root_tp[:n_tp].copy()
+        root_ntp = self._root_ntp[:n_ntp].copy()
+        tp_codes, collapsed_matrix, groups = collapse_choice_matrix_packed(
+            root_tp, root_matrix
+        )
+        value, tp_policy, ntp_policy = solve_small_zero_sum(collapsed_matrix)
+        # Cache the UNCOLLAPSED root matrix (not just the groups) so
+        # resolve_tp_code can look up the exact per-candidate payoff against
+        # the realized reaction directly — the same numbers the column-max
+        # used for the LP value, no recomputation.
+        self._last_choice_key = (int(lane0), int(lane1))
+        self._last_choice_groups = groups
+        self._last_root_tp = root_tp
+        self._last_root_ntp = root_ntp
+        self._last_root_matrix = root_matrix
         return (
             float(value),
-            self._root_tp[:n_tp].copy(),
-            self._root_ntp[:n_ntp].copy(),
+            tp_codes,
+            root_ntp,
             tp_policy,
             ntp_policy,
         )
+
+    def resolve_tp_code(self, lane0: int, lane1: int, tp_code: int,
+                        ntp_code: int) -> int:
+        """Post-reaction resolution: turn a sampled TP code from ``solve()``
+        into a concrete code ``step`` can execute.
+
+        Non-CHOICE-meta codes pass through unchanged. A collapsed CHOICE meta
+        code (``is_choice_meta_code(tp_code)``) is resolved to the stocked
+        skill that maximizes the payoff against the REALIZED opponent
+        reaction ``ntp_code`` — the post-reaction (second-mover) skill pick
+        this whole fix implements, read directly off the uncollapsed root
+        matrix ``solve()`` just built (the exact numbers the column-max
+        collapse used). Must be called with the SAME (lane0, lane1) as the
+        immediately preceding ``solve()`` call."""
+        if not is_choice_meta_code(tp_code):
+            return tp_code
+        key = (int(lane0), int(lane1))
+        if key != self._last_choice_key or tp_code not in self._last_choice_groups:
+            # Defensive fallback: recompute a one-off solve() to populate the
+            # cache (should not normally trigger — callers resolve right
+            # after solve()).
+            self.solve(lane0, lane1)
+        candidates = self._last_choice_groups[tp_code]
+        if len(candidates) == 1:
+            return int(candidates[0])
+        col = int(np.nonzero(self._last_root_ntp == ntp_code)[0][0])
+        code_to_row = {int(c): r for r, c in enumerate(self._last_root_tp)}
+        best_code, best_value = candidates[0], -float("inf")
+        for code in candidates:
+            row = code_to_row[int(code)]
+            value = float(self._last_root_matrix[row, col])
+            if value > best_value:
+                best_value = value
+                best_code = code
+        return int(best_code)
 
     def _expand_depth2_snapshot(self, lane0: int, lane1: int):
         """Expand one depth-2 tree and copy out the slices needed to back it
@@ -703,6 +815,8 @@ class BatchedSearcher:
             self._child_ntp_n[:n_children].copy(),
             self._child_offset[:n_children].copy(),
             self._cell_const[:cells].copy(), self._cell_leaf[:cells].copy(),
+            self._child_keys0[:n_children].copy(),
+            self._child_keys1[:n_children].copy(),
         )
         return (
             snap,
@@ -712,14 +826,15 @@ class BatchedSearcher:
 
     def _backup_depth2(self, snap, leaf_values: np.ndarray):
         """Back up a depth-2 snapshot. Returns (value, tp_codes, ntp_codes,
-        tp_policy, ntp_policy) — identical to solve()."""
+        tp_policy, ntp_policy) — identical to solve() (CHOICE collapse
+        included; see solve())."""
         (n_tp, n_ntp, n_children, n_leaves,
          root_tp, root_ntp, root_const, root_child,
          child_tp_n, child_ntp_n, child_offset,
-         cell_const, cell_leaf) = snap
+         cell_const, cell_leaf, child_keys0, child_keys1) = snap
         child_values = self._backup(
             n_children, child_tp_n, child_ntp_n, child_offset,
-            cell_const, cell_leaf, leaf_values,
+            cell_const, cell_leaf, leaf_values, child_keys0, child_keys1,
         )
         root_matrix = np.empty((n_tp, n_ntp))
         for a in range(n_tp):
@@ -730,8 +845,15 @@ class BatchedSearcher:
                     root_matrix[a, b] = root_const[pos]
                 else:
                     root_matrix[a, b] = root_const[pos] * self.gamma * child_values[child]
-        value, tp_policy, ntp_policy = solve_small_zero_sum(root_matrix)
-        return float(value), root_tp, root_ntp, tp_policy, ntp_policy
+        tp_codes, collapsed_matrix, groups = collapse_choice_matrix_packed(
+            root_tp, root_matrix
+        )
+        value, tp_policy, ntp_policy = solve_small_zero_sum(collapsed_matrix)
+        self._last_choice_groups = groups
+        self._last_root_tp = root_tp
+        self._last_root_ntp = root_ntp
+        self._last_root_matrix = root_matrix
+        return float(value), tp_codes, root_ntp, tp_policy, ntp_policy
 
     def solve_batch(self, keys0, keys1, leaf_budget: int = 120_000):
         """Depth-2 net-leaf solve for many states in one shot — identical
@@ -837,13 +959,16 @@ class BatchedSearcher:
         l2_values = self._backup(
             n_l2, self._l2_tp_n, self._l2_ntp_n, self._l2_offset,
             self._l2_const, self._l2_idx, leaf_values,
+            self._l2_keys0, self._l2_keys1,
         )
         l1_values = self._backup(
             n_l1, self._child_tp_n, self._child_ntp_n, self._child_offset,
             self._l1_const, self._l1_idx, l2_values,
+            self._child_keys0, self._child_keys1,
         )
         value = self._root_value(
             n_tp, n_ntp, self._root_const, self._root_child, l1_values,
+            self._root_tp,
         )
         return float(value)
 
@@ -905,17 +1030,21 @@ class BatchedSearcher:
         l3_values = self._backup(
             n_l3, self._l3_tp_n, self._l3_ntp_n, self._l3_offset,
             self._l3_const, self._l3_idx, leaf_values,
+            self._l3_keys0, self._l3_keys1,
         )
         l2_values = self._backup(
             n_l2, self._l2_tp_n, self._l2_ntp_n, self._l2_offset,
             self._l2_const, self._l2_idx, l3_values,
+            self._l2_keys0, self._l2_keys1,
         )
         l1_values = self._backup(
             n_l1, self._child_tp_n, self._child_ntp_n, self._child_offset,
             self._l1_const, self._l1_idx, l2_values,
+            self._child_keys0, self._child_keys1,
         )
         value = self._root_value(
             n_tp, n_ntp, self._root_const, self._root_child, l1_values,
+            self._root_tp,
         )
         return float(value)
 
@@ -952,12 +1081,15 @@ class BatchedSearcher:
         rc = n_tp * n_ntp
         snap = (
             n_tp, n_ntp, n_l1, n_l2, n_leaves,
+            self._root_tp[:n_tp].copy(),
             self._root_const[:rc].copy(), self._root_child[:rc].copy(),
             self._child_tp_n[:n_l1].copy(), self._child_ntp_n[:n_l1].copy(),
             self._child_offset[:n_l1].copy(),
+            self._child_keys0[:n_l1].copy(), self._child_keys1[:n_l1].copy(),
             self._l1_const[:l1_cells].copy(), self._l1_idx[:l1_cells].copy(),
             self._l2_tp_n[:n_l2].copy(), self._l2_ntp_n[:n_l2].copy(),
             self._l2_offset[:n_l2].copy(),
+            self._l2_keys0[:n_l2].copy(), self._l2_keys1[:n_l2].copy(),
             self._l2_const[:l2_cells].copy(), self._l2_idx[:l2_cells].copy(),
         )
         return (
@@ -970,18 +1102,23 @@ class BatchedSearcher:
         """Back up a snapshot from _expand_depth3_snapshot given its leaf
         values. Mirrors value_depth3's backup exactly."""
         (n_tp, n_ntp, n_l1, n_l2, n_leaves,
+         root_tp,
          root_const, root_child, child_tp_n, child_ntp_n, child_offset,
+         child_keys0, child_keys1,
          l1_const, l1_idx, l2_tp_n, l2_ntp_n, l2_offset,
+         l2_keys0, l2_keys1,
          l2_const, l2_idx) = snap
 
         l2_values = self._backup(
             n_l2, l2_tp_n, l2_ntp_n, l2_offset, l2_const, l2_idx, leaf_values,
+            l2_keys0, l2_keys1,
         )
         l1_values = self._backup(
             n_l1, child_tp_n, child_ntp_n, child_offset,
-            l1_const, l1_idx, l2_values,
+            l1_const, l1_idx, l2_values, child_keys0, child_keys1,
         )
-        value = self._root_value(n_tp, n_ntp, root_const, root_child, l1_values)
+        value = self._root_value(n_tp, n_ntp, root_const, root_child, l1_values,
+                                 root_tp)
         return float(value)
 
     def value_depth3_batch(self, keys0, keys1, leaf_budget: int = 80_000):

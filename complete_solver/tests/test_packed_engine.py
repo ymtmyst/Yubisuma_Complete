@@ -150,6 +150,16 @@ class TestPackedEngineDifferential(unittest.TestCase):
 
         events: set = set()
         specials = [
+            # Opening combo may not reduce the mover to zero before the
+            # opponent has made their first declaration.
+            State(
+                me=PlayerState(hands=1, quick_level=1),
+                opp=PlayerState(has_declared_skill=False),
+            ),
+            State(
+                me=PlayerState(hands=2, quick_level=2),
+                opp=PlayerState(has_declared_skill=False),
+            ),
             # Skipped player holding Time (the skip+time interrupt).
             State(
                 me=PlayerState(has_declared_skill=True, skip_phases=1,

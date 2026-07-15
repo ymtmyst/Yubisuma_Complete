@@ -1,0 +1,79 @@
+<!doctype html><html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>壊れストック因果実験 — 行動分布（2026-07-15）</title>
+<style>
+:root{color-scheme:light dark}
+body{font-family:-apple-system,"Segoe UI","Yu Gothic UI",sans-serif;line-height:1.6;max-width:1000px;margin:0 auto;padding:24px;color:#111;background:#fff}
+h1{font-size:22px;margin:0 0 4px} h2{font-size:17px;margin:24px 0 6px;border-left:5px solid #2563eb;padding-left:8px}
+.sub{color:#666;font-size:13px} .mini{font-size:12.5px;margin:4px 0;color:#333}
+.box{background:#f6f8fa;border:1px solid #e2e6ea;border-radius:10px;padding:13px 17px;margin:12px 0}
+table{border-collapse:collapse;width:100%;font-size:13px;margin-top:6px}
+th,td{border:1px solid #e2e6ea;padding:5px 8px;text-align:left;vertical-align:top}
+th{background:#eef2f7} td.n{text-align:right;font-variant-numeric:tabular-nums} td.b{font-weight:700} td.l{font-weight:600}
+table.bar{border:0} table.bar td{border:0;padding:2px 6px} table.bar td.l{width:130px} table.bar td.n{width:56px}
+.cols{display:flex;gap:20px;flex-wrap:wrap} .col{flex:1;min-width:300px}
+@media (prefers-color-scheme:dark){body{color:#e6e6e6;background:#0f1115}.box{background:#161a20;border-color:#2a2f37}th{background:#1b2028}th,td{border-color:#2a2f37}.mini{color:#cfd3d8}}
+</style></head><body>
+<h1>壊れストック 因果実験 — AIの行動分布</h1>
+<div class="sub">計測 2026-07-15。各400局×2席の自己対戦（方策の混合戦略からサンプリング、CHOICEは反応公開後に最適スキルを解決）。測定専用。</div>
+
+<div class="box">
+<b>この実験は何か</b><br>
+基本ルールでAIは<b>ストックをほぼ使わない(宣言0.03%)</b>。これが「探索/学習の盲点」なのか「真に弱いから」なのかを切り分けるため、ストックを段階的に“壊れ性能”にして、AIが使い始めるかを見た。<br>
+<b>結論</b>: 壊すと<b>学習系は即ストックを大量採用</b>する（保持 0% → 約78〜87%）。∴ 基本ルールの0%は盲点でなく<b>“真に割に合わない”正しい0%</b>＝学習系は価値があれば拾う。<b>貫通(P1)もテンポ無料(P2)も単体で保持~78%を誘発（ほぼ同等）</b>＝どちらの緩和でも採用される（両方入りP3が最強87%）。全部盛りは壊れすぎてゲームが退化(平均長が伸び、チョイス:スキップで追加ターン無限化)し、学習LPが数値破綻(gen10で打切り)＝“壊れ”の証拠。
+</div>
+
+<h2>4構成の比較</h2>
+<div style="overflow-x:auto"><table>
+<tr><th>構成</th><th>ストック<br>保持%</th><th>宣言%</th><th>消化%</th><th>平均<br>ゲーム長</th><th>a0<br>(強さ)</th><th>主な行動 top3</th></tr>
+<tr><td class='l'>baseline</td><td class='n b'>0.0</td><td class='n'>0.00</td><td class='n'>0.00</td><td class='n'>9.0</td><td class='n'>0.834</td><td class='sub'>フェイント 22%、数字 17%、コピー 16%</td></tr>
+<tr><td class='l'>P1: 貫通</td><td class='n b'>78.8</td><td class='n'>2.87</td><td class='n'>70.31</td><td class='n'>32.9</td><td class='n'>0.836</td><td class='sub'>チョイス:スキップ 69%、スキップ 9%、フェイント 5%</td></tr>
+<tr><td class='l'>P2: テンポ無料</td><td class='n b'>77.7</td><td class='n'>13.26</td><td class='n'>70.15</td><td class='n'>25.6</td><td class='n'>0.831</td><td class='sub'>チョイス:スキップ 64%、ストック:フェイント 8%、フェイント 6%</td></tr>
+<tr><td class='l'>P3: 全部盛り</td><td class='n b'>86.7</td><td class='n'>25.63</td><td class='n'>67.62</td><td class='n'>23.3</td><td class='n'>0.807</td><td class='sub'>チョイス:スキップ 48%、チョイス:ガード 13%、ストック:フェイント 9%</td></tr>
+</table></div>
+<div class="sub" style="margin-top:4px">ストック保持=1手でもストックを持つ盤面の割合。消化=チョイス/オール/ドロップの使用率。基本ゲームの平均ゲーム長は約9手。</div>
+
+<h2 style="border:0;margin-top:26px;font-size:18px">構成別の詳細分布</h2>
+
+<h2>baseline</h2>
+<div class="sub">基本ルール + 正しいCHOICE(バグ修正済)。壊し無し。　ストック保持 <b>0.0%</b>・宣言 <b>0.00%</b>・消化 <b>0.00%</b>・平均ゲーム長 <b>9.0手</b>（基本~9手）</div>
+<div class="cols">
+  <div class="col"><b>行動分布(全体)</b><table class='bar'><tr><td class='l'>フェイント</td><td class='n'>21.8%</td><td><div style='background:#3b82f6;height:11px;width:100%;border-radius:3px'></div></td></tr><tr><td class='l'>数字</td><td class='n'>17.2%</td><td><div style='background:#3b82f6;height:11px;width:79%;border-radius:3px'></div></td></tr><tr><td class='l'>コピー</td><td class='n'>16.1%</td><td><div style='background:#3b82f6;height:11px;width:74%;border-radius:3px'></div></td></tr><tr><td class='l'>スキップ</td><td class='n'>13.8%</td><td><div style='background:#3b82f6;height:11px;width:63%;border-radius:3px'></div></td></tr><tr><td class='l'>フラッシュ</td><td class='n'>10.1%</td><td><div style='background:#3b82f6;height:11px;width:46%;border-radius:3px'></div></td></tr><tr><td class='l'>ガード</td><td class='n'>9.1%</td><td><div style='background:#3b82f6;height:11px;width:41%;border-radius:3px'></div></td></tr><tr><td class='l'>ブースト</td><td class='n'>7.3%</td><td><div style='background:#3b82f6;height:11px;width:33%;border-radius:3px'></div></td></tr><tr><td class='l'>クイック</td><td class='n'>4.2%</td><td><div style='background:#3b82f6;height:11px;width:19%;border-radius:3px'></div></td></tr><tr><td class='l'>セメント</td><td class='n'>0.2%</td><td><div style='background:#3b82f6;height:11px;width:1%;border-radius:3px'></div></td></tr><tr><td class='l'>ロック</td><td class='n'>0.1%</td><td><div style='background:#3b82f6;height:11px;width:0%;border-radius:3px'></div></td></tr></table></div>
+  <div class="col"><b>初手の分布</b><table class='bar'><tr><td class='l'>フェイント</td><td class='n'>42.2%</td><td><div style='background:#16a34a;height:11px;width:100%;border-radius:3px'></div></td></tr><tr><td class='l'>スキップ</td><td class='n'>29.5%</td><td><div style='background:#16a34a;height:11px;width:69%;border-radius:3px'></div></td></tr><tr><td class='l'>ブースト</td><td class='n'>28.2%</td><td><div style='background:#16a34a;height:11px;width:66%;border-radius:3px'></div></td></tr></table></div>
+</div>
+<div class="mini"><b>上げ本数(thumb)</b>: 0 87.13% / 1 9.01% / 2 3.86%　｜　<b>相手反応</b>: なし 58.47% / カウンター 32.75% / ブロック 8.79%</div>
+<div class="mini"><b>保持サイズ</b>: 0 100.0%　｜　<b>ストックした技(延べ)</b>: —</div>
+
+
+<h2>P1: 貫通</h2>
+<div class="sub">自由選択ストック + アルファ無制限 + カウンター貫通。テンポ損は残す。　ストック保持 <b>78.8%</b>・宣言 <b>2.87%</b>・消化 <b>70.31%</b>・平均ゲーム長 <b>32.9手</b>（基本~9手）</div>
+<div class="cols">
+  <div class="col"><b>行動分布(全体)</b><table class='bar'><tr><td class='l'>チョイス:スキップ</td><td class='n'>68.7%</td><td><div style='background:#3b82f6;height:11px;width:100%;border-radius:3px'></div></td></tr><tr><td class='l'>スキップ</td><td class='n'>9.2%</td><td><div style='background:#3b82f6;height:11px;width:13%;border-radius:3px'></div></td></tr><tr><td class='l'>フェイント</td><td class='n'>5.2%</td><td><div style='background:#3b82f6;height:11px;width:7%;border-radius:3px'></div></td></tr><tr><td class='l'>コピー</td><td class='n'>3.4%</td><td><div style='background:#3b82f6;height:11px;width:4%;border-radius:3px'></div></td></tr><tr><td class='l'>数字</td><td class='n'>2.6%</td><td><div style='background:#3b82f6;height:11px;width:3%;border-radius:3px'></div></td></tr><tr><td class='l'>ブースト</td><td class='n'>2.1%</td><td><div style='background:#3b82f6;height:11px;width:3%;border-radius:3px'></div></td></tr><tr><td class='l'>フラッシュ</td><td class='n'>2.0%</td><td><div style='background:#3b82f6;height:11px;width:2%;border-radius:3px'></div></td></tr><tr><td class='l'>ガード</td><td class='n'>1.9%</td><td><div style='background:#3b82f6;height:11px;width:2%;border-radius:3px'></div></td></tr><tr><td class='l'>ストック:スキップ</td><td class='n'>1.4%</td><td><div style='background:#3b82f6;height:11px;width:2%;border-radius:3px'></div></td></tr><tr><td class='l'>チョイス:フェイント</td><td class='n'>1.4%</td><td><div style='background:#3b82f6;height:11px;width:1%;border-radius:3px'></div></td></tr><tr><td class='l'>ストック:フェイント</td><td class='n'>1.4%</td><td><div style='background:#3b82f6;height:11px;width:1%;border-radius:3px'></div></td></tr><tr><td class='l'>クイック</td><td class='n'>0.5%</td><td><div style='background:#3b82f6;height:11px;width:0%;border-radius:3px'></div></td></tr><tr><td class='l'>ドロップ</td><td class='n'>0.1%</td><td><div style='background:#3b82f6;height:11px;width:0%;border-radius:3px'></div></td></tr><tr><td class='l'>ストック:フラッシュ</td><td class='n'>0.1%</td><td><div style='background:#3b82f6;height:11px;width:0%;border-radius:3px'></div></td></tr></table></div>
+  <div class="col"><b>初手の分布</b><table class='bar'><tr><td class='l'>フェイント</td><td class='n'>53.5%</td><td><div style='background:#16a34a;height:11px;width:100%;border-radius:3px'></div></td></tr><tr><td class='l'>ブースト</td><td class='n'>25.0%</td><td><div style='background:#16a34a;height:11px;width:46%;border-radius:3px'></div></td></tr><tr><td class='l'>スキップ</td><td class='n'>21.5%</td><td><div style='background:#16a34a;height:11px;width:40%;border-radius:3px'></div></td></tr></table></div>
+</div>
+<div class="mini"><b>上げ本数(thumb)</b>: 0 97.55% / 1 1.81% / 2 0.64%　｜　<b>相手反応</b>: なし 88.03% / カウンター 9.01% / ブロック 2.96%</div>
+<div class="mini"><b>保持サイズ</b>: 0 21.25% / 1 1.44% / 2 76.82% / 3 0.43% / 4 0.08%　｜　<b>ストックした技(延べ)</b>: スキップ 10270 / フェイント 10255 / フラッシュ 59 / ガード 11 / セメント 5 / ロック 1</div>
+
+
+<h2>P2: テンポ無料</h2>
+<div class="sub">自由選択ストック + アルファ無制限 + テンポ無料(宣言で追加1ターン)。貫通なし。　ストック保持 <b>77.7%</b>・宣言 <b>13.26%</b>・消化 <b>70.15%</b>・平均ゲーム長 <b>25.6手</b>（基本~9手）</div>
+<div class="cols">
+  <div class="col"><b>行動分布(全体)</b><table class='bar'><tr><td class='l'>チョイス:スキップ</td><td class='n'>63.6%</td><td><div style='background:#3b82f6;height:11px;width:100%;border-radius:3px'></div></td></tr><tr><td class='l'>ストック:フェイント</td><td class='n'>8.0%</td><td><div style='background:#3b82f6;height:11px;width:12%;border-radius:3px'></div></td></tr><tr><td class='l'>フェイント</td><td class='n'>6.2%</td><td><div style='background:#3b82f6;height:11px;width:9%;border-radius:3px'></div></td></tr><tr><td class='l'>チョイス:フェイント</td><td class='n'>6.0%</td><td><div style='background:#3b82f6;height:11px;width:9%;border-radius:3px'></div></td></tr><tr><td class='l'>スキップ</td><td class='n'>4.0%</td><td><div style='background:#3b82f6;height:11px;width:6%;border-radius:3px'></div></td></tr><tr><td class='l'>ストック:スキップ</td><td class='n'>3.9%</td><td><div style='background:#3b82f6;height:11px;width:6%;border-radius:3px'></div></td></tr><tr><td class='l'>数字</td><td class='n'>2.8%</td><td><div style='background:#3b82f6;height:11px;width:4%;border-radius:3px'></div></td></tr><tr><td class='l'>コピー</td><td class='n'>2.8%</td><td><div style='background:#3b82f6;height:11px;width:4%;border-radius:3px'></div></td></tr><tr><td class='l'>ストック:フラッシュ</td><td class='n'>1.0%</td><td><div style='background:#3b82f6;height:11px;width:1%;border-radius:3px'></div></td></tr><tr><td class='l'>ブースト</td><td class='n'>0.4%</td><td><div style='background:#3b82f6;height:11px;width:0%;border-radius:3px'></div></td></tr><tr><td class='l'>チョイス:フラッシュ</td><td class='n'>0.3%</td><td><div style='background:#3b82f6;height:11px;width:0%;border-radius:3px'></div></td></tr><tr><td class='l'>フラッシュ</td><td class='n'>0.3%</td><td><div style='background:#3b82f6;height:11px;width:0%;border-radius:3px'></div></td></tr><tr><td class='l'>ストック:ガード</td><td class='n'>0.2%</td><td><div style='background:#3b82f6;height:11px;width:0%;border-radius:3px'></div></td></tr><tr><td class='l'>ストック:セメント</td><td class='n'>0.1%</td><td><div style='background:#3b82f6;height:11px;width:0%;border-radius:3px'></div></td></tr></table></div>
+  <div class="col"><b>初手の分布</b><table class='bar'><tr><td class='l'>フェイント</td><td class='n'>43.8%</td><td><div style='background:#16a34a;height:11px;width:100%;border-radius:3px'></div></td></tr><tr><td class='l'>ストック:フェイント</td><td class='n'>42.2%</td><td><div style='background:#16a34a;height:11px;width:96%;border-radius:3px'></div></td></tr><tr><td class='l'>スキップ</td><td class='n'>14.0%</td><td><div style='background:#16a34a;height:11px;width:32%;border-radius:3px'></div></td></tr></table></div>
+</div>
+<div class="mini"><b>上げ本数(thumb)</b>: 0 87.99% / 1 11.91% / 2 0.1%　｜　<b>相手反応</b>: なし 80.21% / カウンター 14.28% / ブロック 5.51%</div>
+<div class="mini"><b>保持サイズ</b>: 0 22.26% / 1 10.07% / 2 41.35% / 3 17.3% / 4 7.04% / 5 1.55% / 6 0.43%　｜　<b>ストックした技(延べ)</b>: フェイント 7969 / スキップ 6943 / フラッシュ 2480 / ガード 905 / セメント 442 / クイック 44 / ロック 1</div>
+
+
+<h2>P3: 全部盛り</h2>
+<div class="sub">全4トグル(貫通+テンポ無料+自由選択+アルファ無制限)。壊れすぎて退化・学習はgen10でLPクラッシュ。　ストック保持 <b>86.7%</b>・宣言 <b>25.63%</b>・消化 <b>67.62%</b>・平均ゲーム長 <b>23.3手</b>（基本~9手）</div>
+<div class="cols">
+  <div class="col"><b>行動分布(全体)</b><table class='bar'><tr><td class='l'>チョイス:スキップ</td><td class='n'>47.8%</td><td><div style='background:#3b82f6;height:11px;width:100%;border-radius:3px'></div></td></tr><tr><td class='l'>チョイス:ガード</td><td class='n'>12.9%</td><td><div style='background:#3b82f6;height:11px;width:27%;border-radius:3px'></div></td></tr><tr><td class='l'>ストック:フェイント</td><td class='n'>8.6%</td><td><div style='background:#3b82f6;height:11px;width:17%;border-radius:3px'></div></td></tr><tr><td class='l'>ストック:スキップ</td><td class='n'>6.7%</td><td><div style='background:#3b82f6;height:11px;width:13%;border-radius:3px'></div></td></tr><tr><td class='l'>ストック:フラッシュ</td><td class='n'>5.1%</td><td><div style='background:#3b82f6;height:11px;width:10%;border-radius:3px'></div></td></tr><tr><td class='l'>ストック:ガード</td><td class='n'>4.0%</td><td><div style='background:#3b82f6;height:11px;width:8%;border-radius:3px'></div></td></tr><tr><td class='l'>チョイス:フラッシュ</td><td class='n'>3.6%</td><td><div style='background:#3b82f6;height:11px;width:7%;border-radius:3px'></div></td></tr><tr><td class='l'>スキップ</td><td class='n'>3.4%</td><td><div style='background:#3b82f6;height:11px;width:7%;border-radius:3px'></div></td></tr><tr><td class='l'>チョイス:フェイント</td><td class='n'>1.8%</td><td><div style='background:#3b82f6;height:11px;width:3%;border-radius:3px'></div></td></tr><tr><td class='l'>数字</td><td class='n'>1.5%</td><td><div style='background:#3b82f6;height:11px;width:3%;border-radius:3px'></div></td></tr><tr><td class='l'>フェイント</td><td class='n'>1.5%</td><td><div style='background:#3b82f6;height:11px;width:3%;border-radius:3px'></div></td></tr><tr><td class='l'>オール</td><td class='n'>1.5%</td><td><div style='background:#3b82f6;height:11px;width:3%;border-radius:3px'></div></td></tr><tr><td class='l'>ストック:クイック</td><td class='n'>0.7%</td><td><div style='background:#3b82f6;height:11px;width:1%;border-radius:3px'></div></td></tr><tr><td class='l'>ストック:ロック</td><td class='n'>0.6%</td><td><div style='background:#3b82f6;height:11px;width:1%;border-radius:3px'></div></td></tr></table></div>
+  <div class="col"><b>初手の分布</b><table class='bar'><tr><td class='l'>ストック:フェイント</td><td class='n'>81.2%</td><td><div style='background:#16a34a;height:11px;width:100%;border-radius:3px'></div></td></tr><tr><td class='l'>スキップ</td><td class='n'>11.5%</td><td><div style='background:#16a34a;height:11px;width:14%;border-radius:3px'></div></td></tr><tr><td class='l'>フェイント</td><td class='n'>7.2%</td><td><div style='background:#16a34a;height:11px;width:8%;border-radius:3px'></div></td></tr></table></div>
+</div>
+<div class="mini"><b>上げ本数(thumb)</b>: 0 73.67% / 1 23.97% / 2 2.36%　｜　<b>相手反応</b>: なし 77.29% / カウンター 16.57% / ブロック 6.14%</div>
+<div class="mini"><b>保持サイズ</b>: 0 13.26% / 1 8.73% / 2 23.42% / 3 15.39% / 4 11.59% / 5 27.61%　｜　<b>ストックした技(延べ)</b>: スキップ 7276 / フェイント 7157 / フラッシュ 5530 / ガード 4029 / クイック 2591 / ロック 113</div>
+
+
+<div class="sub" style="margin-top:18px">生成: scratchpad/stock_policy_dist.py + build_broken_stock_report.py。個別JSON: data/dist_*.json。関連: WORK_LOG「壊れストック因果実験」、skill_value_probe_2026-07-14.html。</div>
+</body></html>

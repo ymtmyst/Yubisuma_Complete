@@ -26,6 +26,7 @@ from .constants import (
     ULTIMATE_TP_SKILLS,
 )
 from .state import SkillRef, State
+from .toggles import STOCK_FREECHOICE, STOCK_UNLIMITED_ALPHA
 
 
 @dataclass(frozen=True)
@@ -51,6 +52,10 @@ class TPAction:
     thumb: int = 0
     choice: str | None = None
     all_order: tuple[str, ...] = ()
+    # Only set for a targeted STOCK declaration (YS_STOCK_FREECHOICE): the
+    # specific stockable skill (id 0..7) to stock, independent of
+    # previous_skill. None (default) = base STOCK behaviour, unchanged.
+    stock_target: str | None = None
 
     def key(self) -> str:
         if isinstance(self.skill, int):
@@ -59,6 +64,8 @@ class TPAction:
             return f"CHOICE({self.choice},thumb={self.thumb})"
         if self.skill == ALL:
             return f"ALL(order={self.all_order},thumb={self.thumb})"
+        if self.skill == STOCK and self.stock_target is not None:
+            return f"STOCK_TARGET({self.stock_target},thumb={self.thumb})"
         return f"{self.skill}(thumb={self.thumb})"
 
 
@@ -108,6 +115,20 @@ def legal_tp_actions(state: State, config: RulesConfig = RulesConfig()) -> tuple
             if isinstance(previous, str) and previous not in REFERENCEABLE_SKILLS:
                 continue
         elif skill == STOCK:
+            if STOCK_FREECHOICE:
+                # Targeted STOCK (YS_STOCK_FREECHOICE): stock ANY stockable
+                # skill not already held, regardless of previous_skill, on
+                # any turn. max_stock_size still caps how many may be held.
+                if (
+                    config.max_stock_size is not None
+                    and len(state.me.stock) >= config.max_stock_size
+                ):
+                    continue
+                targets = sorted(_stockable_skills(config) - state.me.stock)
+                for target in targets:
+                    for thumb in thumbs:
+                        actions.append(TPAction(skill, thumb, stock_target=target))
+                continue
             if not isinstance(previous, str) or previous not in _stockable_skills(config):
                 continue
             if previous in state.me.stock:
@@ -117,7 +138,11 @@ def legal_tp_actions(state: State, config: RulesConfig = RulesConfig()) -> tuple
                 and len(state.me.stock) >= config.max_stock_size
             ):
                 continue
-        elif skill in STOCK_ALPHA_SKILLS and state.me.stock_alpha_used_this_phase:
+        elif (
+            skill in STOCK_ALPHA_SKILLS
+            and state.me.stock_alpha_used_this_phase
+            and not STOCK_UNLIMITED_ALPHA
+        ):
             continue
         elif skill == CHOICE:
             available = sorted(state.me.stock - state.me.choice_used_this_phase)

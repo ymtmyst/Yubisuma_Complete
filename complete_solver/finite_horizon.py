@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import lru_cache
 from typing import Callable
 
 import numpy as np
 
 from .actions import NTPAction, RulesConfig, TPAction, legal_ntp_actions, legal_tp_actions
+from .choice_collapse import collapse_choice_actions, resolve_choice_action
 from .matrix_game import solve_zero_sum_matrix
 from .state import State
 from .transition import transition
@@ -24,6 +25,9 @@ class StatePolicy:
     tp_policy: tuple[float, ...]
     ntp_policy: tuple[float, ...]
     matrix: tuple[tuple[float, ...], ...]
+    # thumb -> original (pre-collapse) TPActions a collapsed CHOICE row
+    # replaced. Empty for states with 0/1 choosable stock (no collapse).
+    choice_groups: dict[int, tuple[TPAction, ...]] = field(default_factory=dict)
 
 
 class FiniteHorizonSolver:
@@ -48,9 +52,11 @@ class FiniteHorizonSolver:
     def solve_state(self, state: State, depth: int) -> StatePolicy:
         if depth < 1:
             value = float(self.leaf_evaluator(state))
-            return StatePolicy(value, (), (), (), (), ())
+            return StatePolicy(value, (), (), (), (), (), {})
 
-        matrix, tp_actions, ntp_actions = self.build_payoff_matrix(state, depth)
+        matrix, tp_actions, ntp_actions, choice_groups = self.build_payoff_matrix(
+            state, depth
+        )
         solution = solve_zero_sum_matrix(matrix)
         return StatePolicy(
             value=solution.value,
@@ -59,40 +65,67 @@ class FiniteHorizonSolver:
             tp_policy=tuple(float(x) for x in solution.row_policy),
             ntp_policy=tuple(float(x) for x in solution.col_policy),
             matrix=tuple(tuple(float(x) for x in row) for row in matrix),
+            choice_groups=choice_groups,
         )
 
     def value(self, state: State, depth: int) -> float:
         return self._value(state, depth)
 
+    def _cell_payoff(
+        self, state: State, tp_action: TPAction, ntp_action: NTPAction, depth: int
+    ) -> float:
+        result = transition(state, tp_action, ntp_action, self.config)
+        if result.terminal_reward is not None:
+            return result.terminal_reward
+        assert result.next_state is not None
+        if depth <= 1:
+            payoff = self.gamma * self.leaf_evaluator(result.next_state)
+        else:
+            payoff = self.gamma * self._value(result.next_state, depth - 1)
+        if not result.same_turn_player:
+            payoff = -payoff
+        return payoff
+
     def build_payoff_matrix(
         self,
         state: State,
         depth: int,
-    ) -> tuple[np.ndarray, tuple[TPAction, ...], tuple[NTPAction, ...]]:
+    ) -> tuple[
+        np.ndarray,
+        tuple[TPAction, ...],
+        tuple[NTPAction, ...],
+        dict[int, tuple[TPAction, ...]],
+    ]:
+        """Build the (collapsed) payoff matrix.
+
+        CHOICE rows are pre-committed per legal_tp_actions (one row per
+        stocked skill); this collapses same-thumb groups to their per-column
+        max BEFORE the LP solve, implementing the post-reaction (second-
+        mover) skill pick. See choice_collapse.py for the rule rationale.
+        """
         tp_actions = legal_tp_actions(state, self.config)
         ntp_actions = legal_ntp_actions(state, self.config)
-        matrix = np.zeros((len(tp_actions), len(ntp_actions)), dtype=float)
+        raw = np.zeros((len(tp_actions), len(ntp_actions)), dtype=float)
 
         for row, tp_action in enumerate(tp_actions):
             for col, ntp_action in enumerate(ntp_actions):
-                result = transition(state, tp_action, ntp_action, self.config)
-                if result.terminal_reward is not None:
-                    payoff = result.terminal_reward
-                elif depth <= 1:
-                    assert result.next_state is not None
-                    leaf_value = self.leaf_evaluator(result.next_state)
-                    payoff = self.gamma * leaf_value
-                    if not result.same_turn_player:
-                        payoff = -payoff
-                else:
-                    assert result.next_state is not None
-                    next_value = self._value(result.next_state, depth - 1)
-                    payoff = self.gamma * next_value
-                    if not result.same_turn_player:
-                        payoff = -payoff
-                matrix[row, col] = payoff
+                raw[row, col] = self._cell_payoff(state, tp_action, ntp_action, depth)
 
-        return matrix, tp_actions, ntp_actions
+        collapsed_actions, matrix, choice_groups = collapse_choice_actions(
+            tp_actions, raw
+        )
+        return matrix, collapsed_actions, ntp_actions, choice_groups
+
+    def resolve_choice(
+        self, state: State, thumb: int, ntp_action: NTPAction, depth: int
+    ) -> TPAction:
+        """Post-reaction skill pick: given the realized opponent reaction,
+        return the concrete TPAction(CHOICE, thumb, choice=<best skill>) —
+        the argmax the column-max collapse used for the matrix value."""
+        return resolve_choice_action(
+            state, thumb, ntp_action,
+            lambda candidate, ntp: self._cell_payoff(state, candidate, ntp, depth),
+        )
 
     @lru_cache(maxsize=None)
     def _value(self, state: State, depth: int) -> float:

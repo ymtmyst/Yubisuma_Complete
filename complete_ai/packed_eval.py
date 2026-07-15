@@ -13,6 +13,7 @@ from __future__ import annotations
 import numpy as np
 from numba import njit
 
+from complete_solver.choice_collapse import collapse_choice_rows_njit
 from complete_solver.packed_engine import legal_ntp_codes, legal_tp_codes, step
 from complete_solver.packed_vi import _matrix_value
 
@@ -76,7 +77,8 @@ def material_leaf_batch(keys0, keys1):
 
 
 @njit(cache=True)
-def _depth1_value(lane0, lane1, gamma, tp_buf, ntp_buf, matrix, tableau, basis):
+def _depth1_value(lane0, lane1, gamma, tp_buf, ntp_buf, matrix, tableau, basis,
+                  collapsed_codes, collapsed_matrix):
     n_tp = legal_tp_codes(lane0, lane1, _FULL_MASK, _NO_CAP, tp_buf)
     n_ntp = legal_ntp_codes(lane0, lane1, ntp_buf)
     for a in range(n_tp):
@@ -89,14 +91,19 @@ def _depth1_value(lane0, lane1, gamma, tp_buf, ntp_buf, matrix, tableau, basis):
             else:
                 sign = 1.0 if status == 1 else -1.0
                 matrix[a, b] = sign * gamma * material_leaf_bits(child0, child1)
-    value, _ = _matrix_value(matrix, n_tp, n_ntp, tableau, basis)
+    n_c = collapse_choice_rows_njit(
+        tp_buf, matrix, n_tp, n_ntp, collapsed_codes, collapsed_matrix
+    )
+    value, _ = _matrix_value(collapsed_matrix, n_c, n_ntp, tableau, basis)
     return value
 
 
 @njit(cache=True)
 def _depth2_value(lane0, lane1, gamma,
                   tp_buf, ntp_buf, matrix, tableau, basis,
-                  tp_buf2, ntp_buf2, matrix2):
+                  tp_buf2, ntp_buf2, matrix2,
+                  collapsed_codes, collapsed_matrix,
+                  collapsed_codes2, collapsed_matrix2):
     n_tp = legal_tp_codes(lane0, lane1, _FULL_MASK, _NO_CAP, tp_buf)
     n_ntp = legal_ntp_codes(lane0, lane1, ntp_buf)
     for a in range(n_tp):
@@ -111,9 +118,13 @@ def _depth2_value(lane0, lane1, gamma,
                 child_value = _depth1_value(
                     child0, child1, gamma, tp_buf2, ntp_buf2,
                     matrix2, tableau, basis,
+                    collapsed_codes2, collapsed_matrix2,
                 )
                 matrix[a, b] = sign * gamma * child_value
-    value, _ = _matrix_value(matrix, n_tp, n_ntp, tableau, basis)
+    n_c = collapse_choice_rows_njit(
+        tp_buf, matrix, n_tp, n_ntp, collapsed_codes, collapsed_matrix
+    )
+    value, _ = _matrix_value(collapsed_matrix, n_c, n_ntp, tableau, basis)
     return value
 
 
@@ -121,7 +132,10 @@ def _depth2_value(lane0, lane1, gamma,
 def _depth3_value(lane0, lane1, gamma,
                   tp_buf, ntp_buf, matrix, tableau, basis,
                   tp_buf2, ntp_buf2, matrix2,
-                  tp_buf3, ntp_buf3, matrix3):
+                  tp_buf3, ntp_buf3, matrix3,
+                  collapsed_codes, collapsed_matrix,
+                  collapsed_codes2, collapsed_matrix2,
+                  collapsed_codes3, collapsed_matrix3):
     n_tp = legal_tp_codes(lane0, lane1, _FULL_MASK, _NO_CAP, tp_buf)
     n_ntp = legal_ntp_codes(lane0, lane1, ntp_buf)
     for a in range(n_tp):
@@ -137,9 +151,14 @@ def _depth3_value(lane0, lane1, gamma,
                     child0, child1, gamma,
                     tp_buf2, ntp_buf2, matrix2, tableau, basis,
                     tp_buf3, ntp_buf3, matrix3,
+                    collapsed_codes2, collapsed_matrix2,
+                    collapsed_codes3, collapsed_matrix3,
                 )
                 matrix[a, b] = sign * gamma * child_value
-    value, _ = _matrix_value(matrix, n_tp, n_ntp, tableau, basis)
+    n_c = collapse_choice_rows_njit(
+        tp_buf, matrix, n_tp, n_ntp, collapsed_codes, collapsed_matrix
+    )
+    value, _ = _matrix_value(collapsed_matrix, n_c, n_ntp, tableau, basis)
     return value
 
 
@@ -159,12 +178,21 @@ def depth3_values(keys0, keys1, gamma):
     matrix3 = np.zeros((96, 16), dtype=np.float64)
     tableau = np.zeros((97, 120), dtype=np.float64)
     basis = np.zeros(96, dtype=np.int64)
+    collapsed_codes = np.zeros(96, dtype=np.int64)
+    collapsed_matrix = np.zeros((96, 16), dtype=np.float64)
+    collapsed_codes2 = np.zeros(96, dtype=np.int64)
+    collapsed_matrix2 = np.zeros((96, 16), dtype=np.float64)
+    collapsed_codes3 = np.zeros(96, dtype=np.int64)
+    collapsed_matrix3 = np.zeros((96, 16), dtype=np.float64)
     for i in range(n):
         out[i] = _depth3_value(
             keys0[i], keys1[i], gamma,
             tp_buf, ntp_buf, matrix, tableau, basis,
             tp_buf2, ntp_buf2, matrix2,
             tp_buf3, ntp_buf3, matrix3,
+            collapsed_codes, collapsed_matrix,
+            collapsed_codes2, collapsed_matrix2,
+            collapsed_codes3, collapsed_matrix3,
         )
     return out
 
@@ -222,10 +250,16 @@ def depth2_values(keys0, keys1, gamma):
     matrix2 = np.zeros((96, 16), dtype=np.float64)
     tableau = np.zeros((97, 120), dtype=np.float64)
     basis = np.zeros(96, dtype=np.int64)
+    collapsed_codes = np.zeros(96, dtype=np.int64)
+    collapsed_matrix = np.zeros((96, 16), dtype=np.float64)
+    collapsed_codes2 = np.zeros(96, dtype=np.int64)
+    collapsed_matrix2 = np.zeros((96, 16), dtype=np.float64)
     for i in range(n):
         out[i] = _depth2_value(
             keys0[i], keys1[i], gamma,
             tp_buf, ntp_buf, matrix, tableau, basis,
             tp_buf2, ntp_buf2, matrix2,
+            collapsed_codes, collapsed_matrix,
+            collapsed_codes2, collapsed_matrix2,
         )
     return out

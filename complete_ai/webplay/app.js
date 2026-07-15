@@ -3,8 +3,9 @@
 let gameId = null;
 let sel = { decl: null, thumb: null };
 let lastView = null;
-let mode = localStorage.getItem("ys_mode") || "adult";   // "kid" | "adult"
+const mode = "adult";
 let tipOn = localStorage.getItem("ys_tip") !== "off";
+let meterOn = localStorage.getItem("ys_meter") !== "off";
 let soundOn = localStorage.getItem("ys_sound") !== "off";
 let difficulty = localStorage.getItem("ys_diff") || "normal";
 let prevHands = { human: 2, ai: 2 };
@@ -43,18 +44,25 @@ async function api(path, body) {
 
 // ---- toggles ----
 function refreshToggles() {
-  const m = $("tg-mode");
-  m.dataset.mode = mode;
-  $("tg-mode-label").textContent = mode === "kid" ? "こども" : "おとな";
-  m.querySelector(".tg-emoji").textContent = mode === "kid" ? "🧒" : "🧑";
   const t = $("tg-tip");
   t.classList.toggle("on", tipOn);
   $("tg-tip-label").textContent = tipOn ? "説明ON" : "説明OFF";
+  const meterToggle = $("tg-meter");
+  meterToggle.classList.toggle("on", meterOn);
+  meterToggle.querySelector(".tg-emoji").textContent = meterOn ? "📊" : "📉";
+  $("tg-meter-label").textContent = meterOn ? "形勢判断ON" : "形勢判断OFF";
+  $("meter").classList.toggle("hidden", !meterOn);
+  const s = $("tg-sound");
+  s.classList.toggle("on", soundOn);
+  s.querySelector(".tg-emoji").textContent = soundOn ? "🔊" : "🔇";
+  $("tg-sound-label").textContent = soundOn ? "サウンドON" : "サウンドOFF";
 }
-$("tg-mode").onclick = () => { mode = mode === "kid" ? "adult" : "kid";
-  localStorage.setItem("ys_mode", mode); refreshToggles(); renderStart(); if (lastView) render(lastView); };
 $("tg-tip").onclick = () => { tipOn = !tipOn; localStorage.setItem("ys_tip", tipOn ? "on" : "off");
   refreshToggles(); hideTip(); };
+$("tg-meter").onclick = () => { meterOn = !meterOn; localStorage.setItem("ys_meter", meterOn ? "on" : "off");
+  refreshToggles(); };
+$("tg-sound").onclick = () => { soundOn = !soundOn; localStorage.setItem("ys_sound", soundOn ? "on" : "off");
+  refreshToggles(); if (soundOn) SND.click(); };
 refreshToggles();
 
 // ---- 戦績 ----
@@ -121,6 +129,7 @@ for (const b of document.querySelectorAll("#start [data-first]")) {
   };
 }
 $("again").onclick = () => show("start");
+$("again-inline").onclick = () => show("start");
 
 // ---- surrender ----
 $("surrender").onclick = async () => {
@@ -135,7 +144,11 @@ function handsHtml(hands) {
 }
 function metaHtml(p) {
   let chips = p.buffs.map(b => `<span class="chip">${b}</span>`);
-  chips = chips.concat(p.stock.map(s => `<span class="chip stock">📦${s}</span>`));
+  if (p.skip_notice !== undefined) chips.unshift(`<span class="chip skip-alert">⏭️ このフェーズはスキップ（残り${p.skip_notice}）</span>`);
+  if (p.stock.length) {
+    const stored = p.stock.map(s => `<span class="stock-child" title="${s}">${(SKILLS[s]||{}).emoji||"❓"}<small>${s}</small></span>`).join("");
+    chips.push(`<span class="stock-cluster"><span class="stock-root">📦 ストック</span><span class="stock-children">${stored}</span></span>`);
+  }
   if (p.cement > 0) chips.push(`<span class="chip">🧱固定${p.cement}</span>`);
   return chips.join("");
 }
@@ -146,15 +159,15 @@ function exchangeHtml(e) {
   return `
     <div class="ex-label">${UI.phaseTurn(declarer, e.phase, e.turn, mode)}</div>
     <span class="ex-side ${e.side}">${declarer}</span>
-    <div class="ex-move"><span class="big">${e.decl.emoji}</span><span class="nm">${e.decl.name}</span><span class="tb">🤚${e.decl.thumb}本</span></div>
+    <div class="ex-move"><span class="big ${e.decl.kind === "number" ? "number-icon" : ""}">${e.decl.emoji}</span><span class="nm">${e.decl.name}</span><span class="tb">👍${e.decl.thumb}本</span></div>
     <span class="ex-arrow">→</span>
-    <div class="ex-move"><span class="big">${e.react.emoji}</span><span class="nm">${e.react.name}</span><span class="tb">🤚${e.react.thumb}本</span></div>
+    <div class="ex-move"><span class="big">${e.react.emoji}</span><span class="nm">${e.react.name}</span><span class="tb">👍${e.react.thumb}本</span></div>
     <span class="ex-side ${reactorCls}">${reactor}</span>`;
 }
 function logRowHtml(e) {
   return `<div class="log-row ${e.side}"><span class="lr-tag">${SIDE_JP[e.side]} ${e.phase}-${e.turn}</span>
-    <div class="lr-body">${e.decl.emoji}${e.decl.name}🤚${e.decl.thumb}
-      <span class="lr-react">→ ${e.react.emoji}${e.react.name}🤚${e.react.thumb}</span></div></div>`;
+    <div class="lr-body"><span class="${e.decl.kind === "number" ? "number-icon mini" : ""}">${e.decl.emoji}</span>${e.decl.name}👍${e.decl.thumb}
+      <span class="lr-react">→ ${e.react.emoji}${e.react.name}👍${e.react.thumb}</span></div></div>`;
 }
 
 function flashDrop(side) {
@@ -166,11 +179,14 @@ function flashDrop(side) {
 function render(v) {
   lastView = v;
   $("surrender").textContent = "🏳️ " + T(START.surrender);
+  $("surrender").classList.toggle("hidden", v.over);
   $("ai-hands").innerHTML = handsHtml(v.ai.hands);
   $("human-hands").innerHTML = handsHtml(v.human.hands);
   $("ai-meta").innerHTML = metaHtml(v.ai);
   $("human-meta").innerHTML = metaHtml(v.human);
   $("last-exchange").innerHTML = exchangeHtml(v.last_exchange);
+  $("game-end").classList.toggle("hidden", !v.over);
+  $("meter").classList.toggle("hidden", !meterOn);
 
   // 形勢メーター(あなた% / AI% を色分け表示)
   $("meter-title").textContent = T(START.meter);
@@ -197,63 +213,73 @@ function render(v) {
   list.innerHTML = rows; list.scrollTop = list.scrollHeight;
 
   if (v.over) {
+    document.querySelector(".player-panel.human").classList.remove("turn-active");
+    document.querySelector(".player-panel.ai").classList.remove("turn-active");
+    $("human-badge").textContent = "";
+    $("ai-badge").textContent = "";
     if (!v._recorded) {
       v._recorded = true;
       const key = v.human_won ? "ys_win" : "ys_loss";
       localStorage.setItem(key, String(parseInt(localStorage.getItem(key) || "0", 10) + 1));
       (v.human_won ? SND.win : SND.lose)();
     }
-    setTimeout(() => { $("result-emoji").textContent = v.human_won ? "🎉" : "😢";
-      $("result-text").textContent = v.human_won ? T(UI.win) : T(UI.lose);
-      $("result-record").innerHTML = recordHtml();
-      $("start-record").innerHTML = recordHtml(); show("result"); }, 700);
+    $("game-end-emoji").textContent = v.human_won ? "🎉" : "😢";
+    $("game-end-text").textContent = v.human_won ? T(UI.win) : T(UI.lose);
+    $("game-end-record").innerHTML = recordHtml();
+    $("again-inline").textContent = T(START.again);
+    $("start-record").innerHTML = recordHtml();
+    $("controls").innerHTML = `<div class="control-card end-note"><b>${v.human_won ? T(UI.win) : T(UI.lose)}</b><span>最後の宣言と履歴を確認できます</span></div>`;
     return;
   }
 
-  const humanTurn = v.phase === "declare";
+  const humanTurn = v.phase === "declare" || v.phase === "choice";
   document.querySelector(".player-panel.human").classList.toggle("turn-active", humanTurn);
   document.querySelector(".player-panel.ai").classList.toggle("turn-active", !humanTurn);
   $("human-badge").textContent = humanTurn ? T(UI.youTurn) : "";
   $("ai-badge").textContent = humanTurn ? "" : T(UI.aiTurn);
 
   sel = { decl: null, thumb: null };
-  if (humanTurn) renderDeclare(v.options); else renderReact(v.options);
+  if (v.phase === "choice") renderChoice(v.options);
+  else if (humanTurn) renderDeclare(v.options); else renderReact(v.options);
   wireOpts();
 }
 
-function optHtml(kind, dataAttrs, emoji, name, desc, extraCls = "") {
+function optHtml(kind, dataAttrs, emoji, name, desc, extraCls = "", extraHtml = "") {
   return `<button class="opt ${extraCls}" ${dataAttrs} data-desc="${(desc||"").replace(/"/g,"&quot;")}">
-    <span class="oe">${emoji}</span><span class="on">${name}</span></button>`;
+    <span class="oe">${emoji}</span><span class="on">${name}</span>${extraHtml}</button>`;
 }
 
 function renderDeclare(o) {
   const numHtml = o.numbers.map(n =>
-    optHtml("number", `data-kind="number" data-value="${n}"`, "🔢", `${T(UI.numberLabel)}${n}`, T(SKILLS["数字"]))).join("");
-  const mainSkills = o.skills.filter(s => !STOCK_SET.includes(s));
-  const stockSkills = o.skills.filter(s => STOCK_SET.includes(s));
-  const skillHtml = mainSkills.map(s =>
-    optHtml("skill", `data-kind="skill" data-name="${s}"`, (SKILLS[s]||{}).emoji||"❓", s, T(SKILLS[s]))).join("");
-
-  // ストック系グループ(ストック / チョイス→X / オール / ドロップ)
-  let stockHtml = "";
-  const stockParts = [];
-  stockSkills.filter(s => s === "ストック").forEach(s =>
-    stockParts.push(optHtml("skill", `data-kind="skill" data-name="ストック"`, SKILLS["ストック"].emoji, "ストック", T(SKILLS["ストック"]))));
-  o.choices.forEach(t =>
-    stockParts.push(optHtml("skill", `data-kind="choice" data-target="${t}"`, (SKILLS[t]||{}).emoji||"🎯", `${T(UI.chooseLabel)}${t}`, T(SKILLS["チョイス"]))));
-  stockSkills.filter(s => s === "オール").forEach(s =>
-    stockParts.push(optHtml("skill", `data-kind="skill" data-name="オール"`, SKILLS["オール"].emoji, "オール", T(SKILLS["オール"]))));
-  stockSkills.filter(s => s === "ドロップ").forEach(s =>
-    stockParts.push(optHtml("skill", `data-kind="skill" data-name="ドロップ"`, SKILLS["ドロップ"].emoji, "ドロップ", T(SKILLS["ドロップ"]))));
-  if (stockParts.length) {
-    stockHtml = `<div class="group-label">📦 ${T(UI.stockGroup)}</div>
-      <div class="stock-group"><div class="opt-grid">${stockParts.join("")}</div></div>`;
-  }
+    optHtml("number", `data-kind="number" data-value="${n}" aria-label="数字${n}"`, n, "", T(SKILLS["数字"]), "number")).join("");
+  const legal = new Set(o.skills);
+  const skillOpt = (s, cls="", extra="") => optHtml("skill",
+    `data-kind="${s === "チョイス" ? "choice" : "skill"}" data-name="${s}"`,
+    (SKILLS[s]||{}).emoji||"❓", s, T(SKILLS[s]), cls, extra);
+  const pick = order => order.filter(s=>legal.has(s)).map(s=>skillOpt(s)).join("");
+  const normalSkills = pick(["フラッシュ","ガード","セメント","クイック","チャージ","スキップ"]);
+  const normal = `<section class="declare-group normal"><div class="declare-group-head">${T(CAT.normal.label)}</div>
+    <div class="normal-number-grid">${numHtml}</div><div class="normal-skill-grid">${normalSkills}</div></section>`;
+  const antiCards = pick(["フェイント","ロック"]);
+  const ultCards = pick(["ブースト","タイム"]);
+  const alpha = ["チョイス","ドロップ","オール"].filter(s=>legal.has(s));
+  const source = o.copy_source;
+  const sourceIcon = source === null || source === undefined ? "" : typeof source === "number"
+    ? `<span class="copy-source number-source" title="コピー元：数字${source}">${source}</span>`
+    : `<span class="copy-source" title="コピー元：${source}">${(SKILLS[source]||{}).emoji||"❓"}</span>`;
+  const copyTop = legal.has("コピー") ? skillOpt("コピー", "copy-opt", sourceIcon) : `<div class="ref-spacer"></div>`;
+  const stockTop = legal.has("ストック") ? skillOpt("ストック") : alpha.length
+    ? `<div class="stock-hub"><span>📦</span><small>ストック</small></div>` : `<div class="ref-spacer"></div>`;
+  const refTop = (legal.has("コピー") || legal.has("ストック") || alpha.length) ? copyTop + stockTop : "";
+  const alphaHtml = alpha.length ? `<div class="ref-branches">${alpha.map(s=>`<div class="ref-branch">${skillOpt(s,"alpha-opt")}</div>`).join("")}</div>` : "";
+  const ref = (refTop || alphaHtml) ? `<section class="declare-group ref"><div class="declare-group-head">${T(CAT.ref.label)}</div>
+    <div class="ref-top">${refTop}</div>${alphaHtml}</section>` : "";
+  const lower = `<div class="declare-lower">${antiCards ? `<section class="declare-group anti"><div class="declare-group-head">${T(CAT.anti.label)}</div><div class="opt-grid">${antiCards}</div></section>` : ""}
+    ${ultCards ? `<details class="declare-group ult"><summary class="declare-group-head">${T(CAT.ult.label)}<span>開く</span></summary><div class="opt-grid">${ultCards}</div></details>` : ""}</div>${ref}`;
 
   $("controls").innerHTML = `<div class="control-card">
     <div class="step-title">${T(UI.declareTitle)} <small>${T(UI.declareSub)}</small></div>
-    <div class="opt-grid">${numHtml}${skillHtml}</div>
-    ${stockHtml}
+    <div class="declare-groups">${normal}${lower}</div>
     <div class="divider"></div>
     <div class="step-title">${T(UI.thumbTitle)}</div>
     <div class="thumb-row">${thumbButtons(o.thumbs)}</div>
@@ -262,9 +288,21 @@ function renderDeclare(o) {
   </div>`;
 }
 
+function renderChoice(o) {
+  const reaction = o.reaction;
+  const cards = o.choices.map(s => optHtml("choice_target", `data-kind="choice_target" data-target="${s}"`,
+    (SKILLS[s]||{}).emoji||"❓", s, T(SKILLS[s]))).join("");
+  $("controls").innerHTML = `<div class="control-card choice-after-reaction">
+    <div class="step-title">${T(UI.choiceTitle)} <small>${T(UI.choiceSub)}</small></div>
+    <div class="reaction-reveal">AIの反応：<b>${reaction.emoji} ${reaction.name}</b> ／ 👍${reaction.thumb}本</div>
+    <div class="opt-grid">${cards}</div>
+    <button class="confirm" id="go" disabled>${T(UI.choiceGo)}</button>
+  </div>`;
+}
+
 function renderReact(o) {
   const rHtml = o.reactions.map(r => {
-    const extra = r === "カウンター" ? "react counter" : "react";
+    const extra = r === "カウンター" ? "react counter" : r === "ブロック" ? "react block ultimate" : "react";
     return optHtml("react", `data-kind="react" data-name="${r}"`, (REACTIONS[r]||{}).emoji||"❓", r, T(REACTIONS[r]), extra);
   }).join("");
   $("controls").innerHTML = `<div class="control-card">
@@ -279,7 +317,7 @@ function renderReact(o) {
 }
 
 function thumbButtons(thumbs) {
-  return thumbs.map(t => `<button class="thumb-opt" data-thumb="${t}"><span class="te">🤚</span>${t} 本</button>`).join("");
+  return thumbs.map(t => `<button class="thumb-opt" data-thumb="${t}"><span class="te">👍</span>${t} 本</button>`).join("");
 }
 
 function wireOpts() {
@@ -295,13 +333,14 @@ function wireOpts() {
   }
   $("go").onclick = submit;
 }
-function updateGo() { $("go").disabled = !(sel.decl && sel.thumb !== null); }
+function updateGo() { $("go").disabled = !(sel.decl && (lastView.phase === "choice" || sel.thumb !== null)); }
 
 async function submit() {
   $("go").disabled = true; hideTip();
-  const d = sel.decl, action = { thumb: sel.thumb };
+  const d = sel.decl, action = lastView.phase === "choice" ? {} : { thumb: sel.thumb };
   if (d.kind === "number") { action.kind = "number"; action.value = parseInt(d.value, 10); }
-  else if (d.kind === "choice") { action.kind = "choice"; action.target = d.target; }
+  else if (d.kind === "choice") { action.kind = "choice"; }
+  else if (d.kind === "choice_target") { action.kind = "choice_target"; action.target = d.target; }
   else if (d.kind === "react") { action.kind = "react"; action.name = d.name; }
   else { action.kind = "skill"; action.name = d.name; }
   const res = await api("/api/act", { game_id: gameId, action });

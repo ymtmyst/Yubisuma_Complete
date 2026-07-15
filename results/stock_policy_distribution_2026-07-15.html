@@ -1,0 +1,47 @@
+<!doctype html><html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>現行モデルのストック込み方策分布（2026-07-15）</title>
+<style>
+:root{color-scheme:light dark}
+body{font-family:-apple-system,"Segoe UI","Yu Gothic UI",sans-serif;line-height:1.6;max-width:900px;margin:0 auto;padding:24px;color:#111;background:#fff}
+h1{font-size:21px;margin:0 0 4px} h2{font-size:16px;margin:22px 0 6px;border-left:5px solid #2563eb;padding-left:8px}
+.sub{color:#666;font-size:13px;margin-bottom:14px}
+.box{background:#f6f8fa;border:1px solid #e2e6ea;border-radius:10px;padding:12px 16px;margin:10px 0}
+table{border-collapse:collapse;width:100%;font-size:13px} td{border:0;padding:3px 8px} td.l{font-weight:600;width:120px} td.n{text-align:right;width:70px;font-variant-numeric:tabular-nums}
+.cols{display:flex;gap:18px;flex-wrap:wrap} .col{flex:1;min-width:320px}
+@media (prefers-color-scheme:dark){body{color:#e6e6e6;background:#0f1115}.box{background:#161a20;border-color:#2a2f37}}
+</style></head><body>
+<h1>現行モデル（value_gvi_latest）のストック込み方策分布</h1>
+<div class="sub">計測 2026-07-15。400局×2席の自己対戦（方策の混合戦略からサンプリング、ε=0）。配信版=ストック枝刈り有り(2個上限・フェイント/ロック例外)、枝刈り無し=上限なしの真の傾向。測定専用。</div>
+<div class="box"><b>要点</b>：配信版でもストックは死に技ではない（保持率・消化率は下記）。消化はほぼ<b>チョイス:フェイント</b>が中心で、ドメイン知識「ストックの筆頭＝フェイント」と一致。枝刈りの有無で保持サイズ上限が変わるが、消化の中身はフェイント偏重で共通。</div>
+<div class="cols">
+<div class="col"><h2>配信版（枝刈り有り）</h2><ul><li>ストック保持率 <b>77.7%</b>（1手でもストックを持っている盤面の割合）</li><li>ストック宣言率 <b>0.00%</b></li><li>ストック消化（チョイス/オール/ドロップ） <b>70.15%</b>：チョイス:スキップ 63.63% / チョイス:フェイント 6.02% / チョイス:フラッシュ 0.35% / チョイス:ガード 0.09% / ドロップ 0.07%</li><li>保持サイズ分布：0個 22.3% / 1個 10.1% / 2個 41.4% / 3個 17.3% / 4個 7.0% / 5個 1.6% / 6個 0.4%</li><li>実際にストックされた技（延べ）：フェイント 7969 / スキップ 6943 / フラッシュ 2480 / ガード 905 / セメント 442 / クイック 44 / ロック 1</li></ul><h2>行動分布</h2><table><tr><td class='l'>チョイス:スキップ</td><td class='n'>63.6%</td><td><div style='background:#3b82f6;height:12px;width:100%;border-radius:3px'></div></td></tr>
+<tr><td class='l'>ストック:フェイント</td><td class='n'>8.0%</td><td><div style='background:#3b82f6;height:12px;width:12%;border-radius:3px'></div></td></tr>
+<tr><td class='l'>フェイント</td><td class='n'>6.2%</td><td><div style='background:#3b82f6;height:12px;width:9%;border-radius:3px'></div></td></tr>
+<tr><td class='l'>チョイス:フェイント</td><td class='n'>6.0%</td><td><div style='background:#3b82f6;height:12px;width:9%;border-radius:3px'></div></td></tr>
+<tr><td class='l'>スキップ</td><td class='n'>4.0%</td><td><div style='background:#3b82f6;height:12px;width:6%;border-radius:3px'></div></td></tr>
+<tr><td class='l'>ストック:スキップ</td><td class='n'>3.9%</td><td><div style='background:#3b82f6;height:12px;width:6%;border-radius:3px'></div></td></tr>
+<tr><td class='l'>数字</td><td class='n'>2.8%</td><td><div style='background:#3b82f6;height:12px;width:4%;border-radius:3px'></div></td></tr>
+<tr><td class='l'>コピー</td><td class='n'>2.8%</td><td><div style='background:#3b82f6;height:12px;width:4%;border-radius:3px'></div></td></tr>
+<tr><td class='l'>ストック:フラッシュ</td><td class='n'>1.0%</td><td><div style='background:#3b82f6;height:12px;width:1%;border-radius:3px'></div></td></tr>
+<tr><td class='l'>ブースト</td><td class='n'>0.4%</td><td><div style='background:#3b82f6;height:12px;width:0%;border-radius:3px'></div></td></tr>
+<tr><td class='l'>チョイス:フラッシュ</td><td class='n'>0.4%</td><td><div style='background:#3b82f6;height:12px;width:0%;border-radius:3px'></div></td></tr>
+<tr><td class='l'>フラッシュ</td><td class='n'>0.3%</td><td><div style='background:#3b82f6;height:12px;width:0%;border-radius:3px'></div></td></tr>
+<tr><td class='l'>ストック:ガード</td><td class='n'>0.2%</td><td><div style='background:#3b82f6;height:12px;width:0%;border-radius:3px'></div></td></tr></table></div>
+<div class="col"><h2>枝刈り無し</h2><ul><li>ストック保持率 <b>76.9%</b>（1手でもストックを持っている盤面の割合）</li><li>ストック宣言率 <b>0.00%</b></li><li>ストック消化（チョイス/オール/ドロップ） <b>69.47%</b>：チョイス:スキップ 62.94% / チョイス:フェイント 5.06% / チョイス:ガード 1.10% / チョイス:フラッシュ 0.36% / ドロップ 0.02%</li><li>保持サイズ分布：0個 23.1% / 1個 9.0% / 2個 38.3% / 3個 18.3% / 4個 8.1% / 5個 3.2%</li><li>実際にストックされた技（延べ）：フェイント 7720 / スキップ 6817 / フラッシュ 2868 / ガード 926 / セメント 416 / クイック 217 / ロック 1</li></ul><h2>行動分布</h2><table><tr><td class='l'>チョイス:スキップ</td><td class='n'>62.9%</td><td><div style='background:#3b82f6;height:12px;width:100%;border-radius:3px'></div></td></tr>
+<tr><td class='l'>ストック:フェイント</td><td class='n'>7.4%</td><td><div style='background:#3b82f6;height:12px;width:11%;border-radius:3px'></div></td></tr>
+<tr><td class='l'>フェイント</td><td class='n'>6.6%</td><td><div style='background:#3b82f6;height:12px;width:10%;border-radius:3px'></div></td></tr>
+<tr><td class='l'>チョイス:フェイント</td><td class='n'>5.1%</td><td><div style='background:#3b82f6;height:12px;width:8%;border-radius:3px'></div></td></tr>
+<tr><td class='l'>スキップ</td><td class='n'>4.5%</td><td><div style='background:#3b82f6;height:12px;width:7%;border-radius:3px'></div></td></tr>
+<tr><td class='l'>ストック:スキップ</td><td class='n'>3.5%</td><td><div style='background:#3b82f6;height:12px;width:5%;border-radius:3px'></div></td></tr>
+<tr><td class='l'>コピー</td><td class='n'>3.5%</td><td><div style='background:#3b82f6;height:12px;width:5%;border-radius:3px'></div></td></tr>
+<tr><td class='l'>数字</td><td class='n'>2.8%</td><td><div style='background:#3b82f6;height:12px;width:4%;border-radius:3px'></div></td></tr>
+<tr><td class='l'>チョイス:ガード</td><td class='n'>1.1%</td><td><div style='background:#3b82f6;height:12px;width:1%;border-radius:3px'></div></td></tr>
+<tr><td class='l'>ストック:フラッシュ</td><td class='n'>1.1%</td><td><div style='background:#3b82f6;height:12px;width:1%;border-radius:3px'></div></td></tr>
+<tr><td class='l'>チョイス:フラッシュ</td><td class='n'>0.4%</td><td><div style='background:#3b82f6;height:12px;width:0%;border-radius:3px'></div></td></tr>
+<tr><td class='l'>ブースト</td><td class='n'>0.3%</td><td><div style='background:#3b82f6;height:12px;width:0%;border-radius:3px'></div></td></tr>
+<tr><td class='l'>フラッシュ</td><td class='n'>0.3%</td><td><div style='background:#3b82f6;height:12px;width:0%;border-radius:3px'></div></td></tr>
+<tr><td class='l'>ストック:ガード</td><td class='n'>0.2%</td><td><div style='background:#3b82f6;height:12px;width:0%;border-radius:3px'></div></td></tr></table></div>
+</div>
+<div class="sub" style="margin-top:14px">生成: scratchpad/stock_policy_dist.py。関連: skill_value_probe_2026-07-14.html（スキル別価値）。</div>
+</body></html>

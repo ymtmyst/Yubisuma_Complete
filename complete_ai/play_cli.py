@@ -168,7 +168,12 @@ def main() -> None:
             codes = [int(c) for c in ntp_buf[:n]]
             print("  AIが宣言を選びました(あなたの反応を先に決めてください)")
             index = choose("あなたの反応", [describe_ntp(c) for c in codes])
-            tp_code, ntp_code = ai_tp, codes[index]
+            ntp_code = codes[index]
+            # CHOICE fix: if the AI's declaration was a CHOICE(thumb) with 2+
+            # stocked skills, the concrete skill is picked now that your
+            # reaction is known (post-reaction / second-mover pick).
+            tp_code = agent.resolve_tp_action(int(lane0), int(lane1), int(ai_tp),
+                                              int(ntp_code))
             print(f"  AIの宣言: {describe_tp(tp_code)}")
 
         child0, child1, status, reward = step(

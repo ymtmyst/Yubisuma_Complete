@@ -36,6 +36,7 @@ from .actions import (
     legal_ntp_actions,
     legal_tp_actions,
 )
+from .choice_collapse import choice_row_groups, resolve_choice_action
 from .finite_horizon import material_leaf_evaluator
 from .small_matrix import solve_small_zero_sum
 from .state import State
@@ -65,6 +66,12 @@ class _Expansion:
     ntp_actions: tuple[NTPAction, ...]
     # (row, col) -> ("T", reward) | ("S", sign, child_state)
     cells: dict[tuple[int, int], tuple] = field(default_factory=dict)
+    # CHOICE post-reaction collapse (see choice_collapse.py): collapsed_tp_actions
+    # is tp_actions with same-thumb CHOICE groups (>=2 stocked skills) replaced
+    # by one pseudo action; row_sources[k] gives the RAW tp_actions indices the
+    # collapsed row k aggregates (max). Computed once per expansion.
+    collapsed_tp_actions: tuple[TPAction, ...] = ()
+    row_sources: tuple[tuple[int, ...], ...] = ()
 
 
 @dataclass
@@ -136,24 +143,45 @@ class FastHorizonSolver:
         if cached is not None:
             self.stats.tt_hits += 1
             return cached
-        value, _, _ = self._solve_node(state, depth)
+        value, _, _, _ = self._solve_node(state, depth)
         self._tt[key] = value
         return value
 
     def solve_state(self, state: State, depth: int) -> FastStatePolicy:
-        """Solve the root and return value plus full-length mixed policies."""
+        """Solve the root and return value plus full-length mixed policies.
+
+        ``tp_actions``/``tp_policy`` are over the COLLAPSED action space (see
+        choice_collapse.py): a CHOICE thumb backed by 2+ choosable stock is
+        ONE pseudo action (``choice=None``) whose probability is the mover's
+        probability of declaring that thumb — which concrete skill fires is a
+        post-reaction pick (``resolve_choice``), not part of this policy.
+        """
         if depth < 1:
             return FastStatePolicy(self._leaf(state), (), (), (), ())
-        value, row_policy, col_policy = self._solve_node(state, depth)
+        value, tp_actions, row_policy, col_policy = self._solve_node(state, depth)
         self._tt[(state, depth)] = value
         exp = self._expand(state)
         return FastStatePolicy(
             value=value,
-            tp_actions=exp.tp_actions,
+            tp_actions=tp_actions,
             ntp_actions=exp.ntp_actions,
             tp_policy=tuple(row_policy),
             ntp_policy=tuple(col_policy),
         )
+
+    def resolve_choice(
+        self, state: State, thumb: int, ntp_action: NTPAction, depth: int
+    ) -> TPAction:
+        """Post-reaction skill pick for a CHOICE(thumb) declaration, now that
+        the opponent's realized reaction ``ntp_action`` is known."""
+        exp = self._expand(state)
+        col = exp.ntp_actions.index(ntp_action)
+
+        def payoff_fn(candidate: TPAction, _ntp: NTPAction) -> float:
+            row = exp.tp_actions.index(candidate)
+            return self._payoff(state, exp, row, col, depth)
+
+        return resolve_choice_action(state, thumb, ntp_action, payoff_fn)
 
     def clear_caches(self) -> None:
         self._expansions.clear()
@@ -181,9 +209,13 @@ class FastHorizonSolver:
     def _expand(self, state: State) -> _Expansion:
         exp = self._expansions.get(state)
         if exp is None:
+            tp_actions = legal_tp_actions(state, self.config)
+            collapsed_tp_actions, row_sources = choice_row_groups(tp_actions)
             exp = _Expansion(
-                tp_actions=legal_tp_actions(state, self.config),
+                tp_actions=tp_actions,
                 ntp_actions=legal_ntp_actions(state, self.config),
+                collapsed_tp_actions=collapsed_tp_actions,
+                row_sources=row_sources,
             )
             self._expansions[state] = exp
             self.stats.expansions += 1
@@ -211,25 +243,45 @@ class FastHorizonSolver:
         _, sign, child = cell
         return sign * self.gamma * self.value(child, depth - 1)
 
-    def _solve_node(self, state: State, depth: int) -> tuple[float, np.ndarray, np.ndarray]:
+    def _solve_node(
+        self, state: State, depth: int
+    ) -> tuple[float, tuple[TPAction, ...], np.ndarray, np.ndarray]:
+        """Solve one node's (collapsed) matrix game.
+
+        Returns ``(value, collapsed_tp_actions, row_policy, col_policy)``.
+        CHOICE rows sharing a thumb (2+ choosable stock) are collapsed to one
+        row = the per-column max BEFORE the LP/double-oracle solve — the
+        post-reaction skill pick (see choice_collapse.py). ``row_policy`` is
+        over ``collapsed_tp_actions``, not the raw ``exp.tp_actions``.
+        """
         exp = self._expand(state)
-        n_rows = len(exp.tp_actions)
+        n_rows = len(exp.collapsed_tp_actions)
         n_cols = len(exp.ntp_actions)
+        row_sources = exp.row_sources
 
         if not self.use_double_oracle or n_rows * n_cols <= self.full_matrix_threshold:
             matrix = np.empty((n_rows, n_cols), dtype=float)
             for i in range(n_rows):
-                for j in range(n_cols):
-                    matrix[i, j] = self._payoff(state, exp, i, j, depth)
+                sources = row_sources[i]
+                if len(sources) == 1:
+                    for j in range(n_cols):
+                        matrix[i, j] = self._payoff(state, exp, sources[0], j, depth)
+                else:
+                    for j in range(n_cols):
+                        matrix[i, j] = max(
+                            self._payoff(state, exp, raw_i, j, depth)
+                            for raw_i in sources
+                        )
             value, row_policy, col_policy = self._solve_matrix(matrix)
-            return value, row_policy, col_policy
+            return value, exp.collapsed_tp_actions, row_policy, col_policy
 
         return self._solve_double_oracle(state, exp, depth)
 
     def _solve_double_oracle(
         self, state: State, exp: _Expansion, depth: int
-    ) -> tuple[float, np.ndarray, np.ndarray]:
-        n_rows = len(exp.tp_actions)
+    ) -> tuple[float, tuple[TPAction, ...], np.ndarray, np.ndarray]:
+        row_sources = exp.row_sources
+        n_rows = len(exp.collapsed_tp_actions)
         n_cols = len(exp.ntp_actions)
 
         warm = self._support.get(state)
@@ -251,7 +303,8 @@ class FastHorizonSolver:
         child_depth = depth - 1
         cell_evals = 0
 
-        def payoff(i: int, j: int) -> float:
+        def raw_payoff(i: int, j: int) -> float:
+            """Payoff of a RAW (uncollapsed) tp_actions row i vs column j."""
             nonlocal cell_evals
             cell_evals += 1
             cell = cells.get((i, j))
@@ -266,6 +319,15 @@ class FastHorizonSolver:
             if cell[0] == "T":
                 return cell[1]
             return cell[1] * gamma * value_fn(cell[2], child_depth)
+
+        def payoff(i: int, j: int) -> float:
+            """Payoff of a COLLAPSED row i (index into exp.collapsed_tp_actions)
+            vs column j — the per-column max over its raw source rows (a
+            single-element max for pass-through rows)."""
+            sources = row_sources[i]
+            if len(sources) == 1:
+                return raw_payoff(sources[0], j)
+            return max(raw_payoff(raw_i, j) for raw_i in sources)
 
         # col_vectors[j] = payoffs of every row against column j (length n_rows)
         # row_vectors[i] = payoffs of row i against every column (length n_cols)
@@ -340,7 +402,7 @@ class FastHorizonSolver:
             row_policy[i] = sub_x[a]
         for b, j in enumerate(cols):
             col_policy[j] = sub_y[b]
-        return value, row_policy, col_policy
+        return value, exp.collapsed_tp_actions, row_policy, col_policy
 
     def _solve_matrix(self, matrix: np.ndarray) -> tuple[float, np.ndarray, np.ndarray]:
         self.stats.matrix_solves += 1

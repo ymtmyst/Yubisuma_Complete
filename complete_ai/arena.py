@@ -54,6 +54,17 @@ def play_match(
             _, _, _, _, opp_ntp_policy = cached_solve(1 - mover, key)
             tp_code = tp_codes[_sample(rng, tp_policy, epsilon)]
             ntp_code = ntp_codes[_sample(rng, opp_ntp_policy, epsilon)]
+            # CHOICE fix: resolve a collapsed CHOICE declaration to the
+            # concrete stocked skill now that the opponent's realized
+            # reaction is known (post-reaction / second-mover pick). Resolved
+            # against the MOVER's own searcher (resolve_tp_code re-solves
+            # internally if its single-slot cache doesn't match this state —
+            # e.g. because the opponent's cached_solve call above used a
+            # different searcher instance, or this state's mover-side result
+            # was itself a cache hit).
+            tp_code = searchers[mover].resolve_tp_code(
+                lane0, lane1, int(tp_code), int(ntp_code)
+            )
             child0, child1, status, reward = step(
                 lane0, lane1, np.int64(tp_code), np.int64(ntp_code), _FULL_MASK
             )

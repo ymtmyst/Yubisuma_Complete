@@ -23,6 +23,10 @@ from __future__ import annotations
 
 import numpy as np
 
+from complete_solver.choice_collapse import (
+    collapse_choice_matrix_packed,
+    is_choice_meta_code,
+)
 from complete_solver.packed_engine import legal_ntp_codes, step
 from complete_solver.small_matrix import solve_small_zero_sum
 
@@ -30,20 +34,71 @@ from .batched_search import _FULL_MASK, _legal_tp_pruned
 from .graph_teacher import net_values
 
 
+def _collapse_solve(tp_codes, matrix, collapse=True):
+    """Collapse same-thumb CHOICE rows (post-reaction skill pick; see
+    choice_collapse.py) and solve the reduced LP. Returns (value,
+    collapsed_codes, row_policy, col_policy, groups).
+
+    ``collapse=False`` reproduces the pre-fix (pre-committed CHOICE) behavior
+    — solve the raw matrix with no collapse — used ONLY by the CHOICE-fix
+    impact measurement harness to get an apples-to-apples old-vs-new value
+    through the identical depth-d engine. Production always uses the default
+    (``collapse=True``); the searcher's ``collapse_choice`` attribute is True
+    unless a measurement explicitly flips it."""
+    if not collapse:
+        value, row_policy, col_policy = solve_small_zero_sum(matrix)
+        return value, np.asarray(tp_codes), row_policy, col_policy, {}
+    collapsed_codes, collapsed_matrix, groups = collapse_choice_matrix_packed(
+        tp_codes, matrix
+    )
+    value, row_policy, col_policy = solve_small_zero_sum(collapsed_matrix)
+    return value, collapsed_codes, row_policy, col_policy, groups
+
+
+def _expand_support(tp_codes, collapsed_codes, row_policy, groups, tau):
+    """Map the collapsed-row support (probability > tau) back to RAW row
+    indices into ``tp_codes`` — the deepening loop indexes cells by raw
+    (uncollapsed) row position. A collapsed CHOICE row's whole group is kept
+    in support (any member might become the post-reaction argmax once
+    deepened)."""
+    code_to_idx = {int(c): i for i, c in enumerate(tp_codes)}
+    support: list[int] = []
+    for k, code in enumerate(collapsed_codes):
+        if row_policy[k] <= tau:
+            continue
+        code = int(code)
+        members = groups.get(code)
+        if members is None:
+            support.append(code_to_idx[code])
+        else:
+            support.extend(code_to_idx[int(c)] for c in members)
+    return support
+
+
 class SelectiveSearcher:
     """Support-restricted iterative-deepening value search with net leaves."""
 
     def __init__(self, model, device: str, gamma: float = 0.999,
-                 prune: bool = False, depth: int = 4, tau: float = 0.05):
+                 prune: bool = False, depth: int = 4, tau: float = 0.05,
+                 collapse_choice: bool = True):
         self.model = model
         self.device = device
         self.gamma = gamma
         self.prune = prune
         self.depth = depth      # acting depth used by solve()
         self.tau = tau          # acting support threshold used by solve()
+        # CHOICE post-reaction collapse (the rule fix). Default True = fixed
+        # engine. Set False ONLY for the fix-impact measurement harness to
+        # reproduce the pre-fix (pre-committed CHOICE) values on the same
+        # states/engine. See _collapse_solve.
+        self.collapse_choice = collapse_choice
         self._tp_buf = np.zeros(96, dtype=np.int64)
         self._ntp_buf = np.zeros(16, dtype=np.int64)
         self._solve_cache: dict[tuple[int, int], tuple] = {}
+        # Per-state CHOICE post-reaction resolution data from solve() (the
+        # UNCOLLAPSED final root matrix + tp_codes + collapse groups), keyed
+        # like _solve_cache — see resolve_tp_code / choice_collapse.py.
+        self._choice_resolve_cache: dict[tuple[int, int], tuple] = {}
         self.reset_stats()
 
     def reset_stats(self) -> None:
@@ -139,16 +194,17 @@ class SelectiveSearcher:
         child0, child1, const, is_term = self._children(
             key[0], key[1], tp_codes, ntp_codes)
         shallow = self._shallow_matrix(n_tp, n_ntp, child0, child1, const, is_term)
-        v_sh, tp_pol, ntp_pol = solve_small_zero_sum(shallow)
+        v_sh, tp_codes_c, tp_pol, ntp_pol, groups = _collapse_solve(tp_codes, shallow, self.collapse_choice)
         if self.depth <= 1:
-            res = (float(v_sh), tp_codes, ntp_codes, tp_pol, ntp_pol)
+            res = (float(v_sh), tp_codes_c, ntp_codes, tp_pol, ntp_pol)
             self._solve_cache[key] = res
+            self._choice_resolve_cache[key] = (tp_codes, shallow, groups)
             return res
         if self.tau < 0:
             sup_tp = range(n_tp)
             sup_ntp = range(n_ntp)
         else:
-            sup_tp = [a for a in range(n_tp) if tp_pol[a] > self.tau]
+            sup_tp = _expand_support(tp_codes, tp_codes_c, tp_pol, groups, self.tau)
             sup_ntp = [b for b in range(n_ntp) if ntp_pol[b] > self.tau]
         deep = shallow.copy()
         for a in sup_tp:
@@ -158,10 +214,42 @@ class SelectiveSearcher:
                     continue
                 deep[a, b] = const[pos] * self.gamma * self._value(
                     int(child0[pos]), int(child1[pos]), self.depth - 1, self.tau)
-        v, tp_pol2, ntp_pol2 = solve_small_zero_sum(deep)
-        res = (float(v), tp_codes, ntp_codes, tp_pol2, ntp_pol2)
+        v, tp_codes_c2, tp_pol2, ntp_pol2, groups2 = _collapse_solve(tp_codes, deep, self.collapse_choice)
+        res = (float(v), tp_codes_c2, ntp_codes, tp_pol2, ntp_pol2)
         self._solve_cache[key] = res
+        self._choice_resolve_cache[key] = (tp_codes, deep, groups2)
         return res
+
+    def resolve_tp_code(self, lane0: int, lane1: int, tp_code: int,
+                        ntp_code: int) -> int:
+        """Post-reaction resolution (mirrors ``BatchedSearcher.resolve_tp_code``):
+        turn a sampled TP code from ``solve()`` into a concrete code ``step``
+        can execute, picking the stocked skill that maximizes the payoff
+        against the REALIZED opponent reaction. No-op for non-CHOICE-meta
+        codes. Must be called with the SAME (lane0, lane1) as a preceding
+        ``solve()`` call (results are cached, so this also works after
+        several other states were solved in between)."""
+        if not is_choice_meta_code(tp_code):
+            return tp_code
+        key = (int(lane0), int(lane1))
+        cached = self._choice_resolve_cache.get(key)
+        if cached is None:
+            self.solve(lane0, lane1)
+            cached = self._choice_resolve_cache[key]
+        tp_codes, matrix, groups = cached
+        candidates = groups[int(tp_code)]
+        if len(candidates) == 1:
+            return int(candidates[0])
+        code_to_row = {int(c): i for i, c in enumerate(tp_codes)}
+        ntp_codes = self._solve_cache[key][2]
+        col = int(np.nonzero(np.asarray(ntp_codes) == ntp_code)[0][0])
+        best_code, best_value = candidates[0], -float("inf")
+        for code in candidates:
+            value = float(matrix[code_to_row[int(code)], col])
+            if value > best_value:
+                best_value = value
+                best_code = code
+        return int(best_code)
 
     def _value(self, lane0: int, lane1: int, depth: int, tau: float) -> float:
         if depth <= 0:
@@ -178,7 +266,7 @@ class SelectiveSearcher:
             lane0, lane1, tp_codes, ntp_codes)
 
         shallow = self._shallow_matrix(n_tp, n_ntp, child0, child1, const, is_term)
-        v_sh, tp_pol, ntp_pol = solve_small_zero_sum(shallow)
+        v_sh, tp_codes_c, tp_pol, ntp_pol, groups = _collapse_solve(tp_codes, shallow, self.collapse_choice)
         self.stats["solves"] += 1
         if depth == 1:
             self._val_memo[memo_key] = float(v_sh)
@@ -189,7 +277,7 @@ class SelectiveSearcher:
             sup_tp = range(n_tp)
             sup_ntp = range(n_ntp)
         else:
-            sup_tp = [a for a in range(n_tp) if tp_pol[a] > tau]
+            sup_tp = _expand_support(tp_codes, tp_codes_c, tp_pol, groups, tau)
             sup_ntp = [b for b in range(n_ntp) if ntp_pol[b] > tau]
 
         deep = shallow.copy()
@@ -201,7 +289,7 @@ class SelectiveSearcher:
                 self.stats["deep_cells"] += 1
                 deep[a, b] = const[pos] * self.gamma * self._value(
                     int(child0[pos]), int(child1[pos]), depth - 1, tau)
-        v, _, _ = solve_small_zero_sum(deep)
+        v, _, _, _, _ = _collapse_solve(tp_codes, deep, self.collapse_choice)
         self.stats["solves"] += 1
         self._val_memo[memo_key] = float(v)
         return float(v)

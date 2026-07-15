@@ -10,7 +10,7 @@
   *{box-sizing:border-box;}
   body{margin:0;font-family:-apple-system,"Segoe UI","Hiragino Maru Gothic ProN","Yu Gothic",Meiryo,sans-serif;
     color:var(--ink);background:linear-gradient(160deg,#eef3fb,#e7ecfa);line-height:1.7;}
-  .wrap{max-width:780px;margin:0 auto;padding:26px 16px 70px;}
+  .wrap{max-width:1180px;margin:0 auto;padding:26px 16px 70px;}
   h1{text-align:center;font-size:28px;margin:6px 0 2px;}
   .lead{text-align:center;color:var(--muted);margin:0 0 16px;}
   #toggles{position:fixed;top:10px;right:12px;display:flex;gap:8px;z-index:50;}
@@ -28,19 +28,40 @@
   .cat.normal{background:#3b82f6;}.cat.anti{background:#3a32c3;}.cat.ref{background:#059669;}
   .cat.react{background:#ef4444;}.cat.ult{background:#782069;}
   .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
-  @media(max-width:560px){.grid{grid-template-columns:1fr;}}
+  .cat-desc{margin:-4px 4px 12px;padding:11px 13px;border-radius:10px;
+    color:#27364f;font-size:13.5px;font-weight:700;border:1px solid var(--line);box-shadow:0 2px 7px rgba(40,60,120,.07);}
+  .category-block:has(.cat.normal) .cat-desc{background:#eaf3ff;border-color:#bfdbfe;}
+  .category-block:has(.cat.anti) .cat-desc{background:#eeedff;border-color:#c7c2ff;}
+  .category-block:has(.cat.ref) .cat-desc{background:#e8fbf2;border-color:#a7e5c8;}
+  .category-block:has(.cat.react) .cat-desc{background:#fff0f0;border-color:#fecaca;}
+  .category-block:has(.cat.ult) .cat-desc{background:#faedf6;border-color:#efc2dd;}
+  .category-columns{display:grid;grid-template-columns:1fr 1fr;gap:28px;align-items:start;}
+  .category-columns .grid{grid-template-columns:1fr 1fr;}
+  .definition-box{margin:18px 0;background:#fff;border:2px solid #c4b5fd;border-radius:16px;box-shadow:0 7px 22px rgba(91,33,182,.16);overflow:hidden;}
+  .definition-box>summary{cursor:pointer;padding:16px 20px;font-weight:900;color:#5b21b6;background:linear-gradient(135deg,#f3e8ff,#ede9fe);font-size:15px;}
+  .definition-body{padding:8px 18px 18px;font-size:14px;}.definition-body h3{margin:16px 0 5px;font-size:15px;color:var(--accent);}
+  .definition-body table{width:100%;border-collapse:collapse}.definition-body th,.definition-body td{border:1px solid var(--line);padding:8px;text-align:left;vertical-align:top;}
+  .rule-detail{margin-top:16px;border:1px solid #fecaca;border-radius:12px;overflow:hidden}.rule-detail summary{cursor:pointer;padding:11px 13px;background:#fff1f2;color:#b42335;font-weight:800;}
+  .rule-detail div{padding:12px 14px;}
+  @media(max-width:850px){.category-columns{grid-template-columns:1fr;gap:0}.category-columns .grid{grid-template-columns:1fr 1fr;}}
+  @media(max-width:560px){.grid,.category-columns .grid{grid-template-columns:1fr;}}
   .skill{background:var(--card);border-radius:14px;box-shadow:var(--shadow);padding:12px 14px;
     display:flex;gap:12px;align-items:flex-start;border:1px solid var(--line);cursor:pointer;transition:all .12s;}
   .skill:hover{border-color:var(--accent);transform:translateY(-1px);}
   .skill .ico{font-size:34px;line-height:1;flex:0 0 auto;}
   .skill .nm{font-weight:800;font-size:15px;}
   .skill .ds{font-size:13px;color:#445;margin-top:2px;}
-  .clicknote{background:#eef2ff;border:1px solid #c7d2fe;border-radius:12px;padding:11px 14px;
-    font-size:13px;color:#4338ca;font-weight:700;text-align:center;margin:0 0 18px;}
-  .stock-wrap{border:1.5px dashed #e6c877;border-radius:14px;padding:10px;margin-top:4px;background:#fffdf6;}
+  .clicknote{width:max-content;max-width:calc(100% - 24px);background:#fff;border:1.5px solid #cbd5e1;border-radius:14px;padding:40px 24px;
+    font-size:14px;color:#334155;font-weight:900;text-align:center;margin:4px auto 22px;box-shadow:0 5px 14px rgba(40,60,120,.10);}
+  .stock-wrap{border:1.5px dashed #e6c877;border-radius:14px;padding:12px;margin-top:16px;background:#fffdf6;}
   .stock-head{font-weight:800;color:#8a6d1a;margin-bottom:8px;font-size:14px;}
-  .tip{background:#fff7e6;border-left:4px solid #f59e0b;border-radius:10px;padding:12px 14px;font-size:13px;
-    margin-top:14px;color:#6b5416;}
+  .stock-flow{display:grid;grid-template-columns:minmax(140px,.8fr) 28px minmax(280px,1.6fr);gap:9px;align-items:center;}
+  .stock-flow .flow-arrow{text-align:center;color:#b18a19;font-size:22px;font-weight:900;}
+  .stock-flow .stock-dest{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+  .stock-flow .skill{height:100%;}
+  .stock-dest .skill{flex-direction:column;align-items:center;text-align:center;padding:10px 6px;gap:4px;box-shadow:0 4px 12px rgba(40,60,120,.09);}
+  .stock-dest .skill .ico{font-size:27px}.stock-dest .skill .nm{font-size:13px}.stock-dest .skill .ds{display:block;font-size:10.5px;line-height:1.45;color:#58657a;}
+  @media(max-width:560px){.stock-flow{grid-template-columns:1fr}.stock-flow .flow-arrow{transform:rotate(90deg)}.stock-flow .stock-dest{grid-template-columns:1fr;}}
   footer{text-align:center;color:var(--muted);font-size:12px;margin-top:30px;}
   /* modal */
   .backdrop{position:fixed;inset:0;background:rgba(20,25,40,.5);display:flex;align-items:center;
@@ -56,11 +77,11 @@
     line-height:1.85;white-space:pre-line;border-left:4px solid #94a3b8;}
   .modal .close{margin-top:16px;width:100%;border:none;border-radius:12px;padding:12px;font-size:15px;
     font-weight:800;color:#fff;background:var(--human);cursor:pointer;font-family:inherit;}
+  .modal.compact-modal{max-width:430px;padding:18px}.modal.compact-modal .strict{font-size:13px;padding:11px 13px;line-height:1.7;}
 </style>
 </head>
 <body>
 <div id="toggles">
-  <button class="tg" id="tg-mode" data-mode="adult"><span id="me">🧑</span><span id="ml">おとな</span></button>
   <a class="tg" href="index.html"><span>🎮</span>対戦へ</a>
 </div>
 <div class="wrap">
@@ -68,10 +89,31 @@
   <p class="lead" id="lead"></p>
   <div class="goal"><div id="goal1"></div><div class="big" id="goal2"></div></div>
   <div class="howto"><h2 id="howto-h"></h2><ol id="howto-list"></ol></div>
+  <details class="definition-box" id="definitions">
+    <summary>定義</summary>
+    <div class="definition-body">
+      <h3>スキル／宣言／効果／発動</h3>
+      <p>スキルを宣言することで効果を発動します。</p>
+      <p><b>例：</b>フラッシュというスキルを「いっせーのーせーフラッシュ！」と宣言することで、「自分と相手の上げた指の数が同じだった場合、一発上がりする」という効果を発動します。</p>
+      <h3>フェーズ／ターン</h3>
+      <table><tr><th>フェーズ</th><td>自分がターンをはじめてから、相手がターンをはじめるまでの期間</td></tr>
+        <tr><th>ターン</th><td>スキルを1回宣言する期間</td></tr></table>
+      <p>基本は1フェーズにつき1ターン行動します。フェイント等の効果で追加ターンを得た場合、1フェーズ中に2ターン以上行動することになります。</p>
+      <h3>バフ／デバフ／フィールド効果</h3>
+      <table><tr><th>バフ</th><td>ガード、クイック、チャージ、ミラー</td></tr>
+        <tr><th>デバフ</th><td>セメント、ロック、ドロップ</td></tr>
+        <tr><th>フィールド効果</th><td>スキップ、ストック、タイム</td></tr></table>
+      <h3>フィールド効果について</h3>
+      <p>プレイヤーに効果が直接適用されているのではなく、ゲーム環境（ボードゲームでいうボード上）に効果が適用されています。プレイヤーは間接的にその効果を受けます。</p>
+      <details class="rule-detail"><summary>勝利できるタイミングのルール</summary><div>
+        <b>スキルを宣言していないプレイヤーがいる間、ゲームに勝利することはできません。</b>
+        <p>たとえば先手が最初のフェーズから「スキップ → コピー → クイック → クイック」と連続行動し、相手がまだ一度も宣言していない場合、最後のクイックで0手になる処理は無効です。勝利にはならず、相手が宣言できる状態でゲームを続けます。</p>
+      </div></details>
+    </div>
+  </details>
   <div class="clicknote" id="clicknote"></div>
   <div id="cats"></div>
-  <div class="tip" id="cointip"></div>
-  <footer>くわしい正式ルールは「完全ルール（新）」を見てね。各パネルを<b>クリック</b>すると厳密な定義が出ます。</footer>
+  <footer>くわしいルールは「完全ルール（新）」も参照してください。各パネルを<b>クリック</b>すると詳細が出ます。</footer>
 </div>
 
 <div class="backdrop hidden" id="backdrop"><div class="modal" id="modal"></div></div>
@@ -79,88 +121,87 @@
 <script src="skills_data.js"></script>
 <script>
 "use strict";
-let mode = localStorage.getItem("ys_mode") || "adult";
+const mode = "adult";
 const T = (o)=> o ? (o[mode] ?? o.adult ?? "") : "";
 const $ = (id)=>document.getElementById(id);
 const CAT_CLS = {normal:"normal",anti:"anti",ref:"ref",react:"react",ult:"ult"};
-const CAT_ORDER = ["normal","anti","ref","ult"];
+// A/Bテスト用。false にすると従来に近い縦1列へ即座に戻せます。
+const RULEBOOK_TWO_COLUMN_LAYOUT = true;
 
 const TEXT = {
-  lead:{kid:"むずかしい ことば ぬきで、わざの こうかを やさしく せつめい！",adult:"スキルの効果をわかりやすく説明します。パネルを押すと厳密な定義も見られます。"},
+  lead:{kid:"むずかしい ことば ぬきで、わざの こうかを やさしく せつめい！",adult:"スキルの効果と定義を、種類ごとにわかりやすく説明します。"},
   goal1:{kid:"🖐️ おたがい 手が 2つ",adult:"🖐️ おたがい 手が 2つ"},
   goal2:{kid:"じぶんの手を さきに 0 にしたら かち！",adult:"自分の手を先に 0 にしたら勝ち"},
   howtoH:{kid:"あそびかたの きほん",adult:"基本の流れ"},
-  howto:{kid:[
-    "じぶんの番では ①なにを言うか（数字 か わざ）→②親指を何本あげるか を えらぶ。",
-    "あいての番では あいての わざに どう反応するか（なし／カウンター／ブロック）を えらぶ。",
-    "数字は 2人の親指の合計が 言った数と 同じなら 手を1つ おろせる。",
-    "フラッシュは 2人の親指が同じ数なら 手を2つ おろせる。"],
-   adult:[
+  howto:{adult:[
     "自分の番：①宣言（数字 or スキル）→②上げる親指の本数 を選ぶ。",
     "相手の番：相手のスキルへの反応（なし／カウンター／ブロック）を選ぶ。",
-    "数字は 2人の親指の合計が宣言値と一致すれば 手を1つ降ろす。",
-    "フラッシュは 2人の親指が同数なら 手を2つ降ろす。"]},
-  cointip:{kid:"🎓 コツ：数字は おわりのほうで つよい。フェイントは カウンターまちの ワナ。ストックは 2つで つよい！",
-    adult:"🎓 コツ：数字は終盤で強い。フェイントはカウンター待ちの罠。ストックは2つ以上で強力。"},
-  clickMore:{kid:"タップで くわしく",adult:"クリックで厳密な定義"},
+    "情報が一斉に公開。それぞれのスキルの効果を発動する。",
+    "これを交互に繰り返し、先に親指の数が0になった方が勝利！"]},
+  clickMore:{kid:"タップで くわしく",adult:"クリックで定義"},
 };
 const TAG_COLOR = {normal:"#3b82f6",anti:"#3a32c3",ref:"#059669",react:"#ef4444",ult:"#782069"};
 
-function skillCard(name){
+function skillCard(name, compact=false){
   const s = SKILLS[name];
-  return `<div class="skill" data-skill="${name}">
+  return `<div class="skill${compact ? " compact" : ""}" data-skill="${name}">
     <div class="ico">${s.emoji}</div>
     <div><div class="nm">${name}</div><div class="ds">${T(s)}</div></div></div>`;
 }
 
+function categoryBlock(cat, body){
+  return `<section class="category-block"><h2 class="cat ${CAT_CLS[cat]}">${T(CAT[cat].label)}</h2>
+    <div class="cat-desc">${T(CAT[cat].desc)}</div>${body}</section>`;
+}
+
+function skillGrid(names){ return `<div class="grid">${names.map(skillCard).join("")}</div>`; }
+
+function stockFamily(){
+  return `<div class="stock-wrap"><div class="stock-head">📦 ストック（ためて使うセット）</div>
+    <div class="stock-flow">${skillCard("ストック")}<div class="flow-arrow">→</div>
+      <div class="stock-dest">${["チョイス","ドロップ","オール"].map(n=>skillCard(n,true)).join("")}</div></div></div>`;
+}
+
+function reactionCard(name){
+  const s=REACTIONS[name];
+  return `<div class="skill" data-react="${name}"><div class="ico">${s.emoji}</div>
+    <div><div class="nm">${name}</div><div class="ds">${T(s)}</div></div></div>`;
+}
+
 function render(){
-  $("tg-mode").dataset.mode = mode;
-  $("me").textContent = mode==="kid"?"🧒":"🧑";
-  $("ml").textContent = mode==="kid"?"こども":"おとな";
   $("lead").textContent = T(TEXT.lead);
   $("goal1").textContent = T(TEXT.goal1);
   $("goal2").textContent = T(TEXT.goal2);
   $("howto-h").textContent = T(TEXT.howtoH);
   $("howto-list").innerHTML = T(TEXT.howto).map(x=>`<li>${x}</li>`).join("");
   $("clicknote").textContent = T(START.ruleNotice);
-  $("cointip").textContent = T(TEXT.cointip);
 
-  // reference: split stock family
-  let html = "";
-  for (const cat of CAT_ORDER){
-    const names = Object.keys(SKILLS).filter(n=>SKILLS[n].cat===cat && !SKILLS[n].child_of);
-    if (cat==="react") continue;
-    html += `<h2 class="cat ${CAT_CLS[cat]}">${T(CAT[cat].label)}</h2>`;
-    if (cat==="ref"){
-      // コピー and ストック(親); チョイス/オール/ドロップ are children of ストック
-      const standalone = names.filter(n=>n!=="ストック");
-      html += `<div class="grid">${standalone.map(skillCard).join("")}</div>`;
-      const kids = Object.keys(SKILLS).filter(n=>SKILLS[n].child_of==="ストック");
-      html += `<div class="stock-wrap"><div class="stock-head">📦 ストック（ためて使うセット）</div>
-        <div class="grid">${skillCard("ストック")}${kids.map(skillCard).join("")}</div></div>`;
-    } else {
-      html += `<div class="grid">${names.map(skillCard).join("")}</div>`;
-    }
-  }
-  // reaction category (relevant during opponent's turn)
-  html += `<h2 class="cat react">${T(CAT.react.label)}</h2><div class="grid">` +
-    Object.keys(REACTIONS).filter(r=>r!=="なし").map(r=>{
-      const s=REACTIONS[r];
-      return `<div class="skill" data-react="${r}"><div class="ico">${s.emoji}</div>
-        <div><div class="nm">${r}</div><div class="ds">${T(s)}</div></div></div>`;
-    }).join("") + `</div>`;
-  $("cats").innerHTML = html;
+  const normal = Object.keys(SKILLS).filter(n=>SKILLS[n].cat==="normal");
+  const traps = Object.keys(SKILLS).filter(n=>SKILLS[n].cat==="anti");
+  const refs = Object.keys(SKILLS).filter(n=>SKILLS[n].cat==="ref" && !SKILLS[n].child_of && n!=="ストック");
+  const ults = Object.keys(SKILLS).filter(n=>SKILLS[n].cat==="ult");
+  const left = categoryBlock("normal", skillGrid(normal)) +
+    categoryBlock("ult", `<div class="grid">${ults.map(skillCard).join("")}${reactionCard("ブロック")}</div>`);
+  const right = categoryBlock("react", `<div class="grid">${reactionCard("カウンター")}</div>`) +
+    categoryBlock("anti", skillGrid(traps)) +
+    categoryBlock("ref", skillGrid(refs) + stockFamily());
+  $("cats").innerHTML = RULEBOOK_TWO_COLUMN_LAYOUT
+    ? `<div class="category-columns"><div>${left}</div><div>${right}</div></div>`
+    : left + right;
   wire();
 }
 
 function openModal(name, data, catCls){
   const color = TAG_COLOR[data.cat] || "#7c3aed";
   const catLabel = data.cat ? T(CAT[data.cat].label) : (mode==="kid"?"はんのう":"反応");
+  const tags = (data.tags || (data.cat ? [data.cat] : ["react"])).map(cat =>
+    `<span class="tag" style="background:${TAG_COLOR[cat]}">${T(CAT[cat].label)}</span>`).join("");
+  $("modal").classList.toggle("compact-modal", !!data.child_of);
   $("modal").innerHTML = `
     <div class="mh"><span class="ico">${data.emoji}</span><span class="nm">${name}</span>
-      <span class="tag" style="background:${color}">${catLabel}</span></div>
-    <div class="sec">📖 正式な定義（完全ルール）</div>
-    <div class="strict">${data.strict}</div>
+      ${tags}</div>
+    <div class="sec">📖 詳細</div>
+    <div class="strict">${data.compactDetail || data.strict}</div>
     <button class="close" id="mclose">${mode==="kid"?"とじる":"閉じる"}</button>`;
   $("backdrop").classList.remove("hidden");
   $("mclose").onclick = ()=>$("backdrop").classList.add("hidden");
@@ -175,7 +216,6 @@ function wire(){
     };
   }
 }
-$("tg-mode").onclick = ()=>{ mode = mode==="kid"?"adult":"kid"; localStorage.setItem("ys_mode",mode); render(); };
 render();
 </script>
 </body>

@@ -21,14 +21,20 @@ Skill ids (stockable ids are 0..7 — stock masks index by these):
 
 previous_skill code: 0 = None, 1..5 = declared totals 0..4, 6..20 = skill id+6.
 
-TP action codes: number  = total*4 + thumb            (0..63)
-                 skill   = 64 + skill_id*4 + thumb    (64..127)
-                 choice  = 128 + choice_id*4 + thumb  (128..191)
+TP action codes: number  = total*4 + thumb              (0..63)
+                 skill   = 64 + skill_id*4 + thumb      (64..127)
+                 choice  = 128 + choice_id*4 + thumb    (128..159)
+                 stock_target (YS_STOCK_FREECHOICE only)
+                         = 160 + skill_id*4 + thumb      (160..191, skill_id 0..7)
+                 [reserved: 192..195 = choice_collapse.CHOICE_META_BASE,
+                  collapsed-CHOICE pseudo-rows, never a real input to step()]
                  pass    = 255
 NTP action codes: reaction*4 + thumb, reaction 0=none 1=counter 2=block.
 """
 
 from __future__ import annotations
+
+import os
 
 import numpy as np
 from numba import njit
@@ -56,6 +62,7 @@ from .constants import (
     TIME,
 )
 from .state import PlayerState, State
+from .toggles import STOCK_FREECHOICE, STOCK_FREETEMPO, STOCK_UNLIMITED_ALPHA
 
 # ── skill tables ───────────────────────────────────────────────────────────
 
@@ -76,6 +83,34 @@ REACTION_NONE, REACTION_COUNTER, REACTION_BLOCK = 0, 1, 2
 PASS_CODE = 255
 
 FULL_ALPHABET_MASK = (1 << N_STOCKABLE) - 1
+
+# ── counter-piercing toggle (experimental, defaults OFF) ───────────────────
+# Bitmask over skill ids (see SKILL_ID above): when bit `skill_id` is set,
+# that skill's effect fires under reaction COUNTER exactly as it would under
+# reaction NONE (BLOCK is unaffected). Default 0 = base game, byte-identical.
+#
+# This is read ONCE at module import into a Python global, which `step`
+# below captures as a compile-time constant when numba JIT-compiles it (this
+# is how numba treats module globals referenced from @njit code). Changing
+# the env var therefore has NO EFFECT on an already-compiled/cached `step` —
+# the on-disk numba cache (`complete_solver/__pycache__/*.nb*`,
+# `complete_ai/__pycache__/*.nb*`) must be deleted so `step` and its callers
+# recompile and pick up the new mask. See module docstring / README note.
+_CP_MASK = int(os.environ.get("YS_COUNTER_PIERCE", "0"))
+
+# ── "broken stock" toggles (experimental, default OFF) ─────────────────────
+# See complete_solver/toggles.py for the full description of each flag. Same
+# numba-global-capture caveat as _CP_MASK above applies to all three: changing
+# the env var requires deleting the on-disk numba cache before the next run.
+_STOCK_FREECHOICE = STOCK_FREECHOICE
+_STOCK_UNLIMITED_ALPHA = STOCK_UNLIMITED_ALPHA
+_STOCK_FREETEMPO = STOCK_FREETEMPO
+
+# Targeted-STOCK TP code range (YS_STOCK_FREECHOICE): 160 + skill_id*4 +
+# thumb, skill_id 0..7. Codes 128..159 are CHOICE (8 choice_id x 4 thumb) and
+# 192..195 are choice_collapse.CHOICE_META_BASE (collapsed CHOICE pseudo-rows)
+# — 160..191 is exactly the unused gap between them.
+STOCK_TARGET_BASE = 160
 
 # ── packing (python side) ──────────────────────────────────────────────────
 
@@ -196,6 +231,8 @@ def tp_action_to_code(action: TPAction) -> int:
         return action.skill * 4 + action.thumb
     if action.skill == CHOICE:
         return 128 + SKILL_ID[action.choice] * 4 + action.thumb
+    if action.skill == STOCK and action.stock_target is not None:
+        return STOCK_TARGET_BASE + SKILL_ID[action.stock_target] * 4 + action.thumb
     return 64 + SKILL_ID[action.skill] * 4 + action.thumb
 
 
@@ -206,9 +243,13 @@ def code_to_tp_action(code: int, stock_mask: int = 0) -> TPAction:
         return TPAction(code // 4, code % 4)
     if code < 128:
         return TPAction(SKILL_NAMES[(code - 64) // 4], code % 4)
-    choice_id = (code - 128) // 4
-    all_order: tuple[str, ...] = ()
-    return TPAction(CHOICE, code % 4, choice=SKILL_NAMES[choice_id])
+    if code < STOCK_TARGET_BASE:
+        choice_id = (code - 128) // 4
+        return TPAction(CHOICE, code % 4, choice=SKILL_NAMES[choice_id])
+    if code < STOCK_TARGET_BASE + 32:
+        skill_id = (code - STOCK_TARGET_BASE) // 4
+        return TPAction(STOCK, code % 4, stock_target=SKILL_NAMES[skill_id])
+    raise ValueError(f"code_to_tp_action: reserved/unused code {code}")
 
 
 def ntp_action_to_code(action: NTPAction) -> int:
@@ -262,9 +303,20 @@ def legal_tp_codes(lane0, lane1, alphabet_mask, max_stock, out):
         if prev != 0 and (prev <= 5 or prev - 6 < 8):
             out[n] = 64 + 8 * 4 + thumb
             n += 1
-        # STOCK: previous is a stockable (alphabet) skill not already stocked,
-        # and the holder is below the stock-size cap.
-        if prev >= 6 and prev - 6 < 8:
+        # STOCK: base behaviour = previous is a stockable (alphabet) skill
+        # not already stocked. Targeted behaviour (YS_STOCK_FREECHOICE) =
+        # any alphabet skill not already stocked, regardless of previous.
+        # Either way the holder must be below the stock-size cap.
+        if _STOCK_FREECHOICE:
+            held = 0
+            for bit in range(8):
+                held += stock >> bit & 1
+            if held < max_stock:
+                for skill_id2 in range(8):
+                    if (alphabet_mask >> skill_id2 & 1) and not (stock >> skill_id2 & 1):
+                        out[n] = STOCK_TARGET_BASE + skill_id2 * 4 + thumb
+                        n += 1
+        elif prev >= 6 and prev - 6 < 8:
             prev_id = prev - 6
             if (alphabet_mask >> prev_id & 1) and not (stock >> prev_id & 1):
                 held = 0
@@ -273,8 +325,9 @@ def legal_tp_codes(lane0, lane1, alphabet_mask, max_stock, out):
                 if held < max_stock:
                     out[n] = 64 + 9 * 4 + thumb
                     n += 1
-        # CHOICE / ALL / DROP share the one-per-phase limit
-        if alpha_used == 0:
+        # CHOICE / ALL / DROP share the one-per-phase limit (removed by
+        # YS_STOCK_UNLIMITED_ALPHA).
+        if alpha_used == 0 or _STOCK_UNLIMITED_ALPHA:
             for choice_id in range(8):
                 if (stock >> choice_id & 1) and not (choice_used >> choice_id & 1):
                     out[n] = 128 + choice_id * 4 + thumb
@@ -383,14 +436,21 @@ def step(lane0, lane1, tp_code, ntp_code, alphabet_mask):
         is_number = tp_code < 64
         skill_id = -1
         choice_id = -1
+        stock_target_id = -1
         declared_total = -1
         if is_number:
             declared_total = tp_code // 4
         elif tp_code < 128:
             skill_id = (tp_code - 64) // 4
-        else:
+        elif tp_code < STOCK_TARGET_BASE:
             skill_id = ID_CHOICE
             choice_id = (tp_code - 128) // 4
+        else:
+            # Targeted STOCK (YS_STOCK_FREECHOICE only; legal_tp_codes never
+            # emits this range otherwise). code < 192 always here — 192+ is
+            # choice_collapse.CHOICE_META_BASE and is never a real input.
+            skill_id = ID_STOCK
+            stock_target_id = (tp_code - STOCK_TARGET_BASE) // 4
 
         if skill_id == ID_BOOST or skill_id == ID_TIME:
             me |= np.int64(1) << 14  # used_ultimate
@@ -414,11 +474,25 @@ def step(lane0, lane1, tp_code, ntp_code, alphabet_mask):
                     _resolve_no_reaction(
                         me, opp, me_blocked, opp_blocked, added_extra,
                         me_guard_extra, prev, is_number, declared_total,
-                        skill_id, choice_id, charge_was_active,
+                        skill_id, choice_id, stock_target_id, charge_was_active,
                         tp_thumb, ntp_thumb, total,
                     )
                 )
             # else: fully blocked, no effect
+        elif reaction == REACTION_COUNTER and skill_id >= 0 and (
+            (_CP_MASK >> skill_id) & 1
+        ) == 1:
+            # Counter-piercing (experimental, toggle via YS_COUNTER_PIERCE):
+            # this skill fires exactly as under reaction NONE; COUNTER does
+            # not negate it. BLOCK (handled above) is unaffected.
+            me, opp, me_blocked, opp_blocked, added_extra, me_guard_extra = (
+                _resolve_no_reaction(
+                    me, opp, me_blocked, opp_blocked, added_extra,
+                    me_guard_extra, prev, is_number, declared_total,
+                    skill_id, choice_id, stock_target_id, charge_was_active,
+                    tp_thumb, ntp_thumb, total,
+                )
+            )
         elif reaction == REACTION_COUNTER:
             if skill_id == ID_FEINT:
                 me = _lower_one_bits(me, me_blocked)
@@ -481,7 +555,7 @@ def step(lane0, lane1, tp_code, ntp_code, alphabet_mask):
                 _resolve_no_reaction(
                     me, opp, me_blocked, opp_blocked, added_extra,
                     me_guard_extra, prev, is_number, declared_total,
-                    skill_id, choice_id, charge_was_active,
+                    skill_id, choice_id, stock_target_id, charge_was_active,
                     tp_thumb, ntp_thumb, total,
                 )
             )
@@ -500,6 +574,14 @@ def step(lane0, lane1, tp_code, ntp_code, alphabet_mask):
 
     # ---- finish turn ----------------------------------------------------
     both_declared = (me >> 16 & 1) and (opp >> 16 & 1)
+    # Both players must have declared before either can reach zero hands.
+    # Restore the final hand when an opening combo would otherwise create a
+    # zero-hand, non-terminal state with no valid continuation.
+    if not both_declared:
+        if (me & 3) <= 0:
+            me = (me & ~np.int64(15)) | np.int64(1)
+        if (opp & 3) <= 0:
+            opp = (opp & ~np.int64(15)) | np.int64(1)
     if both_declared:
         if (me & 3) <= 0:
             return np.int64(0), np.int64(0), np.int64(2), np.int64(1)
@@ -596,6 +678,9 @@ def _two_hand_drop(me, opp, me_blocked, opp_blocked, target_is_opp):
         return me, opp, me_blocked, opp_blocked
 
     hands = dropper & 3
+    both_declared = (me >> 16 & 1) and (opp >> 16 & 1)
+    if hands <= 2 and not both_declared:
+        return me, opp, me_blocked, opp_blocked
     if hands < 2:
         dropper = _lower_one_bits(dropper, blocked)
     elif opponent >> 4 & 1:  # opponent's guard cancels and blocks this side
@@ -667,7 +752,7 @@ def _counter_referenced(me, opp, me_blocked, opp_blocked, added_extra,
 @njit(cache=True)
 def _resolve_no_reaction(me, opp, me_blocked, opp_blocked, added_extra,
                          me_guard_extra, prev, is_number, declared_total,
-                         skill_id, choice_id, charge_was_active,
+                         skill_id, choice_id, stock_target_id, charge_was_active,
                          tp_thumb, ntp_thumb, total):
     """_resolve_skill_effect: TP's declaration with no (effective) reaction."""
     if is_number:
@@ -726,8 +811,17 @@ def _resolve_no_reaction(me, opp, me_blocked, opp_blocked, added_extra,
                         me_guard_extra, prev - 6, tp_thumb, ntp_thumb,
                     )
     elif skill_id == ID_STOCK:
-        if prev >= 6 and prev - 6 < 8:
+        if _STOCK_FREECHOICE and stock_target_id >= 0:
+            # Targeted STOCK (YS_STOCK_FREECHOICE): legal_tp_codes only ever
+            # emits a target not already held, so this always succeeds.
+            if not (me >> 18 >> stock_target_id & 1):
+                me |= np.int64(1) << (18 + stock_target_id)
+        elif prev >= 6 and prev - 6 < 8:
             me |= np.int64(1) << (18 + (prev - 6))
+        if _STOCK_FREETEMPO:
+            # YS_STOCK_FREETEMPO: STOCK does not pass initiative (base and
+            # targeted alike).
+            added_extra += 1
     elif skill_id == ID_CHOICE:
         if choice_id >= 0 and (me >> 18 >> choice_id & 1):
             me |= np.int64(1) << (26 + choice_id)

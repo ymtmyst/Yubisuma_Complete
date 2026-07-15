@@ -41,15 +41,19 @@ from .packed_vi import (
 
 @njit(cache=True)
 def _fill_open(seed0, seed1, n_seed, alphabet_mask, max_stock,
-               offsets, child_idx, cell_val, front0, front1):
+               offsets, child_idx, cell_val, front0, front1,
+               row_offsets, tp_code_table):
     """Fill transition tables for the interior seeds, discovering frontier.
 
     Interior seeds occupy global indices ``0 .. n_seed-1``. Any non-terminal
     child that is not itself a seed is appended to the frontier
     (``front0/front1``) and assigned index ``n_seed + k``. Terminal children
     are stored as ``child_idx = -1`` with the terminal reward in ``cell_val``
-    (identical convention to ``packed_vi._fill_tables``). Returns the frontier
-    count, or -1 if ``front0`` overflowed."""
+    (identical convention to ``packed_vi._fill_tables``). Also fills
+    ``tp_code_table`` (each seed's own TP codes, at ``row_offsets[i]``) for
+    the CHOICE post-reaction collapse in the shared ``packed_vi._jacobi_sweep``
+    (see choice_collapse.py). Returns the frontier count, or -1 if ``front0``
+    overflowed."""
     index = NumbaDict.empty(_KEY_TYPE, types.int64)
     for i in range(n_seed):
         index[(seed0[i], seed1[i])] = i
@@ -62,6 +66,9 @@ def _fill_open(seed0, seed1, n_seed, alphabet_mask, max_stock,
         lane1 = seed1[i]
         n_tp = legal_tp_codes(lane0, lane1, alphabet_mask, max_stock, tp_buf)
         n_ntp = legal_ntp_codes(lane0, lane1, ntp_buf)
+        row_base = row_offsets[i]
+        for a in range(n_tp):
+            tp_code_table[row_base + a] = tp_buf[a]
         pos = offsets[i]
         for a in range(n_tp):
             for b in range(n_ntp):
@@ -98,7 +105,7 @@ class SubgraphTables:
 
     def __init__(self, seed0, seed1, front0, front1,
                  tp_counts, ntp_counts, offsets, child_idx, cell_val,
-                 alphabet_mask, max_stock):
+                 alphabet_mask, max_stock, row_offsets, tp_code_table):
         self.n_seed = int(seed0.shape[0])
         self.n_front = int(front0.shape[0])
         self.n_total = self.n_seed + self.n_front
@@ -111,6 +118,11 @@ class SubgraphTables:
         self.cell_val = cell_val
         self.alphabet_mask = int(alphabet_mask)
         self.max_stock = int(max_stock)
+        # Seeds' own TP codes (CHOICE post-reaction collapse; see
+        # packed_vi._jacobi_sweep / choice_collapse.py). Frontier states never
+        # get their own row here — they are fixed boundary values, never swept.
+        self.row_offsets = row_offsets
+        self.tp_code_table = tp_code_table
 
     @property
     def frontier_fraction(self) -> float:
@@ -142,6 +154,10 @@ def build_subgraph(seed0, seed1, alphabet_mask, max_stock) -> SubgraphTables:
             (tp_counts.astype(np.int64) * ntp_counts.astype(np.int64))[:-1],
             out=offsets[1:],
         )
+    row_offsets = np.zeros(n_seed, dtype=np.int64)
+    if n_seed > 1:
+        np.cumsum(tp_counts.astype(np.int64)[:-1], out=row_offsets[1:])
+    tp_code_table = np.empty(int(tp_counts.astype(np.int64).sum()), dtype=np.int64)
     child_idx = np.empty(total_cells, dtype=np.int32)
     cell_val = np.empty(total_cells, dtype=np.int8)
     # Upper bound on frontier size: at most one new state per cell.
@@ -151,6 +167,7 @@ def build_subgraph(seed0, seed1, alphabet_mask, max_stock) -> SubgraphTables:
     n_front = _fill_open(
         seed0, seed1, n_seed, mask, ms,
         offsets, child_idx, cell_val, front0, front1,
+        row_offsets, tp_code_table,
     )
     if n_front < 0:  # pragma: no cover — bounded by total_cells, unreachable
         raise RuntimeError("frontier overflow (should be bounded by cell count)")
@@ -159,6 +176,7 @@ def build_subgraph(seed0, seed1, alphabet_mask, max_stock) -> SubgraphTables:
     return SubgraphTables(
         seed0, seed1, front0, front1,
         tp_counts, ntp_counts, offsets, child_idx, cell_val, mask, ms,
+        row_offsets, tp_code_table,
     )
 
 
@@ -228,12 +246,14 @@ def run_subgraph_vi(
         max_delta, n_failed = _jacobi_sweep(
             tab.tp_counts, tab.ntp_counts, tab.offsets,
             tab.child_idx, tab.cell_val, values, v_next, gamma, fail_idx,
+            tab.row_offsets, tab.tp_code_table,
         )
         for k in range(n_failed):
             i = int(fail_idx[k])
             repaired = _repair_state_value(
                 i, tab.tp_counts, tab.ntp_counts, tab.offsets,
                 tab.child_idx, tab.cell_val, values, gamma,
+                tab.row_offsets, tab.tp_code_table,
             )
             v_next[i] = repaired
         if omega < 1.0:

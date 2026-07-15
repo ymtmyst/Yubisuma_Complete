@@ -84,7 +84,7 @@ footer { margin-top: 40px; font-size: 12px; color: #9ca3af; text-align: center; 
 </style></head>
 <body><div class="wrap">
 <div class="top"><a class="back" href="../index.html">← ハブに戻る</a>
-<span class="meta">更新 07-14 ・ WORK_LOG.md</span></div>
+<span class="meta">更新 07-15 ・ WORK_LOG.md</span></div>
 <article class="doc"><h1>作業ログ WORK_LOG</h1>
 <h1 id="ai_master_plan_v2">作業ログ(AI_MASTER_PLAN_V2 準拠)</h1>
 <p>各作業セッションの記録。書式: 日付 / フェーズ / やったこと / 結果 / 次にやること。</p>
@@ -954,9 +954,347 @@ footer { margin-top: 40px; font-size: 12px; color: #9ca3af; text-align: center; 
 <li><strong>効果</strong>: 従来の律速だったVI(250k状態で約55分)を<strong>njitで実質数秒</strong>に。→ D=6 がクリーンに算出可能になった(従来はVIが壁で不可能)。<strong>残る律速は列挙(torch solve 500状態/秒)</strong> → D≥7 には列挙バッチ化(solve_batch)が次の本丸。</li>
 <li><strong>D=6 クリーン結果(njit, 2026-07-14)</strong>: <strong>exploitability ≈ 0.5368</strong>(346,378状態で閉合 hit_cap=False)。列挙2191s(pincer凍結で158状態/s)、<strong>VI njit 19秒</strong>(371 sweeps 収束、深さリーフ27,986,787+終盤リーフ278,777を内部エッジ7,082,646に畳込)=純Python約45分相当をnjitで19秒に実証。</li>
 <li><strong>【深さトレンド確定・重要】exploitability は単調上昇し頭打ちにならない</strong>: D4 0.5169 / D5 0.5283 / <strong>D6 0.5368</strong>(全クリーン)。増分 +1.14→+0.85pt と減速するが上昇継続 → 幾何的外挿で真値<strong>~0.55-0.56</strong>の可能性。<strong>含意: PPO(0.44)は大幅な過小評価だった。graph-vi モデルは厳密best-responseに対し実際は~0.54+搾取される=「非搾取(≤0.50)」の旧結論は誤り、モデルは測定可能に搾取可能</strong>。深い搾取(ストック等長期筋の可能性)の存在も支持。深部(D7-8で頭打ち確認・ストック起因の切り分け)には列挙バッチ化が必要。log data/graphbr_d6_njit.log。</li>
+</ul>
+<h3 id="graph-br-d8-fast2026-07-14">graph-BR 列挙高速化(D8目標、ユーザー: 既存温存で切替) — プロファイル→fast列挙実装(2026-07-14)</h3>
+<ul>
+<li><strong>プロファイル(cProfile, 8000状態)</strong>: 凍結方策<code>solve</code>が<strong>70%</strong>(ネットbatch=1 17%/njit探索機構(expand/backup/LP)28%/pincerA0辞書9%)、列挙の<code>child_of</code>(Pythonセル走査)<strong>23%</strong>。<code>solve_batch</code>(ネットプール)は実測1.16×どまり(ネットは半分弱・njit機構が非バッチで支配)。→ 真のレバー=<strong>スレッド並列solve + njit子生成 + フラット格納</strong>。</li>
+<li><strong>実装</strong>: 新規 <code>graph_br_fast.enumerate_solve_fast</code>(既存<code>enumerate_br</code>/<code>solve_br</code>は不変・温存)。<strong>レベル同期BFS</strong>で各レベルの凍結方策を<strong>per-threadサーチャ×solve_batchでスレッド並列</strong>、<code>_grid_children</code>(njit)で子生成、<strong>畳み込みフラット配列</strong>へ直接格納(Pythonタプルグラフ廃止=D7-8のメモリ対応)、<strong>深さリーフ=0行の固定値ノード</strong>(VIが更新しない、<code>_coupled_sweep</code>再利用)。<code>_Grow</code>成長配列でGB級配列に対応。</li>
+<li><strong>セマンティクス補正(重要)</strong>: 旧<code>enumerate_br</code>の深さキャップは<strong>経路長基準</strong>で、トランスポジション局面を経路により二重評価する取りこぼしバグがあった。fast版は<strong>BFS距離基準</strong>(各局面を最短距離で1回だけ展開)=<strong>より正確</strong>。∴ fast のD値は旧pythonより僅かに高い(D4: fast0.5261 vs 旧0.5169)。fast版を定義版とする。solve_batchは PincerSearcher でも solve と一致(値3e-8/方策5e-7、無罪確認)。</li>
+<li><strong>効果</strong>: D4で 116s→46s(2.5×、njit VI込)。njit VI はトイ+fuzz parityでpython VIと一致(test_graph_br_fast.py)。D=4..8掃引 実行中(結果は下記追記)。</li>
 <li><strong>平易版</strong>: 2モデルはクセがほぼ同じ。心配だった「ロック/セメント/タイム等を神は使うのに我々は使ってない?」は終盤では"神も使わない"と確定(=穴ではない)。ただしモデルはフェイントを神より多用する軽いクセあり。ストック自体と序盤の価値だけは今回の道具(終盤・ストック抜き)では測れないので、そこはgraph-BR待ちで保留。</li>
 </ul>
+<h3 id="graph_br_fast-court-2026-07-14">セッション復旧: 「graph_br_fast がバグって court 大量出力」の調査【誤診→正典と確定・文書/テスト補強】(2026-07-14)</h3>
+<ul>
+<li><strong>経緯</strong>: ユーザーがログの氾濫を見てセッションを切り、状況確認を依頼。前セッション中に走っていたのは<strong>学習ではなく graph-BR fast 掃引(測定のみ)</strong>。稼働中の学習プロセスは無く、<strong>全モデル・データは無傷</strong>(最終更新12:02=午前の再生成、graph-BR作業14時以降より前)。生存していた python は旧FT1の <code>s3_canonical_drift.py</code>(無関係・古い)のみ。</li>
+<li><strong>当初の誤診と訂正</strong>: <code>data/graphbr_fast_parity.log</code> の <code>MATCH: False</code>(ref states=9378/val0.5169 vs fast states=65946/val0.5261)を見て「off-by-one バグ」と仮説→<strong>低depth実測で反証</strong>(<code>scratchpad/br_enum_diag.py</code>): <strong>fast(D=2)=ref(D=2)=0.0073 で厳密一致</strong>、D≥3で fast が単調に上(より多く搾取を発見)。状態数は fast(D).n≈ref(D+1).n。=これは[[上記 896行 セマンティクス補正]]どおり<strong>意図的な設計差</strong>(fast=BFS距離キャップ=より正確なタイト下界、ref=経路長キャップで攻撃者を過小評価)。<strong>fast版が正典</strong>で、<strong>参照に合わせる"修正"は精度を落とす誤り</strong>と確定。</li>
+<li><strong>氾濫(court大量)の正体</strong>: バグではなく、重い測定ラン(6.5万〜35万状態)の verbose 進捗出力+<strong>本来一致しないもの同士を比べた不適切な enum-vs-enum parity スクリプト</strong>(このセッションで書かれた、ファイル化されず・ログのみ)。誤ったログ3本(fast_sweep_console/graphbr_fast_sweep/graphbr_fast_parity)は削除済み。</li>
+<li><strong>正しさの担保(再確認)</strong>: njit VI == 純Python VI(<code>test_graph_br_fast.py</code> トイ+fuzz)PASS。<strong>列挙の正しさは fast(D=2)==ref(D=2)</strong> が保証。</li>
+<li><strong>再発防止(補強)</strong>: ① <code>graph_br_fast.py</code> モジュール docstring を更新——「2本のfast経路(共有列挙+njit VI / 別列挙 enumerate_solve_fast)」を明示し、<strong>enum-vs-enum の不一致は設計どおり・"修正"禁止</strong>と明記(旧docstring「両者は同一列挙」は enumerate_solve_fast 追加前の古い記述で混乱の元だった)。② 回帰テスト <code>test_fast_matches_reference_at_base_depth</code>(D=2でfast==ref)追加=「fastは壊れているか?」に自動で答える。全parity系3件PASS(5.4s)。</li>
+<li><strong>結論</strong>: <strong>失われた成果は何もない。学習は止まっていない。コード上の実バグは無し。</strong> fast掃引の数値(D4 0.5261/D5 0.5360)は正典engineの有効値。</li>
+<li><strong>平易版</strong>: 「採点ツールが壊れて画面が溢れた」件を調べたら、壊れていなかった——採点ツールは"より厳しく正確な採点法"に意図的に変えてあり(前回そう記録済み)、氾濫はただの進捗ログの出し過ぎと、比べてはいけない2つを比べた確認スクリプトのせい。答案(AI本体)は無傷。将来また誤解しないよう説明書きと自動チェックを足した。</li>
+</ul>
 <h3 id="2026-07-14-graph-vi-a0n7-aexploitability-graph-brexploitability-finalize-value_gvi_latestpt-graph_br-finalizevi-njit-or-br-play_cliplay_serverpolicy_report-model-value_latestptdepth-graph-vi-or">【決定(2026-07-14)】本採用 = graph-vi 継続(a0・長期スキル使用で僅優、N7-A本命路線と整合)。exploitability の互角を踏まえ<strong>最終決着は graph-BR(厳密exploitability)の finalize に委ねる</strong>。それまで value_gvi_latest.pt を本採用維持。次アクション候補: graph_br finalize(凍結方策バッチ化+連立VI njit化 or 深さ制限BR+厳密終盤テーブル葉)。<strong>注意: play_cli/play_server/policy_report の既定 --model が value_latest.pt(depth) のため、配信で graph-vi を使うなら明示指定 or 既定変更が必要</strong>。</h3>
+<h3 id="n7-g-2026-07-14">N7-G セメント強制プローブ(長期スキル過小評価の診断、2026-07-14) — 単発は不支持・多手/非中立は未検証</h3>
+<ul>
+<li><strong>目的</strong>: ユーザー懸念「セメント/ロック/チャージ/タイム等の長期スキルを、遅効性ゆえ net が過小評価し AI が使わないのでは(鶏卵)」を直接診断。ツール scratchpad/cement_probe.py・cement_depth_scan.py・cement_fullwidth.py(いずれも測定専用、モデル・データ不変)。</li>
+<li><strong>設計</strong>: 相手がセメントされた局面(opp.cement∈{0,1,2}, mover=活用側)を構築。深い選択的探索(SelectiveSearcher)+A0厳密葉(_net_one を EndgameTablebase で上書き=「深い選択的×挟み撃ち」を合成)で ①局面価値 ②均衡方策 ③強制Q(自TP=スキルを強制し相手均衡NTP混合で深部評価、Q&gt;V=過小評価の穴)を測定。ナッシュ規律: 強制は測定のためだけ。</li>
+<li><strong>結果</strong>:</li>
+<li><strong>相手セメントは強い</strong>: mover価値 無0.077→1個0.13→2個0.255。<strong>net はこれを正しく捉える</strong>(net0/d2≈deep、2個で net0.231/deep0.255)=かかった後の局面は盲点でない。</li>
+<li><strong>2個かかった局面の深い最適=ロック58%+フラッシュ17%+スキップ25%</strong> → ユーザーの「セメント→ロック/フラッシュ相関」仮説を実証。しかも<strong>deployed 深さ2エージェントも同分布(ロック57/フラッシュ16%)</strong> → 「AIはこれらを一切使わない」は不正確、<strong>条件付きで正しく使えている</strong>。</li>
+<li><strong>中立からのセメント強制Qは深さ3→7でフラット −0.04(gap −0.12)</strong>。<strong>全幅(tau&lt;0, 枝刈りなし)でも深さ3→5でフラット −0.036→−0.034</strong>(深さ5全幅=22分)=<strong>horizon でも枝刈り交絡でもない</strong>。真因=<strong>相手は反応thumb=0でセメントを62%不発化できる</strong>(defuse)。かかった後(opp_cem2)は defuse 0%(相手は下げられず拘束確定)。</li>
+<li><strong>結論(正直)</strong>: <strong>「AIが長期スキルを horizon で過小評価」仮説は、単発セメント・中立局面では不支持</strong>。AIは間違っておらず、セメントの条件付き価値を正しく評価している。<strong>射程外の未解決</strong>: ①多手コンボ(相手を拘束に追い込む手順)②非中立局面(相手が指を上げざるを得ない=セメントが強く到達可能かもしれない局面)。単発強制Qツールはほぼ出し切った。</li>
+<li><strong>次の妥当な一手</strong>: <strong>自己対戦サンプル局面への強制Q掃引</strong>(3手構築局面でなく実分布上で、候補スキルが「AIが打たない profitable deviation」になる局面を探す)。それでも多手コンボは別機構(強制シーケンス/カリキュラム)が要る。</li>
+</ul>
+<h3 id="n7-g2-setup-costactivated-value">N7-G2 スキル別 setup-cost/activated-value プローブ</h3>
+<p><em>計測日 2026-07-14。SCRATCH/skill_probe.py（測定専用ハーネス、models/data/complete_solver/complete_ai は一切改変せず）。selective depth 5 tau 0.02 を headline、depth-scan [3, 4, 5, 6]、full-width(tau&lt;0) は CHARGE のみ de-confound。全数値 win%=100*(v+1)/2 も併記。</em></p>
+<p>狙い: 採用AIが ~0% しか使わないスキルについて、(1) 発動済み状態の価値、(2) 中立位置から宣言する setup-cost（forced-Q vs 均衡値 V）、(3) 実使用率 を数値化し、真に弱い（後日バフ候補の）スキルを切り分ける。</p>
+<table>
+<thead>
+<tr>
+<th>experiment</th>
+<th>skill</th>
+<th>context</th>
+<th>発動済 win%</th>
+<th>setup win%</th>
+<th>setup gap</th>
+<th>deployed使用%</th>
+<th>deep使用%</th>
+<th>opp defuse%</th>
+<th>所見</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>charge_neutral</td>
+<td>チャージ</td>
+<td>neutral</td>
+<td>60.1</td>
+<td>49.5</td>
+<td>-0.087</td>
+<td>0.0</td>
+<td>0.0</td>
+<td>61.7</td>
+<td>setup is a real cost (opponent defuses); activated state is strong once reached; AI barely plays it</td>
+</tr>
+<tr>
+<td>charge_opp_1hand</td>
+<td>チャージ</td>
+<td>opp_1hand</td>
+<td>49.8</td>
+<td>32.8</td>
+<td>-0.137</td>
+<td>0.0</td>
+<td>0.0</td>
+<td>13.0</td>
+<td>setup is a real cost (opponent defuses); AI barely plays it</td>
+</tr>
+<tr>
+<td>stock_ガード_neutral</td>
+<td ガード="ガード">ストック</td>
+<td>neutral</td>
+<td>54.9</td>
+<td>47.4</td>
+<td>-0.130</td>
+<td>0.0</td>
+<td>0.0</td>
+<td>61.7</td>
+<td>setup is a real cost (opponent defuses); AI barely plays it</td>
+</tr>
+<tr>
+<td>stock_ガード_opp1h</td>
+<td ガード="ガード">ストック</td>
+<td>opp_1hand</td>
+<td>37.6</td>
+<td>30.3</td>
+<td>-0.187</td>
+<td>0.0</td>
+<td>0.0</td>
+<td>13.0</td>
+<td>setup is a real cost (opponent defuses); AI barely plays it</td>
+</tr>
+<tr>
+<td>stock_クイック_neutral</td>
+<td クイック="クイック">ストック</td>
+<td>neutral</td>
+<td>55.0</td>
+<td>47.3</td>
+<td>-0.130</td>
+<td>0.0</td>
+<td>0.0</td>
+<td>61.7</td>
+<td>setup is a real cost (opponent defuses); AI barely plays it</td>
+</tr>
+<tr>
+<td>stock_スキップ_neutral</td>
+<td スキップ="スキップ">ストック</td>
+<td>neutral</td>
+<td>54.9</td>
+<td>45.9</td>
+<td>-0.205</td>
+<td>0.0</td>
+<td>0.0</td>
+<td>0.0</td>
+<td>setup is a real cost (opponent defuses); AI barely plays it</td>
+</tr>
+<tr>
+<td>stock_フェイント+ガード_neutral</td>
+<td フェイント_ガード="フェイント,ガード">ストック</td>
+<td>neutral</td>
+<td>59.3</td>
+<td>-</td>
+<td>-</td>
+<td>55.0</td>
+<td>50.2</td>
+<td>0.0</td>
+<td>(insufficient data)</td>
+</tr>
+<tr>
+<td>stock_フェイント+ガード_opp1h</td>
+<td フェイント_ガード="フェイント,ガード">ストック</td>
+<td>opp_1hand</td>
+<td>42.1</td>
+<td>-</td>
+<td>-</td>
+<td>54.8</td>
+<td>53.9</td>
+<td>0.0</td>
+<td>(insufficient data)</td>
+</tr>
+<tr>
+<td>stock_フェイント+クイック_neutral</td>
+<td フェイント_クイック="フェイント,クイック">ストック</td>
+<td>neutral</td>
+<td>57.1</td>
+<td>-</td>
+<td>-</td>
+<td>49.9</td>
+<td>44.8</td>
+<td>0.0</td>
+<td>(insufficient data)</td>
+</tr>
+<tr>
+<td>stock_フェイント+スキップ_neutral</td>
+<td フェイント_スキップ="フェイント,スキップ">ストック</td>
+<td>neutral</td>
+<td>58.7</td>
+<td>-</td>
+<td>-</td>
+<td>53.3</td>
+<td>48.0</td>
+<td>0.0</td>
+<td>(insufficient data)</td>
+</tr>
+<tr>
+<td>stock_フェイント+フラッシュ_neutral</td>
+<td フェイント_フラッシュ="フェイント,フラッシュ">ストック</td>
+<td>neutral</td>
+<td>57.6</td>
+<td>-</td>
+<td>-</td>
+<td>78.7</td>
+<td>39.7</td>
+<td>0.0</td>
+<td>(insufficient data)</td>
+</tr>
+<tr>
+<td>stock_フェイント+フラッシュ_opp1h</td>
+<td フェイント_フラッシュ="フェイント,フラッシュ">ストック</td>
+<td>opp_1hand</td>
+<td>41.2</td>
+<td>-</td>
+<td>-</td>
+<td>22.3</td>
+<td>62.8</td>
+<td>0.0</td>
+<td>(insufficient data)</td>
+</tr>
+<tr>
+<td>stock_フェイント_neutral</td>
+<td フェイント="フェイント">ストック</td>
+<td>neutral</td>
+<td>55.5</td>
+<td>48.2</td>
+<td>-0.166</td>
+<td>42.9</td>
+<td>40.8</td>
+<td>45.6</td>
+<td>setup is a real cost (opponent defuses)</td>
+</tr>
+<tr>
+<td>stock_フェイント_opp1h</td>
+<td フェイント="フェイント">ストック</td>
+<td>opp_1hand</td>
+<td>38.3</td>
+<td>31.5</td>
+<td>-0.232</td>
+<td>49.6</td>
+<td>50.6</td>
+<td>16.1</td>
+<td>setup is a real cost (opponent defuses)</td>
+</tr>
+<tr>
+<td>stock_フラッシュ+ガード_neutral</td>
+<td フラッシュ_ガード="フラッシュ,ガード">ストック</td>
+<td>neutral</td>
+<td>56.0</td>
+<td>-</td>
+<td>-</td>
+<td>0.0</td>
+<td>0.0</td>
+<td>0.0</td>
+<td>AI barely plays it</td>
+</tr>
+<tr>
+<td>stock_フラッシュ+ガード_opp1h</td>
+<td フラッシュ_ガード="フラッシュ,ガード">ストック</td>
+<td>opp_1hand</td>
+<td>38.0</td>
+<td>-</td>
+<td>-</td>
+<td>17.9</td>
+<td>14.0</td>
+<td>0.0</td>
+<td>(insufficient data)</td>
+</tr>
+<tr>
+<td>stock_フラッシュ_neutral</td>
+<td フラッシュ="フラッシュ">ストック</td>
+<td>neutral</td>
+<td>55.1</td>
+<td>47.3</td>
+<td>-0.131</td>
+<td>0.0</td>
+<td>1.1</td>
+<td>61.7</td>
+<td>setup is a real cost (opponent defuses); AI barely plays it</td>
+</tr>
+<tr>
+<td>stock_フラッシュ_opp1h</td>
+<td フラッシュ="フラッシュ">ストック</td>
+<td>opp_1hand</td>
+<td>38.0</td>
+<td>30.2</td>
+<td>-0.189</td>
+<td>21.7</td>
+<td>17.9</td>
+<td>12.7</td>
+<td>setup is a real cost (opponent defuses)</td>
+</tr>
+<tr>
+<td>ガード_neutral</td>
+<td>ガード</td>
+<td>neutral</td>
+<td>55.9</td>
+<td>52.6</td>
+<td>-0.026</td>
+<td>0.0</td>
+<td>0.0</td>
+<td>61.7</td>
+<td>setup is a real cost (opponent defuses); activated state is strong once reached; AI barely plays it</td>
+</tr>
+<tr>
+<td>ガード_opp_1hand</td>
+<td>ガード</td>
+<td>opp_1hand</td>
+<td>38.7</td>
+<td>35.0</td>
+<td>-0.092</td>
+<td>0.0</td>
+<td>0.0</td>
+<td>13.0</td>
+<td>setup is a real cost (opponent defuses); AI barely plays it</td>
+</tr>
+<tr>
+<td>タイム_neutral</td>
+<td>タイム</td>
+<td>neutral</td>
+<td>50.7</td>
+<td>45.9</td>
+<td>-0.159</td>
+<td>0.0</td>
+<td>0.0</td>
+<td>61.7</td>
+<td>setup is a real cost (opponent defuses); AI barely plays it</td>
+</tr>
+<tr>
+<td>タイム_opp_1hand</td>
+<td>タイム</td>
+<td>opp_1hand</td>
+<td>35.3</td>
+<td>30.4</td>
+<td>-0.186</td>
+<td>0.0</td>
+<td>0.0</td>
+<td>13.0</td>
+<td>setup is a real cost (opponent defuses); AI barely plays it</td>
+</tr>
+<tr>
+<td>ロック_neutral</td>
+<td>ロック</td>
+<td>neutral</td>
+<td>66.9</td>
+<td>50.6</td>
+<td>-0.064</td>
+<td>0.0</td>
+<td>0.0</td>
+<td>61.7</td>
+<td>setup is a real cost (opponent defuses); activated state is strong once reached; AI barely plays it</td>
+</tr>
+<tr>
+<td>ロック_opp_1hand</td>
+<td>ロック</td>
+<td>opp_1hand</td>
+<td>64.3</td>
+<td>35.5</td>
+<td>-0.084</td>
+<td>0.0</td>
+<td>0.0</td>
+<td>13.0</td>
+<td>setup is a real cost (opponent defuses); activated state is strong once reached; AI barely plays it</td>
+</tr>
+</tbody>
+</table>
+<p>詳細JSON: <code>SCRATCH/probe_results/*.json</code>（実験ごとチェックポイント）。自己完結HTML: <code>results/skill_value_probe_2026-07-14.html</code>。</p>
 </article>
 <footer>results/docs/ — <code>python -m complete_ai.build_report_hub</code> で再生成</footer>
 </div></body></html>

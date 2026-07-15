@@ -40,6 +40,7 @@ from .constants import (
     SKIP,
     STOCK,
 )
+from .choice_collapse import collapse_choice_actions
 from .endgame_db import EndgameDB, compute_closure, solve_closure
 from .fast_solver import FastHorizonSolver
 from .finite_horizon import material_leaf_evaluator
@@ -235,7 +236,11 @@ def deviation_scan(
                     else:
                         sign = 1.0 if result.same_turn_player else -1.0
                         matrix[r, c] = sign * gamma * db.values[result.next_state]
-            _, _, ntp_mixture = solve_small_zero_sum(matrix)
+            # CHOICE fix: collapse before solving (only the column/NTP
+            # mixture is used below, so the row collapse is transparent to
+            # the caller — see choice_collapse.py).
+            _, collapsed_matrix, _ = collapse_choice_actions(tp_actions, matrix)
+            _, _, ntp_mixture = solve_small_zero_sum(collapsed_matrix)
 
             # Deviation: STOCK the excluded skill (thumb choice: best gain).
             thumbs = sorted({action.thumb for action in tp_actions})

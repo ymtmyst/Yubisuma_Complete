@@ -25,6 +25,7 @@ from pathlib import Path
 import numpy as np
 
 from .actions import RulesConfig, legal_ntp_actions, legal_tp_actions
+from .choice_collapse import choice_row_groups, collapse_rows_by_sources
 from .small_matrix import solve_small_zero_sum
 from .state import State
 from .transition import transition
@@ -90,9 +91,15 @@ def solve_closure(
     const_m: list[np.ndarray] = []
     idx_m: list[np.ndarray] = []
     sign_m: list[np.ndarray] = []
+    # CHOICE fix: the row grouping (which raw rows collapse to a per-column
+    # max — see choice_collapse.py) depends only on the action LIST, which is
+    # fixed across VI iterations, so it is precomputed once per state here.
+    row_sources_m: list[list[tuple[int, ...]]] = []
     for state in unsolved:
         tp_actions = legal_tp_actions(state, config)
         ntp_actions = legal_ntp_actions(state, config)
+        _, row_sources = choice_row_groups(tp_actions)
+        row_sources_m.append(row_sources)
         rows, cols = len(tp_actions), len(ntp_actions)
         const = np.zeros((rows, cols))
         idx = np.full((rows, cols), -1, dtype=np.int64)
@@ -131,6 +138,7 @@ def solve_closure(
             matrix = const_m[i] + np.where(
                 idx >= 0, sign_m[i] * gamma * values[np.maximum(idx, 0)], 0.0
             )
+            matrix = collapse_rows_by_sources(matrix, row_sources_m[i])
             new_value, _, _ = solve_small_zero_sum(matrix)
             delta = abs(new_value - values[i])
             if delta > max_delta:
@@ -146,6 +154,7 @@ def solve_closure(
         matrix = const_m[i] + np.where(
             idx >= 0, sign_m[i] * gamma * values[np.maximum(idx, 0)], 0.0
         )
+        matrix = collapse_rows_by_sources(matrix, row_sources_m[i])
         value, _, _ = solve_small_zero_sum(matrix)
         max_residual = max(max_residual, abs(value - values[i]))
 

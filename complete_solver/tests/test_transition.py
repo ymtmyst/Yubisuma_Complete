@@ -54,6 +54,40 @@ class CompleteTransitionTests(unittest.TestCase):
         self.assertEqual(result.terminal_reward, 1.0)
         self.assertIsNone(result.next_state)
 
+    def test_winning_drop_is_cancelled_until_both_players_have_declared(self) -> None:
+        state = State(
+            me=PlayerState(hands=1, quick_level=1),
+            opp=PlayerState(has_declared_skill=False),
+        )
+
+        result = transition(state, TPAction("クイック", thumb=0), NTPAction(NONE, thumb=0))
+
+        self.assertIsNone(result.terminal_reward)
+        self.assertEqual(result.next_state.opp.hands, 1)
+        self.assertIn("premature_win_cancelled_me", result.events)
+
+    def test_two_hand_winning_effect_is_entirely_cancelled_before_first_reply(self) -> None:
+        state = State(
+            me=PlayerState(hands=2, quick_level=2),
+            opp=PlayerState(has_declared_skill=False),
+        )
+
+        result = transition(state, TPAction("クイック", thumb=0), NTPAction(NONE, thumb=0))
+
+        self.assertIsNone(result.terminal_reward)
+        self.assertEqual(result.next_state.opp.hands, 2)
+        self.assertIn("quick_premature_win_cancelled", result.events)
+
+    def test_winning_drop_works_after_both_players_have_declared(self) -> None:
+        state = State(
+            me=PlayerState(hands=1, quick_level=1, has_declared_skill=True),
+            opp=PlayerState(has_declared_skill=True),
+        )
+
+        result = transition(state, TPAction("クイック", thumb=0), NTPAction(NONE, thumb=0))
+
+        self.assertEqual(result.terminal_reward, 1.0)
+
     def test_stock_is_a_finite_set_without_duplicates(self) -> None:
         state = State(previous_skill=FLASH, me=PlayerState(stock=frozenset({FLASH})))
 

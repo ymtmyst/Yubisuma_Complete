@@ -907,3 +907,56 @@
 - **平易版**: 「採点ツールが壊れて画面が溢れた」件を調べたら、壊れていなかった——採点ツールは"より厳しく正確な採点法"に意図的に変えてあり(前回そう記録済み)、氾濫はただの進捗ログの出し過ぎと、比べてはいけない2つを比べた確認スクリプトのせい。答案(AI本体)は無傷。将来また誤解しないよう説明書きと自動チェックを足した。
 
 ### 【決定(2026-07-14)】本採用 = graph-vi 継続(a0・長期スキル使用で僅優、N7-A本命路線と整合)。exploitability の互角を踏まえ**最終決着は graph-BR(厳密exploitability)の finalize に委ねる**。それまで value_gvi_latest.pt を本採用維持。次アクション候補: graph_br finalize(凍結方策バッチ化+連立VI njit化 or 深さ制限BR+厳密終盤テーブル葉)。**注意: play_cli/play_server/policy_report の既定 --model が value_latest.pt(depth) のため、配信で graph-vi を使うなら明示指定 or 既定変更が必要**。
+
+### N7-G セメント強制プローブ(長期スキル過小評価の診断、2026-07-14) — 単発は不支持・多手/非中立は未検証
+- **目的**: ユーザー懸念「セメント/ロック/チャージ/タイム等の長期スキルを、遅効性ゆえ net が過小評価し AI が使わないのでは(鶏卵)」を直接診断。ツール scratchpad/cement_probe.py・cement_depth_scan.py・cement_fullwidth.py(いずれも測定専用、モデル・データ不変)。
+- **設計**: 相手がセメントされた局面(opp.cement∈{0,1,2}, mover=活用側)を構築。深い選択的探索(SelectiveSearcher)+A0厳密葉(_net_one を EndgameTablebase で上書き=「深い選択的×挟み撃ち」を合成)で ①局面価値 ②均衡方策 ③強制Q(自TP=スキルを強制し相手均衡NTP混合で深部評価、Q>V=過小評価の穴)を測定。ナッシュ規律: 強制は測定のためだけ。
+- **結果**:
+  - **相手セメントは強い**: mover価値 無0.077→1個0.13→2個0.255。**net はこれを正しく捉える**(net0/d2≈deep、2個で net0.231/deep0.255)=かかった後の局面は盲点でない。
+  - **2個かかった局面の深い最適=ロック58%+フラッシュ17%+スキップ25%** → ユーザーの「セメント→ロック/フラッシュ相関」仮説を実証。しかも**deployed 深さ2エージェントも同分布(ロック57/フラッシュ16%)** → 「AIはこれらを一切使わない」は不正確、**条件付きで正しく使えている**。
+  - **中立からのセメント強制Qは深さ3→7でフラット −0.04(gap −0.12)**。**全幅(tau<0, 枝刈りなし)でも深さ3→5でフラット −0.036→−0.034**(深さ5全幅=22分)=**horizon でも枝刈り交絡でもない**。真因=**相手は反応thumb=0でセメントを62%不発化できる**(defuse)。かかった後(opp_cem2)は defuse 0%(相手は下げられず拘束確定)。
+- **結論(正直)**: **「AIが長期スキルを horizon で過小評価」仮説は、単発セメント・中立局面では不支持**。AIは間違っておらず、セメントの条件付き価値を正しく評価している。**射程外の未解決**: ①多手コンボ(相手を拘束に追い込む手順)②非中立局面(相手が指を上げざるを得ない=セメントが強く到達可能かもしれない局面)。単発強制Qツールはほぼ出し切った。
+- **次の妥当な一手**: **自己対戦サンプル局面への強制Q掃引**(3手構築局面でなく実分布上で、候補スキルが「AIが打たない profitable deviation」になる局面を探す)。それでも多手コンボは別機構(強制シーケンス/カリキュラム)が要る。
+
+
+### N7-G2 スキル別 setup-cost/activated-value プローブ
+
+_計測日 2026-07-14。SCRATCH/skill_probe.py（測定専用ハーネス、models/data/complete_solver/complete_ai は一切改変せず）。selective depth 5 tau 0.02 を headline、depth-scan [3, 4, 5, 6]、full-width(tau<0) は CHARGE のみ de-confound。全数値 win%=100*(v+1)/2 も併記。_
+
+狙い: 採用AIが ~0% しか使わないスキルについて、(1) 発動済み状態の価値、(2) 中立位置から宣言する setup-cost（forced-Q vs 均衡値 V）、(3) 実使用率 を数値化し、真に弱い（後日バフ候補の）スキルを切り分ける。
+
+| experiment | skill | context | 発動済 win% | setup win% | setup gap | deployed使用% | deep使用% | opp defuse% | 所見 |
+|---|---|---|---|---|---|---|---|---|---|
+| charge_neutral | チャージ | neutral | 60.1 | 49.5 | -0.087 | 0.0 | 0.0 | 61.7 | setup is a real cost (opponent defuses); activated state is strong once reached; AI barely plays it |
+| charge_opp_1hand | チャージ | opp_1hand | 49.8 | 32.8 | -0.137 | 0.0 | 0.0 | 13.0 | setup is a real cost (opponent defuses); AI barely plays it |
+| stock_ガード_neutral | ストック {ガード} | neutral | 54.9 | 47.4 | -0.130 | 0.0 | 0.0 | 61.7 | setup is a real cost (opponent defuses); AI barely plays it |
+| stock_ガード_opp1h | ストック {ガード} | opp_1hand | 37.6 | 30.3 | -0.187 | 0.0 | 0.0 | 13.0 | setup is a real cost (opponent defuses); AI barely plays it |
+| stock_クイック_neutral | ストック {クイック} | neutral | 55.0 | 47.3 | -0.130 | 0.0 | 0.0 | 61.7 | setup is a real cost (opponent defuses); AI barely plays it |
+| stock_スキップ_neutral | ストック {スキップ} | neutral | 54.9 | 45.9 | -0.205 | 0.0 | 0.0 | 0.0 | setup is a real cost (opponent defuses); AI barely plays it |
+| stock_フェイント+ガード_neutral | ストック {フェイント,ガード} | neutral | 59.3 | - | - | 55.0 | 50.2 | 0.0 | (insufficient data) |
+| stock_フェイント+ガード_opp1h | ストック {フェイント,ガード} | opp_1hand | 42.1 | - | - | 54.8 | 53.9 | 0.0 | (insufficient data) |
+| stock_フェイント+クイック_neutral | ストック {フェイント,クイック} | neutral | 57.1 | - | - | 49.9 | 44.8 | 0.0 | (insufficient data) |
+| stock_フェイント+スキップ_neutral | ストック {フェイント,スキップ} | neutral | 58.7 | - | - | 53.3 | 48.0 | 0.0 | (insufficient data) |
+| stock_フェイント+フラッシュ_neutral | ストック {フェイント,フラッシュ} | neutral | 57.6 | - | - | 78.7 | 39.7 | 0.0 | (insufficient data) |
+| stock_フェイント+フラッシュ_opp1h | ストック {フェイント,フラッシュ} | opp_1hand | 41.2 | - | - | 22.3 | 62.8 | 0.0 | (insufficient data) |
+| stock_フェイント_neutral | ストック {フェイント} | neutral | 55.5 | 48.2 | -0.166 | 42.9 | 40.8 | 45.6 | setup is a real cost (opponent defuses) |
+| stock_フェイント_opp1h | ストック {フェイント} | opp_1hand | 38.3 | 31.5 | -0.232 | 49.6 | 50.6 | 16.1 | setup is a real cost (opponent defuses) |
+| stock_フラッシュ+ガード_neutral | ストック {フラッシュ,ガード} | neutral | 56.0 | - | - | 0.0 | 0.0 | 0.0 | AI barely plays it |
+| stock_フラッシュ+ガード_opp1h | ストック {フラッシュ,ガード} | opp_1hand | 38.0 | - | - | 17.9 | 14.0 | 0.0 | (insufficient data) |
+| stock_フラッシュ_neutral | ストック {フラッシュ} | neutral | 55.1 | 47.3 | -0.131 | 0.0 | 1.1 | 61.7 | setup is a real cost (opponent defuses); AI barely plays it |
+| stock_フラッシュ_opp1h | ストック {フラッシュ} | opp_1hand | 38.0 | 30.2 | -0.189 | 21.7 | 17.9 | 12.7 | setup is a real cost (opponent defuses) |
+| ガード_neutral | ガード | neutral | 55.9 | 52.6 | -0.026 | 0.0 | 0.0 | 61.7 | setup is a real cost (opponent defuses); activated state is strong once reached; AI barely plays it |
+| ガード_opp_1hand | ガード | opp_1hand | 38.7 | 35.0 | -0.092 | 0.0 | 0.0 | 13.0 | setup is a real cost (opponent defuses); AI barely plays it |
+| タイム_neutral | タイム | neutral | 50.7 | 45.9 | -0.159 | 0.0 | 0.0 | 61.7 | setup is a real cost (opponent defuses); AI barely plays it |
+| タイム_opp_1hand | タイム | opp_1hand | 35.3 | 30.4 | -0.186 | 0.0 | 0.0 | 13.0 | setup is a real cost (opponent defuses); AI barely plays it |
+| ロック_neutral | ロック | neutral | 66.9 | 50.6 | -0.064 | 0.0 | 0.0 | 61.7 | setup is a real cost (opponent defuses); activated state is strong once reached; AI barely plays it |
+| ロック_opp_1hand | ロック | opp_1hand | 64.3 | 35.5 | -0.084 | 0.0 | 0.0 | 13.0 | setup is a real cost (opponent defuses); activated state is strong once reached; AI barely plays it |
+
+詳細JSON: `SCRATCH/probe_results/*.json`（実験ごとチェックポイント）。自己完結HTML: `results/skill_value_probe_2026-07-14.html`。
+
+
+### 壊れストック因果実験 + CHOICE後出しバグ修正(2026-07-15)
+- **CHOICE後出しバグ(ユーザー発見)を修正**: CHOICEは「宣言→相手反応公開→最適スキル選択」の後出しが正しいが、エンジンは事前コミット実装だった。全行列構築を列max崩し(choice_collapse.py)で修正、対局解決をresolve_tp_code化。ゲート全通過(既存139+29 PASS、reference==packed 38万状態で4e-10)。→ 組み上がったコンボは実は強い({フェイント,フラッシュ}=Nash-VI 70%)。
+- **壊れストック因果実験**: 「基本0%は盲点か真に弱いか」を切り分け。独立env トグル3種(YS_STOCK_FREECHOICE=任意スキルを任意ターンに/YS_STOCK_UNLIMITED_ALPHA=チョイス等の1フェーズ1回撤廃/YS_STOCK_FREETEMPO=宣言で追加1ターン)+既存YS_COUNTER_PIERCE。全OFFで基本不変。
+- **結果(graph-vi warm-start 12世代、resolve_tp_code確定値)**: 保持率 baseline **0%** → P1(貫通)**78.75%** / P2(テンポ無料)**77.74%** / P3(全4)**86.74%**。→ **壊すと学習系は即大量採用=基本0%は"真に割に合わない"正しい0%が確定**。CHOICE修正で「コンボは強いが到達コストが見合わない」が最終像。P1≈P2(貫通もテンポも単体で~78%誘発、テンポ単独律速説は撤回)。P3は退化しLP破綻(gen10打切り, チョイス:スキップ47.8%で追加ターン無限化)。
+- レポート: results/broken_stock_experiment_2026-07-15.html(ハブ登録)。基本ルールに復帰済(全トグルOFF)。
