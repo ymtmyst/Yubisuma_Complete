@@ -92,6 +92,20 @@ DOCS = [
      "深さを掘る以外で強くする路線の考察と設計案 A(サブグラフNash-VI)/B/C/D。", "hot"),
 ]
 
+# Isolated v1 beta branch. Sources live beside Complete/ and are rendered
+# into this hub so file:// users can read them without opening raw Markdown.
+BETA_DOCS = [
+    ("v1ベータ版 AI学習・評価", "../Beta_v1/AI_REPORT.md", "md",
+     "BETA_V1_AI_REPORT.html",
+     "4,000局面・3世代の学習結果。基準AIとの80局で53勝27敗（66.25%）。", "hot"),
+    ("v1ベータ版 遊び方・構成", "../Beta_v1/README.md", "md",
+     "BETA_V1_README.html",
+     "別起動、ミラー／ハンマーAB設定、再学習・テスト方法。", "hot"),
+    ("v1ベータ版 実装裁定書", "../Beta_v1/RULES_IMPLEMENTATION.md", "md",
+     "BETA_V1_RULES_IMPLEMENTATION.html",
+     "新ガード・セメント・ロック・チャージ・ストック・チョイス・タイム・ミラー・ハンマーの厳密裁定。", "base"),
+]
+
 # Rulebook (child-friendly, served from the game's webplay folder).
 RULEBOOK = ("📖 かんたんルールブック", "../complete_ai/webplay/rulebook.html",
             "わざの効果をやさしく説明（ビジュアル版）。", "base")
@@ -119,9 +133,20 @@ header p { margin: 0; color: #6b7280; font-size: 14px; }
 .hero .k { font-size: 12px; letter-spacing: .12em; text-transform: uppercase; opacity: .85; }
 .hero .t { font-size: 21px; font-weight: 700; margin: 4px 0 4px; }
 .hero .d { font-size: 14px; opacity: .92; }
-.hero.play { background: linear-gradient(135deg, #16a34a, #059669);
-  box-shadow: 0 8px 24px rgba(5,150,105,.32); margin: 28px 0 10px; }
-.hero.play .t { font-size: 24px; }
+.play-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 28px 0 10px; }
+.play-grid .hero.play { margin: 0; min-height: 156px; display: flex; flex-direction: column;
+  justify-content: center; }
+.hero.play.current { background: linear-gradient(135deg, #16a34a, #059669);
+  box-shadow: 0 8px 24px rgba(5,150,105,.32); }
+.hero.play.beta-play { background: linear-gradient(135deg, #2563eb, #7c3aed);
+  box-shadow: 0 8px 24px rgba(79,70,229,.30); }
+.hero.play .t { font-size: 21px; }
+@media (max-width: 619px) {
+  .play-grid { grid-template-columns: 1fr; }
+  .play-grid .hero.play { min-height: 132px; }
+}
+.hero.beta { background: linear-gradient(135deg, #ea580c, #db2777);
+  box-shadow: 0 8px 24px rgba(219,39,119,.28); }
 .note { font-size: 13px; color: #6b7280; background: #fff; border: 1px solid #e5e7eb;
   border-left: 4px solid #16a34a; border-radius: 10px; padding: 12px 14px; margin: 8px 0 0; line-height: 1.6; }
 .note code { background: #f3f4f6; padding: 1px 6px; border-radius: 5px; font-size: 12px; }
@@ -433,7 +458,7 @@ def build_docs() -> dict[str, str]:
     """Render each planning/log/rule doc to docs/*.html. Returns title->href."""
     DOCS_OUT.mkdir(parents=True, exist_ok=True)
     hrefs: dict[str, str] = {}
-    for title, src_rel, kind, out_name, _desc, _badge in DOCS:
+    for title, src_rel, kind, out_name, _desc, _badge in DOCS + BETA_DOCS:
         src = Path(src_rel)  # relative to Complete/ (cwd)
         if not src.exists():
             print(f"  ! skip {title}: source missing ({src})", flush=True)
@@ -456,20 +481,42 @@ def main() -> None:
             f'<div class="t">{html.escape(hero_title)}</div>'
             f'<div class="d">{html.escape(hero_desc)}</div></a>')
 
-    # Launch button — uses the yubisuma:// custom protocol (register once via
-    # AI対戦リンクを有効化.reg). Browsers cannot run a .bat from a file://
-    # link directly, so this protocol handler is the standard workaround.
+    # Two half-width launch buttons. The combined .reg setup registers both
+    # custom protocols because browsers cannot execute .bat from file://.
     play = (
-        '<a class="hero play" href="yubisuma://play">'
-        '<div class="k">クリックで起動</div>'
-        '<div class="t">▶ AI と対戦する</div>'
-        '<div class="d">初回のみ「AI対戦リンクを有効化.reg」を実行してください（下の注記）。'
-        '起動には十数秒かかり、ブラウザで対戦画面が開きます。</div></a>')
+        '<div class="play-grid">'
+        '<a class="hero play current" href="yubisuma://play">'
+        '<div class="k">ORIGINAL / 現行ルール</div>'
+        '<div class="t">▶ 現行版AIと対戦</div>'
+        '<div class="d">従来のCompleteルール。ブラウザ対戦画面を起動します。</div></a>'
+        '<a class="hero play beta-play" href="yubisuma-beta://play">'
+        '<div class="k">BETA / 新ルール</div>'
+        '<div class="t">🧪 新ルール版AIと対戦</div>'
+        '<div class="d">永続タイム・後出しチャージ・再展開ミラー・ハンマー版。'
+        'ブラウザ対戦画面を開き、開始前にAB設定を選べます。</div></a>'
+        '</div>')
 
     legend = ('<p class="legend">'
               f'{badge_span("hot")} いま動かしている最新情報　'
               f'{badge_span("base")} 土台・安定（随時参照）　'
               f'{badge_span("ref")} 参考・アーカイブ寄り</p>')
+
+    beta_hero = (
+        '<a class="hero beta" href="docs/BETA_V1_AI_REPORT.html">'
+        '<div class="k">NEW — v1からの独立ベータ分岐</div>'
+        '<div class="t">🧪 新ルール版・学習済みAI</div>'
+        '<div class="d">永続タイム、後出しチャージ、再展開ミラー、ハンマー等を実装。'
+        '4つのAB設定を学習し、基準AIとの80局で53勝27敗。</div></a>')
+
+    beta_cards = []
+    for t, src_rel, _kind, _out, d, b in BETA_DOCS:
+        href = doc_hrefs.get(t)
+        if href is None:
+            continue
+        beta_cards.append(card(t, href, d, badge=b, date=fmt_date(Path(src_rel))))
+    beta_html = section(
+        "Complete v1 ベータ分岐", len(beta_cards),
+        f'<div class="grid two">{"".join(beta_cards)}</div>', is_open=True)
 
     # フェーズ別レポート・ルール監査
     report_cards = "".join(
@@ -516,11 +563,14 @@ def main() -> None:
   <p>ミラー・リバーシ OFF / 探索中心アーキテクチャ。このページ1枚から全レポートへ。</p>
 </header>
 {play}
-<p class="note">💡 <b>「▶ AI と対戦する」を使うための初回セットアップ</b>：
+<p class="note">💡 <b>2つの対戦ボタンを使うための初回セットアップ</b>：
 Complete フォルダの <code>AI対戦リンクを有効化.reg</code> をダブルクリックし「はい」を押してください（1回だけ）。
-以降このボタンでゲームが起動します。うまくいかない時は <code>AIと対戦.bat</code> を直接ダブルクリックでもOK。</p>
+これ1つで現行版と新ルール版の両方が登録されます。うまくいかない時は、現行版は
+<code>Complete/AIと対戦.bat</code>、新ルール版は <code>Beta_v1/play_beta.bat</code> を直接ダブルクリックしてください。</p>
 {hero}
+{beta_hero}
 {legend}
+{beta_html}
 {reports}
 {docs_html}
 {endgame}

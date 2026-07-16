@@ -67,12 +67,13 @@ body {
   grid-template-columns: minmax(330px,1fr) 600px minmax(480px,1fr); gap: 85px;
   align-items: center; min-height: calc(100vh - 24px); padding: 0 24px; }
 .col-log { width: 330px; justify-self: end; }
-.col-board { width: 600px; max-width: 100%; justify-self: center; }
+.col-board { width: 600px; max-width: 100%; justify-self: center; align-self: stretch;
+  min-height: calc(100vh - 24px); padding-top: 72px; box-sizing: border-box; }
 .col-controls { width: 480px; justify-self: start; }
 
 /* ---- 形勢メーター(横長・パネルよりわずかに短い幅) ---- */
 .meter { background: var(--card); border-radius: 12px; box-shadow: var(--shadow); padding: 7px 16px;
-  max-width: 460px; margin: 0 auto; }
+  max-width: 460px; margin: 0 auto 30px; }
 .meter-title { font-size: 10.5px; font-weight: 800; color: var(--muted); text-align: center; margin-bottom: 5px; }
 .meter-bar { display: flex; height: 18px; border-radius: 999px; overflow: hidden;
   box-shadow: inset 0 1px 3px rgba(0,0,0,.12); }
@@ -82,7 +83,7 @@ body {
 .mb-ai  { background: linear-gradient(90deg, #ff6b6b, #eb5757); justify-content: flex-end; padding-right: 9px; }
 
 .player-panel { background: var(--card); border-radius: 18px; box-shadow: var(--shadow);
-  padding: 9px 18px; margin: 10px 0; border: 3px solid transparent;
+  padding: 12px 18px; margin: 0 0 20px; border: 3px solid transparent;
   transition: background .25s, border-color .25s, box-shadow .25s; }
 .player-panel.drop { animation: shake .4s ease; }
 @keyframes shake { 0%,100%{transform:translateX(0);} 20%{transform:translateX(-6px);}
@@ -95,15 +96,15 @@ body {
   box-shadow: 0 6px 20px rgba(47,128,237,.20); }
 .player-panel.ai.turn-active { background: #ffecec; border-color: #ffb3b3;
   box-shadow: 0 6px 20px rgba(235,87,87,.20); }
-.panel-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px; }
+.panel-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
 .who { font-weight: 800; font-size: 16px; }
 .player-panel.ai .who { color: var(--ai); }
 .player-panel.human .who { color: var(--human); }
 .badge { font-size: 12px; font-weight: 700; color: #fff; background: var(--accent);
   border-radius: 999px; padding: 3px 10px; }
 .badge:empty { display: none; }
-.hands { display: flex; gap: 10px; justify-content: center; padding: 2px 0; }
-.hand { font-size: 34px; filter: drop-shadow(0 3px 4px rgba(0,0,0,.12)); animation: pop .3s ease; }
+.hands { display: flex; gap: 10px; justify-content: center; padding: 6px 0; }
+.hand { font-size: 40px; filter: drop-shadow(0 3px 4px rgba(0,0,0,.12)); animation: pop .3s ease; }
 .hand.down { opacity: .22; filter: grayscale(1); }
 .meta { display: flex; flex-wrap: wrap; gap: 9px; justify-content: center; min-height: 24px; align-items:center; }
 .chip { font-size: 13px; font-weight:700;background: #eef1f7; border-radius: 999px; padding: 6px 11px; color: #445; }
@@ -116,9 +117,9 @@ body {
 .stock-child small{font-size:9px;font-weight:800;margin-top:3px;color:#765a0d}
 
 /* ---- 直前のやりとり ---- 横幅せまめ・中央寄せ・脇役 ---- */
-.exchange { margin: 22px auto; padding: 16px 20px; border-radius: 18px; background: #fff;
+.exchange { margin: 0 auto 20px; padding: 12px 18px; border-radius: 18px; background: #fff;
   box-shadow: var(--shadow); display: flex; align-items: center; justify-content: center;
-  gap: 14px; min-height: 172px; max-width: 560px; flex-wrap: wrap; animation: pop .28s ease; }
+  gap: 12px; min-height: 126px; max-width: 520px; flex-wrap: wrap; animation: pop .28s ease; }
 .exchange .ex-empty { color: var(--muted); font-weight: 700; font-size: 13px; }
 .ex-side { font-size: 11px; font-weight: 800; padding: 2px 7px; border-radius: 999px; color:#fff; }
 .ex-side.ai { background: var(--ai); } .ex-side.human { background: var(--human); }
@@ -239,7 +240,7 @@ body {
 /* ---- レスポンシブ ---- */
 @media (max-width: 1600px) {
   #game { display:flex;flex-wrap:wrap;gap:24px;align-items:flex-start;justify-content:center;min-height:auto;padding-top:8px; }
-  .col-board { order: 1; flex:0 0 600px; }
+  .col-board { order: 1; flex:0 0 600px; min-height:0; padding-top:0; }
   .col-controls { order: 2; flex:0 0 480px; }
   .col-log { order: 3; flex:0 0 100%;width:100%;max-height:200px; }
 }

@@ -1295,6 +1295,13 @@ footer { margin-top: 40px; font-size: 12px; color: #9ca3af; text-align: center; 
 </tbody>
 </table>
 <p>詳細JSON: <code>SCRATCH/probe_results/*.json</code>（実験ごとチェックポイント）。自己完結HTML: <code>results/skill_value_probe_2026-07-14.html</code>。</p>
+<h3 id="choice2026-07-15">壊れストック因果実験 + CHOICE後出しバグ修正(2026-07-15)</h3>
+<ul>
+<li><strong>CHOICE後出しバグ(ユーザー発見)を修正</strong>: CHOICEは「宣言→相手反応公開→最適スキル選択」の後出しが正しいが、エンジンは事前コミット実装だった。全行列構築を列max崩し(choice_collapse.py)で修正、対局解決をresolve_tp_code化。ゲート全通過(既存139+29 PASS、reference==packed 38万状態で4e-10)。→ 組み上がったコンボは実は強い({フェイント,フラッシュ}=Nash-VI 70%)。</li>
+<li><strong>壊れストック因果実験</strong>: 「基本0%は盲点か真に弱いか」を切り分け。独立env トグル3種(YS_STOCK_FREECHOICE=任意スキルを任意ターンに/YS_STOCK_UNLIMITED_ALPHA=チョイス等の1フェーズ1回撤廃/YS_STOCK_FREETEMPO=宣言で追加1ターン)+既存YS_COUNTER_PIERCE。全OFFで基本不変。</li>
+<li><strong>結果(graph-vi warm-start 12世代、resolve_tp_code確定値)</strong>: 保持率 baseline <strong>0%</strong> → P1(貫通)<strong>78.75%</strong> / P2(テンポ無料)<strong>77.74%</strong> / P3(全4)<strong>86.74%</strong>。→ <strong>壊すと学習系は即大量採用=基本0%は"真に割に合わない"正しい0%が確定</strong>。CHOICE修正で「コンボは強いが到達コストが見合わない」が最終像。P1≈P2(貫通もテンポも単体で~78%誘発、テンポ単独律速説は撤回)。P3は退化しLP破綻(gen10打切り, チョイス:スキップ47.8%で追加ターン無限化)。</li>
+<li>レポート: results/broken_stock_experiment_2026-07-15.html(ハブ登録)。基本ルールに復帰済(全トグルOFF)。</li>
+</ul>
 </article>
 <footer>results/docs/ — <code>python -m complete_ai.build_report_hub</code> で再生成</footer>
 </div></body></html>
